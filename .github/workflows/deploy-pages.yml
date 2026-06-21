@@ -1,0 +1,45 @@
+name: Deploy Web (GitHub Pages)
+
+# Publica a versao web (PWA) da pasta webapp/ no GitHub Pages.
+# Depois do primeiro deploy, o app fica em:
+#   https://criadorcardeal.github.io/Camera-Fantasma/
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "webapp/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Garante um deploy por vez
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Enviar arquivos do app web
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: webapp
+
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

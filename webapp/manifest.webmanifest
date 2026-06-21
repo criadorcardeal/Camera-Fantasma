@@ -1,0 +1,19 @@
+{
+  "name": "Fotos Fantasma",
+  "short_name": "Fotos Fantasma",
+  "description": "Fotos comparativas para angiologia com Ghost Overlay.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0e2a3b",
+  "theme_color": "#0e2a3b",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

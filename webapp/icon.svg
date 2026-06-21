@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0e2a3b"/>
+  <!-- fantasma -->
+  <path d="M256 120c-66 0-120 54-120 120v150c0 10 12 16 20 9l28-22 30 24c6 5 14 5 20 0l30-24 30 24c6 5 14 5 20 0l30-24 28 22c8 7 20 1 20-9V240c0-66-54-120-120-120z" fill="#ffffff" opacity="0.92"/>
+  <circle cx="218" cy="236" r="16" fill="#0e2a3b"/>
+  <circle cx="294" cy="236" r="16" fill="#0e2a3b"/>
+  <!-- lente de camera -->
+  <circle cx="256" cy="300" r="40" fill="none" stroke="#1b5e8c" stroke-width="12"/>
+  <circle cx="256" cy="300" r="16" fill="#f2b705"/>
+</svg>
