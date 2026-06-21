@@ -71,20 +71,28 @@ html, body {
 }
 .empty .big { font-size: 3rem; }
 
-.fab {
+.fab-row {
   position: fixed;
   bottom: max(env(safe-area-inset-bottom), 16px);
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0; right: 0;
+  display: flex; justify-content: center; gap: 10px;
+  padding: 0 16px;
+}
+.fab {
   background: var(--primary);
   color: #fff;
   border: none;
   border-radius: 28px;
-  padding: 14px 24px;
+  padding: 14px 22px;
   font-size: 1rem;
   font-weight: 600;
   box-shadow: 0 4px 12px rgba(0,0,0,0.25);
   cursor: pointer;
+}
+.fab-secondary {
+  background: #fff;
+  color: var(--primary);
+  border: 1.5px solid var(--primary);
 }
 
 /* ---------- Camera ---------- */

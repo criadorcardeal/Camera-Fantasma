@@ -320,6 +320,60 @@ const Cam = {
   },
 };
 
+/* ---------------- Importar foto (galeria / nuvem via Arquivos) ---------------- */
+
+// Reduz a imagem para no maximo `maxSize` px no maior lado e devolve um JPEG
+// em dataURL. Evita guardar fotos enormes (12MP) no aparelho.
+function downscaleImage(file, maxSize) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
+        const scale = Math.min(1, maxSize / Math.max(w, h));
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+        const c = document.createElement("canvas");
+        c.width = w;
+        c.height = h;
+        c.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL("image/jpeg", 0.9));
+      };
+      img.onerror = () => reject(new Error("Não foi possível ler a imagem."));
+      img.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error("Falha ao abrir o arquivo."));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function importBasePhoto(file) {
+  if (!file) return;
+  let dataUrl;
+  try {
+    dataUrl = await downscaleImage(file, 1600);
+  } catch (e) {
+    alert(e.message || "Não foi possível usar esta imagem.");
+    return;
+  }
+  const distance = await openDistanceDialog(null);
+  if (distance == null) return;
+  const session = {
+    id: String(Date.now()),
+    createdAt: new Date().toISOString(),
+    baseImage: dataUrl,
+    baseDistance: distance,
+    filters: { brightness: 1, contrast: 1, saturate: 1 },
+    followImage: null,
+    followDistance: null,
+    followAt: null,
+  };
+  await DB.put(session);
+  await openDetail(session.id);
+}
+
 /* ---------------- Diálogo de distância ---------------- */
 function openDistanceDialog(target) {
   return new Promise((resolve) => {
@@ -451,6 +505,12 @@ function renderCompare(mode) {
 /* ---------------- Eventos globais ---------------- */
 function wireEvents() {
   $("#btn-new").addEventListener("click", () => Cam.open("base"));
+  $("#btn-import").addEventListener("click", () => $("#import-input").click());
+  $("#import-input").addEventListener("change", async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ""; // permite reimportar o mesmo arquivo depois
+    await importBasePhoto(file);
+  });
   $("#cam-close").addEventListener("click", async () => {
     Cam.stop();
     showScreen("screen-home");

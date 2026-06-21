@@ -21,6 +21,9 @@ enquadramento, distância e iluminação.
   base (exposição travada + ajuste, zoom e flash) para deixar as imagens
   semelhantes.
 - **Comparação antes/depois** – cortina deslizante, lado a lado ou sobreposição.
+- **Importar foto base** – usar uma foto já existente como base do Ghost Overlay,
+  vinda da galeria do aparelho ou da nuvem (pelo app Arquivos do iOS: iCloud
+  Drive, Google Drive, OneDrive, Dropbox, se instalados).
 
 As fotos ficam **somente no aparelho** (sem nuvem). Nome/código, banco por
 objeto e animações antes/depois são da **versão paga** (próxima fase).

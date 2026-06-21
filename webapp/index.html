@@ -19,7 +19,11 @@
       <h1>Fotos Fantasma</h1>
     </header>
     <div class="content" id="home-list"></div>
-    <button id="btn-new" class="fab">+ Nova foto base</button>
+    <div class="fab-row">
+      <button id="btn-import" class="fab fab-secondary">🖼 Importar</button>
+      <button id="btn-new" class="fab">📷 Nova foto</button>
+    </div>
+    <input type="file" id="import-input" accept="image/*" hidden />
   </section>
 
   <!-- ============ TELA: CÂMERA ============ -->
