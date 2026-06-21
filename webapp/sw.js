@@ -1,5 +1,6 @@
-/* Service worker simples: cache do "app shell" para abrir offline. */
-const CACHE = "fotos-fantasma-v1";
+/* Service worker: network-first (sempre pega a versao nova quando online;
+   usa o cache apenas como reserva offline). */
+const CACHE = "fotos-fantasma-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -27,6 +28,12 @@ self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
   e.respondWith(
-    caches.match(req).then((cached) => cached || fetch(req).catch(() => cached))
+    fetch(req)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(req))
   );
 });

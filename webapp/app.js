@@ -125,7 +125,17 @@ const Cam = {
     return `brightness(${f.brightness}) contrast(${f.contrast}) saturate(${f.saturate})`;
   },
   applyLiveFilter() {
-    $("#video").style.filter = this.filterString(this.filters());
+    // No iOS/Safari, aplicar filtro CSS direto no <video> ao vivo deixa a
+    // imagem preta. Por isso o ajuste NAO vai no preview: ele e "impresso" na
+    // foto no momento da captura. Aqui so atualizamos os rotulos dos sliders.
+    const set = (id, name) => {
+      const inp = $(id);
+      inp.parentElement.querySelector("span").textContent =
+        name + " " + parseFloat(inp.value).toFixed(2);
+    };
+    set("#f-brightness", "Brilho");
+    set("#f-contrast", "Contraste");
+    set("#f-saturate", "Saturação");
   },
 
   async open(mode, session) {
@@ -167,22 +177,37 @@ const Cam = {
   },
 
   async start() {
+    const video = $("#video");
+    // Propriedades exigidas pelo iOS para tocar o video da camera inline.
+    video.muted = true;
+    video.setAttribute("playsinline", "");
+    video.setAttribute("autoplay", "");
+    $("#cam-start").hidden = true;
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        video: { facingMode: { ideal: "environment" } },
         audio: false,
       });
-      const video = $("#video");
       video.srcObject = this.stream;
-      await video.play().catch(() => {});
       this.track = this.stream.getVideoTracks()[0];
       this.setupTorchButton();
+
+      // Quando os metadados chegam, o video ja tem dimensoes e pode tocar.
+      video.onloadedmetadata = () => {
+        video.play().catch(() => this.showStartButton());
+      };
+      const p = video.play();
+      if (p && p.catch) p.catch(() => this.showStartButton());
     } catch (e) {
       this.showError(
         "Não foi possível acessar a câmera. Verifique a permissão da câmera " +
         "para este site nas configurações do navegador.\n\n(" + e.message + ")"
       );
     }
+  },
+
+  showStartButton() {
+    $("#cam-start").hidden = false;
   },
 
   setupTorchButton() {
@@ -239,7 +264,11 @@ const Cam = {
 
   async shoot() {
     const video = $("#video");
-    if (!video.videoWidth) return;
+    if (!video.videoWidth) {
+      this.flash("Câmera ainda carregando… aguarde 1 segundo e toque de novo.");
+      try { await video.play(); } catch (_) {}
+      return;
+    }
     const canvas = $("#canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -419,6 +448,10 @@ function wireEvents() {
   });
   $("#cam-shoot").addEventListener("click", () => Cam.shoot());
   $("#cam-torch").addEventListener("click", () => Cam.toggleTorch());
+  $("#cam-start").querySelector("button").addEventListener("click", async () => {
+    $("#cam-start").hidden = true;
+    try { await $("#video").play(); } catch (_) {}
+  });
   $("#ghost-opacity").addEventListener("input", (e) => {
     $("#ghost").style.opacity = e.target.value;
   });
