@@ -192,12 +192,22 @@ const Cam = {
       this.track = this.stream.getVideoTracks()[0];
       this.setupTorchButton();
 
-      // Quando os metadados chegam, o video ja tem dimensoes e pode tocar.
-      video.onloadedmetadata = () => {
-        video.play().catch(() => this.showStartButton());
+      // Tenta tocar (no iOS o play() pode "rejeitar" mesmo indo tocar, entao
+      // ignoramos o erro aqui e verificamos de verdade logo depois).
+      const tryPlay = () => {
+        const pr = video.play();
+        if (pr && pr.catch) pr.catch(() => {});
       };
-      const p = video.play();
-      if (p && p.catch) p.catch(() => this.showStartButton());
+      video.onloadedmetadata = tryPlay;
+      tryPlay();
+      // So mostra o botao manual se, apos 1s, o video realmente nao tocou.
+      setTimeout(() => {
+        if (video.paused || !video.videoWidth) {
+          this.showStartButton();
+        } else {
+          $("#cam-start").hidden = true;
+        }
+      }, 1000);
     } catch (e) {
       this.showError(
         "Não foi possível acessar a câmera. Verifique a permissão da câmera " +
