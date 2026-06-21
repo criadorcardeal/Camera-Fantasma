@@ -34,8 +34,6 @@ jobs:
 
       - name: Configurar Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Enviar arquivos do app web
         uses: actions/upload-pages-artifact@v3
