@@ -1,0 +1,25 @@
+name: fotos_fantasma
+description: "Fotos Fantasma - app de fotos comparativas para angiologia (Ghost Overlay)."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  camera: ^0.11.0+2
+  path_provider: ^2.1.5
+  path: ^1.9.0
+  shared_preferences: ^2.3.3
+  intl: ^0.19.0
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
