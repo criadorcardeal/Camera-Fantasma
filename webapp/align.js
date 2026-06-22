@@ -96,54 +96,73 @@ const Aligner = {
 /* ---------- Controles do alinhamento ---------- */
 window.addEventListener("DOMContentLoaded", () => {
   const stage = $("#al-stage");
-  // Suporta 1 dedo (arrastar p/ posicionar) e 2 dedos (pinca p/ zoom + mover).
-  const pointers = new Map();
-  let last = { x: 0, y: 0 };
-  let pinch = { dist: 1, zoom: 1, midX: 0, midY: 0 };
-  const pts = () => [...pointers.values()];
-  const distOf = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) || 1;
+  const setZoom = (z) => {
+    Aligner.z = Math.max(0.5, Math.min(4, z));
+    $("#al-zoom").value = Aligner.z;
+  };
 
-  stage.addEventListener("pointerdown", (e) => {
-    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.size === 1) {
-      last = { x: e.clientX, y: e.clientY };
-    } else if (pointers.size === 2) {
-      const [a, b] = pts();
-      pinch = { dist: distOf(a, b), zoom: Aligner.z, midX: (a.x + b.x) / 2, midY: (a.y + b.y) / 2 };
+  // --- TOQUE (iPhone/Android): 1 dedo = arrastar, 2 dedos = pinca p/ zoom ---
+  // preventDefault no touchmove e essencial: sem ele o iOS da zoom na PAGINA
+  // em vez de entregar a pinca para a gente.
+  const d2 = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) || 1;
+  const m2 = (t) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+  let tLast = null, pinchBase = null;
+
+  stage.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 1) {
+      tLast = { x: e.touches[0].clientX, y: e.touches[0].clientY }; pinchBase = null;
+    } else if (e.touches.length >= 2) {
+      pinchBase = { dist: d2(e.touches), zoom: Aligner.z, mid: m2(e.touches) }; tLast = null;
     }
-  });
+  }, { passive: false });
 
-  stage.addEventListener("pointermove", (e) => {
-    if (!pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.size >= 2) {
-      const [a, b] = pts();
-      const d = distOf(a, b);
-      const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
-      Aligner.z = Math.max(0.5, Math.min(4, pinch.zoom * (d / pinch.dist)));
-      Aligner.tx += midX - pinch.midX;
-      Aligner.ty += midY - pinch.midY;
-      pinch.midX = midX; pinch.midY = midY;
-      $("#al-zoom").value = Aligner.z;
+  stage.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    const t = e.touches;
+    if (t.length >= 2 && pinchBase) {
+      const d = d2(t), m = m2(t);
+      setZoom(pinchBase.zoom * (d / pinchBase.dist));
+      Aligner.tx += m.x - pinchBase.mid.x;
+      Aligner.ty += m.y - pinchBase.mid.y;
+      pinchBase.mid = m;
       Aligner.apply();
+    } else if (t.length === 1 && tLast) {
+      Aligner.tx += t[0].clientX - tLast.x;
+      Aligner.ty += t[0].clientY - tLast.y;
+      tLast = { x: t[0].clientX, y: t[0].clientY };
+      Aligner.apply();
+    }
+  }, { passive: false });
+
+  const tEnd = (e) => {
+    if (e.touches.length === 1) {
+      tLast = { x: e.touches[0].clientX, y: e.touches[0].clientY }; pinchBase = null;
+    } else if (e.touches.length >= 2) {
+      pinchBase = { dist: d2(e.touches), zoom: Aligner.z, mid: m2(e.touches) };
     } else {
-      Aligner.tx += e.clientX - last.x;
-      Aligner.ty += e.clientY - last.y;
-      last = { x: e.clientX, y: e.clientY };
-      Aligner.apply();
-    }
-  });
-
-  const onUp = (e) => {
-    pointers.delete(e.pointerId);
-    if (pointers.size === 1) {
-      const [a] = pts();
-      last = { x: a.x, y: a.y };   // continua arrastando com o dedo restante
+      tLast = null; pinchBase = null;
     }
   };
-  stage.addEventListener("pointerup", onUp);
-  stage.addEventListener("pointercancel", onUp);
+  stage.addEventListener("touchend", tEnd);
+  stage.addEventListener("touchcancel", tEnd);
+
+  // --- MOUSE (desktop): arrastar p/ posicionar (ignora toque, ja tratado) ---
+  let mouseDrag = false, mLast = { x: 0, y: 0 };
+  stage.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "touch") return;
+    mouseDrag = true; mLast = { x: e.clientX, y: e.clientY };
+    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (e.pointerType === "touch" || !mouseDrag) return;
+    Aligner.tx += e.clientX - mLast.x;
+    Aligner.ty += e.clientY - mLast.y;
+    mLast = { x: e.clientX, y: e.clientY };
+    Aligner.apply();
+  });
+  const mUp = (e) => { if (e.pointerType !== "touch") mouseDrag = false; };
+  stage.addEventListener("pointerup", mUp);
+  stage.addEventListener("pointercancel", mUp);
 
   $("#al-zoom").addEventListener("input", (e) => {
     Aligner.z = parseFloat(e.target.value);
