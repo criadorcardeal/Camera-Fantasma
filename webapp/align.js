@@ -101,22 +101,51 @@ window.addEventListener("DOMContentLoaded", () => {
     $("#al-zoom").value = Aligner.z;
   };
 
-  // --- TOQUE (iPhone/Android): 1 dedo = arrastar, 2 dedos = pinca p/ zoom ---
-  // preventDefault no touchmove e essencial: sem ele o iOS da zoom na PAGINA
-  // em vez de entregar a pinca para a gente.
+  // No Safari (iPhone) a pinca e um GESTO NATIVO: eventos de toque nao a
+  // capturam de forma confiavel. O caminho certo e usar os gesture events
+  // (gesturestart/gesturechange com e.scale). No Android nao existem gesture
+  // events, entao a pinca cai no calculo por 2 toques.
+  const supportsGesture = typeof window.GestureEvent !== "undefined";
   const d2 = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) || 1;
   const m2 = (t) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
-  let tLast = null, pinchBase = null;
+  let tLast = null, pinchBase = null, gestureOn = false;
 
+  // ----- GESTURE EVENTS (Safari/iOS): pinca -----
+  let gZoom = 1, gLast = { x: 0, y: 0 };
+  stage.addEventListener("gesturestart", (e) => {
+    e.preventDefault();
+    gestureOn = true; gZoom = Aligner.z;
+    gLast = { x: e.clientX || 0, y: e.clientY || 0 };
+  }, { passive: false });
+  stage.addEventListener("gesturechange", (e) => {
+    e.preventDefault();
+    setZoom(gZoom * e.scale);
+    if (e.clientX != null) {
+      Aligner.tx += e.clientX - gLast.x;
+      Aligner.ty += e.clientY - gLast.y;
+      gLast = { x: e.clientX, y: e.clientY };
+    }
+    Aligner.apply();
+  }, { passive: false });
+  const gEnd = (e) => { if (e.preventDefault) e.preventDefault(); gestureOn = false; };
+  stage.addEventListener("gestureend", gEnd, { passive: false });
+  // Evita o zoom da PAGINA enquanto a tela de alinhamento esta ativa.
+  document.addEventListener("gesturestart", (e) => {
+    if ($("#screen-align").classList.contains("active") && e.preventDefault) e.preventDefault();
+  }, { passive: false });
+
+  // ----- TOQUE: 1 dedo arrasta; 2 dedos pinca (so onde nao ha gesture) -----
   stage.addEventListener("touchstart", (e) => {
     if (e.touches.length === 1) {
       tLast = { x: e.touches[0].clientX, y: e.touches[0].clientY }; pinchBase = null;
-    } else if (e.touches.length >= 2) {
+    } else if (e.touches.length >= 2 && !supportsGesture) {
       pinchBase = { dist: d2(e.touches), zoom: Aligner.z, mid: m2(e.touches) }; tLast = null;
     }
   }, { passive: false });
 
   stage.addEventListener("touchmove", (e) => {
+    if (gestureOn) return;                              // pinca cuidada pelo gesto
+    if (supportsGesture && e.touches.length >= 2) return; // deixa o gesto agir
     e.preventDefault();
     const t = e.touches;
     if (t.length >= 2 && pinchBase) {
@@ -137,9 +166,9 @@ window.addEventListener("DOMContentLoaded", () => {
   const tEnd = (e) => {
     if (e.touches.length === 1) {
       tLast = { x: e.touches[0].clientX, y: e.touches[0].clientY }; pinchBase = null;
-    } else if (e.touches.length >= 2) {
+    } else if (e.touches.length >= 2 && !supportsGesture) {
       pinchBase = { dist: d2(e.touches), zoom: Aligner.z, mid: m2(e.touches) };
-    } else {
+    } else if (e.touches.length === 0) {
       tLast = null; pinchBase = null;
     }
   };
