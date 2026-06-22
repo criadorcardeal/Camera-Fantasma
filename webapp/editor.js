@@ -175,18 +175,51 @@ function estimateSharpness(img) {
   return Math.sqrt(Math.max(0, sumSq / n - mean * mean));
 }
 
-/* ---------- Converte (metrica atual -> alvo) em valores de slider ---------- */
-function slidersFromMetric(m, target) {
-  return {
-    exposure: Math.round(clamp(target.lum - m.lum, -100, 100)),
-    contrast: Math.round(clamp((target.contrast / (m.contrast || 1) - 1) * 100, -100, 100)),
-    saturation: Math.round(clamp((target.saturation / (m.saturation || 1) - 1) * 100, -100, 100)),
-    temperature: Math.round(clamp(target.temperature - m.temperature, -100, 100)),
-    tint: Math.round(clamp((target.tint - m.tint) / 0.75, -100, 100)),
-    highlights: Math.round(clamp((target.highlights - m.highlights) / 0.3, -100, 100)),
-    shadows: Math.round(clamp((target.shadows - m.shadows) / 0.3, -100, 100)),
-    sharpness: Math.round(clamp((target.sharpness / (m.sharpness || 1) - 1) * 50, -100, 100)),
+/* ---------- Solucionador do Ajuste Automatico ----------
+   Para uma imagem, encontra os valores de cada caracteristica que fazem a
+   SAIDA medir exatamente os alvos. Como as caracteristicas interferem entre
+   si, busca cada uma por bisseccao reavaliando o resultado real do pipeline,
+   repetindo em algumas passadas ate convergir. Resolvendo as duas imagens
+   para os MESMOS alvos, elas terminam com as caracteristicas iguais.
+
+   Cada metrica e monotonica crescente em relacao ao seu slider, o que permite
+   a busca binaria. */
+const METRIC_OF = {
+  exposure: "lum",
+  contrast: "contrast",
+  saturation: "saturation",
+  temperature: "temperature",
+  tint: "tint",
+  shadows: "shadows",
+  highlights: "highlights",
+  sharpness: "sharpness",
+};
+
+function solveAdjustments(img, target) {
+  const adj = {
+    exposure: 0, contrast: 0, highlights: 0, shadows: 0,
+    saturation: 0, temperature: 0, tint: 0, sharpness: 0,
   };
+  const solveOne = (key) => {
+    const mk = METRIC_OF[key];
+    let lo = -100, hi = 100;
+    for (let it = 0; it < 12; it++) {
+      const mid = (lo + hi) / 2;
+      adj[key] = mid;
+      const val = measure(applyAdjustments(img, adj))[mk];
+      if (val < target[mk]) lo = mid; else hi = mid;
+    }
+    adj[key] = Math.round((lo + hi) / 2);
+  };
+  // Varias passadas de "coordinate descent" para acomodar as interferencias
+  // entre as caracteristicas ate convergir aos alvos.
+  const order = ["exposure", "contrast", "saturation", "temperature", "tint", "shadows", "highlights"];
+  for (let pass = 0; pass < 4; pass++) {
+    for (const key of order) solveOne(key);
+  }
+  // Nitidez por ultimo (mais pesada) e uma vez.
+  solveOne("sharpness");
+  return adj;
 }
 
 /* ---------- Renderiza versao ajustada em dataURL (resolucao cheia) ---------- */
@@ -334,16 +367,31 @@ const Editor = {
     this.refreshSliderValues();
   },
 
-  auto() {
-    const mb = measure(this.prev.base);
-    const mf = measure(this.prev.follow);
-    const keys = ["lum", "contrast", "saturation", "temperature", "tint", "highlights", "shadows", "sharpness"];
-    const avg = {};
-    keys.forEach((k) => (avg[k] = (mb[k] + mf[k]) / 2));
-    this.adj.base = slidersFromMetric(mb, avg);
-    this.adj.follow = slidersFromMetric(mf, avg);
-    this.refreshSliderValues();
-    this.renderBoth();
+  async auto() {
+    const btn = $("#ed-auto");
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Processando…";
+    // Deixa o botao repintar antes do calculo pesado.
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    try {
+      // Resolve numa resolucao baixa (metricas sao estatisticas estaveis e fica
+      // rapido). Os valores valem para qualquer resolucao na exibicao.
+      const rb = await loadPreviewData(this.session.baseImage, 130);
+      const rf = await loadPreviewData(this.session.followImage, 130);
+      const mb = measure(rb);
+      const mf = measure(rf);
+      const keys = ["lum", "contrast", "saturation", "temperature", "tint", "highlights", "shadows", "sharpness"];
+      const target = {};
+      keys.forEach((k) => (target[k] = (mb[k] + mf[k]) / 2));
+      this.adj.base = solveAdjustments(rb, target);
+      this.adj.follow = solveAdjustments(rf, target);
+      this.refreshSliderValues();
+      this.renderBoth();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
   },
 
   resetActive() {
