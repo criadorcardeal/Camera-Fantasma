@@ -69,6 +69,10 @@ const fmtDate = (iso) => {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
+// Usa a versao com ajustes aplicados (se existir) ou a original.
+const baseSrc = (s) => s.baseImageView || s.baseImage;
+const followSrc = (s) => s.followImageView || s.followImage;
+
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   $("#" + id).classList.add("active");
@@ -94,7 +98,7 @@ async function renderHome() {
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
-      <img src="${s.baseImage}" alt="" />
+      <img src="${baseSrc(s)}" alt="" />
       <div class="info">
         <b>Comparação de ${fmtDate(s.createdAt)}</b>
         <span>${s.followImage ? "Base + acompanhamento" : "Só foto base"} • ${Math.round(s.baseDistance)} cm</span>
@@ -417,17 +421,18 @@ async function openDetail(id) {
          <button data-mode="overlay">Sobrepor</button>
        </div>
        <div id="cmp-host"></div>`
-    : `<div class="compare-stage"><img src="${s.baseImage}" style="object-fit:contain" /></div>`;
+    : `<div class="compare-stage"><img src="${baseSrc(s)}" style="object-fit:contain" /></div>`;
 
   const infoHtml = `
     <div class="info-block">
       <div class="row"><b>Foto base</b><span>${fmtDate(s.createdAt)} • ${Math.round(s.baseDistance)} cm</span></div>
       ${s.followImage ? `<div class="row"><b>Acompanhamento</b><span>${fmtDate(s.followAt)} • ${Math.round(s.followDistance)} cm</span></div>` : ""}
-      <div class="row"><b>Ajuste de imagem</b><span>Brilho ${s.filters.brightness.toFixed(2)} • Contraste ${s.filters.contrast.toFixed(2)} • Saturação ${s.filters.saturate.toFixed(2)}</span></div>
+      <div class="row"><b>Captura (câmera)</b><span>Brilho ${s.filters.brightness.toFixed(2)} • Contraste ${s.filters.contrast.toFixed(2)} • Saturação ${s.filters.saturate.toFixed(2)}</span></div>
     </div>`;
 
   const btnHtml = s.followImage
-    ? `<button class="btn outline" id="btn-redo">Refazer foto de acompanhamento</button>`
+    ? `<button class="btn primary" id="btn-adjust">🎚 Ajustar imagens</button>
+       <button class="btn outline" id="btn-redo">Refazer foto de acompanhamento</button>`
     : `<button class="btn primary" id="btn-follow">Tirar foto de acompanhamento</button>`;
 
   c.innerHTML = compareHtml + infoHtml + btnHtml;
@@ -441,6 +446,7 @@ async function openDetail(id) {
         renderCompare(b.dataset.mode);
       });
     });
+    $("#btn-adjust").addEventListener("click", () => Editor.open(s));
     $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
   } else {
     $("#btn-follow").addEventListener("click", () => Cam.open("follow", s));
@@ -454,14 +460,14 @@ function renderCompare(mode) {
   const host = $("#cmp-host");
   if (mode === "side") {
     host.innerHTML = `<div class="side-by-side">
-        <img src="${s.baseImage}" /><img src="${s.followImage}" /></div>`;
+        <img src="${baseSrc(s)}" /><img src="${followSrc(s)}" /></div>`;
     return;
   }
   if (mode === "overlay") {
     host.innerHTML = `
       <div class="compare-stage">
-        <img src="${s.baseImage}" />
-        <img src="${s.followImage}" id="ov-after" style="opacity:0.5" />
+        <img src="${baseSrc(s)}" />
+        <img src="${followSrc(s)}" id="ov-after" style="opacity:0.5" />
       </div>
       <div class="seg" style="margin-top:8px;background:transparent;padding:0">
         <input type="range" min="0" max="1" step="0.01" value="0.5" id="ov-range" style="width:100%" />
@@ -474,8 +480,8 @@ function renderCompare(mode) {
   // cortina (curtain)
   host.innerHTML = `
     <div class="compare-stage" id="curtain">
-      <img src="${s.baseImage}" />
-      <div class="after-clip" style="position:absolute;inset:0;width:50%"><img src="${s.followImage}" style="width:200%;max-width:none" id="cur-after"/></div>
+      <img src="${baseSrc(s)}" />
+      <div class="after-clip" style="position:absolute;inset:0;width:50%"><img src="${followSrc(s)}" style="width:200%;max-width:none" id="cur-after"/></div>
       <div class="compare-handle" id="cur-handle" style="left:50%"></div>
     </div>`;
   const stage = $("#curtain");

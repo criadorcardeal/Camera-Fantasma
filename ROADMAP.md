@@ -32,8 +32,11 @@ Dropbox, iCloud):
 - cada foto (base e acompanhamento) individualmente;
 - a **imagem da comparação** (antes/depois montado).
 
-### 3. Janela de controle das características das imagens
+### 3. Janela de controle das características das imagens ✅ (implementada)
 Uma janela dedicada para ajustar a aparência das imagens.
+Acesse pelo botão **"🎚 Ajustar imagens"** na tela de comparação (quando há base
+e acompanhamento). Não-destrutivo: guarda os valores e uma versão renderizada;
+o original fica intacto para reedição.
 
 **a) Ajuste manual individualizado** de cada característica, por imagem:
 - Exposição

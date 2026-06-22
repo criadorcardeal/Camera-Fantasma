@@ -79,6 +79,35 @@
     <div class="content" id="detail-content"></div>
   </section>
 
+  <!-- ============ TELA: EDITOR DE IMAGENS (v2.0) ============ -->
+  <section id="screen-editor" class="screen">
+    <header class="topbar">
+      <button id="ed-cancel" class="icon-btn dark">‹</button>
+      <h1>Ajuste de imagens</h1>
+      <button id="ed-save" class="icon-btn dark">✓</button>
+    </header>
+    <div class="content ed-content">
+      <div class="ed-previews">
+        <figure><canvas id="ed-canvas-base"></canvas><figcaption>Base</figcaption></figure>
+        <figure><canvas id="ed-canvas-follow"></canvas><figcaption>Depois</figcaption></figure>
+      </div>
+      <button id="ed-auto" class="btn primary">✨ Ajuste Automático Completo</button>
+      <label class="ed-lock">
+        <input type="checkbox" id="ed-lock-toggle" />
+        <span>Travar as duas imagens <small>(mexer numa altera a outra igual)</small></span>
+      </label>
+      <div class="ed-which-row" id="ed-which-row">
+        <span>Editando:</span>
+        <div class="seg ed-seg" id="ed-which">
+          <button data-img="base" class="active">Base</button>
+          <button data-img="follow">Depois</button>
+        </div>
+      </div>
+      <div id="ed-sliders"></div>
+      <button id="ed-reset" class="btn outline">Zerar ajustes</button>
+    </div>
+  </section>
+
   <!-- ============ DIÁLOGO: DISTÂNCIA ============ -->
   <dialog id="dist-dialog">
     <form method="dialog">
@@ -96,5 +125,6 @@
   </dialog>
 
   <script src="./app.js"></script>
+  <script src="./editor.js"></script>
 </body>
 </html>

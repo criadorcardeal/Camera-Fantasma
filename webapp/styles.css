@@ -227,6 +227,40 @@ html, body {
 .btn.primary { background: var(--primary); color: #fff; }
 .btn.outline { background: #fff; color: var(--primary); border: 1.5px solid var(--primary); }
 
+/* ---------- Editor de imagens (v2.0) ---------- */
+.ed-content { padding-bottom: 32px; }
+.ed-previews { display: flex; gap: 8px; margin-bottom: 12px; }
+.ed-previews figure { margin: 0; flex: 1; text-align: center; }
+.ed-previews canvas {
+  width: 100%; height: auto; border-radius: 8px; background: #000;
+  display: block;
+}
+.ed-previews figcaption {
+  font-size: 0.8rem; color: var(--muted); margin-top: 4px; font-weight: 600;
+}
+.ed-lock {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--card); border-radius: 12px; padding: 12px; margin: 12px 0;
+  font-size: 0.9rem;
+}
+.ed-lock input { width: 22px; height: 22px; flex-shrink: 0; accent-color: var(--primary); }
+.ed-lock small { color: var(--muted); display: block; }
+.ed-which-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+  font-size: 0.9rem; color: var(--muted);
+}
+.ed-which-row .ed-seg { flex: 1; margin-bottom: 0; }
+.ed-slider {
+  display: flex; align-items: center; gap: 10px; padding: 7px 0;
+  border-bottom: 1px solid #eef1f3;
+}
+.ed-slider .ed-name { width: 92px; flex-shrink: 0; font-size: 0.88rem; }
+.ed-slider input[type=range] { flex: 1; accent-color: var(--primary); }
+.ed-slider .ed-val {
+  width: 40px; flex-shrink: 0; text-align: right;
+  font-variant-numeric: tabular-nums; font-size: 0.85rem; color: var(--muted);
+}
+
 /* ---------- Dialog ---------- */
 dialog {
   border: none; border-radius: 16px; padding: 20px; width: min(90vw, 340px);
