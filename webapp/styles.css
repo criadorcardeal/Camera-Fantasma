@@ -34,6 +34,10 @@ html, body {
   color: #fff;
 }
 .topbar h1 { font-size: 1.1rem; margin: 0; flex: 1; text-align: center; }
+.version-badge, .topbar-spacer {
+  width: 40px; flex-shrink: 0;
+  font-size: 0.72rem; color: rgba(255,255,255,0.8); text-align: center;
+}
 .icon-btn {
   background: rgba(255,255,255,0.15);
   border: none;
