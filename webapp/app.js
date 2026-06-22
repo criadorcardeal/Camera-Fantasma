@@ -456,12 +456,13 @@ async function openDetail(id) {
       <div class="row"><b>Captura (câmera)</b><span>Brilho ${s.filters.brightness.toFixed(2)} • Contraste ${s.filters.contrast.toFixed(2)} • Saturação ${s.filters.saturate.toFixed(2)}</span></div>
     </div>`;
 
-  const btnHtml = s.followImage
+  const shareBtn = `<button class="btn outline" id="btn-share">📤 Salvar / Compartilhar</button>`;
+  const btnHtml = (s.followImage
     ? `<button class="btn primary" id="btn-adjust">🎚 Ajustar imagens</button>
        <button class="btn outline" id="btn-redo">📷 Refazer acompanhamento</button>
        <button class="btn outline" id="btn-follow-import">🖼 Importar acompanhamento</button>`
     : `<button class="btn primary" id="btn-follow">📷 Tirar foto de acompanhamento</button>
-       <button class="btn outline" id="btn-follow-import">🖼 Importar acompanhamento</button>`;
+       <button class="btn outline" id="btn-follow-import">🖼 Importar acompanhamento</button>`) + shareBtn;
 
   c.innerHTML = compareHtml + infoHtml + btnHtml;
 
@@ -481,6 +482,7 @@ async function openDetail(id) {
   }
   $("#btn-follow-import").addEventListener("click", () =>
     pickImage().then((file) => importFollowPhoto(s, file)));
+  $("#btn-share").addEventListener("click", () => Share.open(s));
 
   showScreen("screen-detail");
 }

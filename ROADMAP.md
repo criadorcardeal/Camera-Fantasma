@@ -29,11 +29,12 @@ abre a janela **Alinhar acompanhamento**: posiciona (arrastar) e dá zoom
 (slider ou pinça de dois dedos) sobre a base fantasma para deixar as fotos
 simétricas antes de salvar.
 
-### 2. Salvar/baixar fotos e a comparação
-Exportar para a **galeria do aparelho** e/ou **nuvem** (Google Drive, OneDrive,
-Dropbox, iCloud):
-- cada foto (base e acompanhamento) individualmente;
-- a **imagem da comparação** (antes/depois montado).
+### 2. Salvar/baixar fotos e a comparação ✅ (implementada — v3.0)
+Botão **"📤 Salvar / Compartilhar"** no detalhe. Usa o painel nativo do iOS
+(Web Share): **Salvar em Fotos** (galeria) ou **Salvar em Arquivos** (iCloud,
+Google Drive, OneDrive, Dropbox), AirDrop, etc. Em desktop, baixa o arquivo.
+Opções: foto base, foto de acompanhamento e a **imagem da comparação**
+(Base | Acompanhamento, com rótulos, datas e distâncias).
 
 ### 3. Janela de controle das características das imagens ✅ (implementada)
 Uma janela dedicada para ajustar a aparência das imagens.

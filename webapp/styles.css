@@ -302,3 +302,13 @@ dialog menu { display: flex; gap: 8px; justify-content: flex-end; padding: 16px 
 dialog menu button { padding: 10px 16px; border-radius: 8px; border: none; background: #e3e8eb; cursor: pointer; }
 dialog menu button.primary { background: var(--primary); color: #fff; }
 #dist-target { font-weight: 700; color: var(--primary); }
+
+/* ---------- Salvar / Compartilhar (v3.0) ---------- */
+.share-hint { font-size: 0.82rem; color: var(--muted); margin: 0 0 10px; }
+.share-status { font-size: 0.85rem; color: var(--primary); min-height: 18px; margin-bottom: 6px; }
+.share-menu { display: flex; flex-direction: column; gap: 8px; padding: 0; margin: 0; }
+.share-menu button {
+  width: 100%; text-align: left; padding: 12px 14px; border-radius: 10px;
+  border: 1.5px solid var(--primary); background: #fff; color: var(--primary);
+  font-size: 0.95rem; font-weight: 600; cursor: pointer;
+}
