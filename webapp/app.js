@@ -374,16 +374,9 @@ async function importFollowPhoto(session, file) {
     alert(e.message || "Não foi possível usar esta imagem.");
     return;
   }
-  const distance = await openDistanceDialog(session.baseDistance);
-  if (distance == null) return;
-  session.followImage = dataUrl;
-  session.followDistance = distance;
-  session.followAt = new Date().toISOString();
-  // A imagem mudou: descarta ajustes/versao anteriores do acompanhamento.
-  session.followImageView = null;
-  session.followAdj = null;
-  await DB.put(session);
-  await openDetail(session.id);
+  // Abre a janela de alinhamento (posicionar/zoom sobre a base fantasma).
+  // Ela cuida da distancia e do salvamento ao confirmar.
+  Aligner.open(session, dataUrl);
 }
 
 async function importBasePhoto(file) {

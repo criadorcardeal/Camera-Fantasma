@@ -232,6 +232,49 @@ async function bakeView(src, adj) {
   return c.toDataURL("image/jpeg", 0.9);
 }
 
+/* ---------- Escala ABSOLUTA (0-100) de cada caracteristica ----------
+   O slider passa a mostrar o VALOR da caracteristica (nao um ajuste). Assim,
+   no Ajuste Automatico, as duas imagens recebem o MESMO numero (a media) -
+   iguais nos valores - e cada uma e transformada para atingi-lo (semelhantes). */
+const RANGE = {
+  exposure:    { metric: "lum",         lo: 0,    hi: 255 },
+  contrast:    { metric: "contrast",    lo: 0,    hi: 80 },
+  highlights:  { metric: "highlights",  lo: 150,  hi: 255 },
+  shadows:     { metric: "shadows",     lo: 0,    hi: 110 },
+  saturation:  { metric: "saturation",  lo: 0,    hi: 200 },
+  temperature: { metric: "temperature", lo: -120, hi: 120 },
+  tint:        { metric: "tint",        lo: -120, hi: 120 },
+  sharpness:   { metric: "sharpness",   lo: 0,    hi: 40 },
+};
+function norm(key, v) {
+  const r = RANGE[key];
+  return clamp(Math.round(((v - r.lo) / (r.hi - r.lo)) * 100), 0, 100);
+}
+function denorm(key, s) {
+  const r = RANGE[key];
+  return r.lo + (s / 100) * (r.hi - r.lo);
+}
+// Mede e converte cada caracteristica para a escala 0-100.
+function measureTargets(img) {
+  const m = measure(img);
+  const t = {};
+  for (const key in RANGE) t[key] = norm(key, m[RANGE[key].metric]);
+  return t;
+}
+// Resolve apenas UMA caracteristica: ajusta seu delta ate a saida medir o alvo.
+function solveOneDelta(img, deltas, key, targetMetricVal) {
+  const mk = METRIC_OF[key];
+  const d = Object.assign({}, deltas);
+  let lo = -100, hi = 100;
+  for (let it = 0; it < 12; it++) {
+    const mid = (lo + hi) / 2;
+    d[key] = mid;
+    const v = measure(applyAdjustments(img, d))[mk];
+    if (v < targetMetricVal) lo = mid; else hi = mid;
+  }
+  return Math.round((lo + hi) / 2);
+}
+
 /* ============================ Editor (UI) ============================ */
 const Editor = {
   CHARS: [
@@ -247,7 +290,8 @@ const Editor = {
   session: null,
   locked: false,
   which: "base",
-  adj: { base: null, follow: null },
+  adj: { base: null, follow: null },     // ajustes internos (deltas) p/ applyAdjustments
+  target: { base: null, follow: null },  // valores ABSOLUTOS exibidos (0-100) por caracteristica
   prev: { base: null, follow: null },
   raf: null,
   pending: null,
@@ -264,8 +308,6 @@ const Editor = {
 
   async open(session) {
     this.session = session;
-    this.adj.base = Object.assign(this.defaults(), session.baseAdj || {});
-    this.adj.follow = Object.assign(this.defaults(), session.followAdj || {});
     this.locked = false;
     this.which = "base";
     $("#ed-lock-toggle").checked = false;
@@ -282,6 +324,18 @@ const Editor = {
       await openDetail(session.id);
       return;
     }
+    // Restaura estado salvo ou parte dos valores medidos de cada imagem.
+    ["base", "follow"].forEach((k) => {
+      const saved = k === "base" ? session.baseTarget : session.followTarget;
+      const savedAdj = k === "base" ? session.baseAdj : session.followAdj;
+      if (saved) {
+        this.target[k] = Object.assign(measureTargets(this.prev[k]), saved);
+        this.adj[k] = Object.assign(this.defaults(), savedAdj || {});
+      } else {
+        this.target[k] = measureTargets(this.prev[k]);
+        this.adj[k] = this.defaults();
+      }
+    });
     this.buildSliders();
     this.renderBoth();
   },
@@ -294,7 +348,7 @@ const Editor = {
       row.className = "ed-slider";
       row.innerHTML =
         `<span class="ed-name">${ch.name}</span>` +
-        `<input type="range" min="-100" max="100" step="1" data-key="${ch.key}" />` +
+        `<input type="range" min="0" max="100" step="1" data-key="${ch.key}" />` +
         `<span class="ed-val"></span>`;
       const input = row.querySelector("input");
       input.addEventListener("input", () =>
@@ -309,38 +363,41 @@ const Editor = {
   },
 
   refreshSliderValues() {
-    const a = this.adj[this.displaySource()];
+    const t = this.target[this.displaySource()];
     $("#ed-sliders").querySelectorAll(".ed-slider").forEach((row) => {
       const input = row.querySelector("input");
       const key = input.dataset.key;
-      input.value = a[key];
-      row.querySelector(".ed-val").textContent = (a[key] > 0 ? "+" : "") + a[key];
+      input.value = t[key];
+      row.querySelector(".ed-val").textContent = t[key];
     });
   },
 
   onSlider(key, val) {
-    if (this.locked) {
-      this.adj.base[key] = val;
-      this.adj.follow[key] = val;
-      this.scheduleRender("both");
-    } else {
-      this.adj[this.which][key] = val;
-      this.scheduleRender(this.which);
-    }
+    const keys = this.locked ? ["base", "follow"] : [this.which];
+    keys.forEach((k) => (this.target[k][key] = val));
     const row = [...$("#ed-sliders").querySelectorAll(".ed-slider")]
       .find((r) => r.querySelector("input").dataset.key === key);
-    if (row) row.querySelector(".ed-val").textContent = (val > 0 ? "+" : "") + val;
+    if (row) row.querySelector(".ed-val").textContent = val;
+    this.queueSolve(key, keys);
   },
 
-  scheduleRender(target) {
-    this.pending = this.pending || new Set();
-    if (target === "both") { this.pending.add("base"); this.pending.add("follow"); }
-    else this.pending.add(target);
+  // Resolve apenas a caracteristica mexida (rapido) p/ a imagem atingir o
+  // valor absoluto escolhido, e redesenha. Coalescido por frame.
+  queueSolve(key, keys) {
+    this.pending = this.pending || { base: new Set(), follow: new Set() };
+    keys.forEach((k) => this.pending[k].add(key));
     if (this.raf) return;
     this.raf = requestAnimationFrame(() => {
       this.raf = null;
-      const set = this.pending; this.pending = null;
-      set.forEach((k) => this.renderImage(k));
+      const p = this.pending; this.pending = null;
+      ["base", "follow"].forEach((k) => {
+        if (!p[k] || !p[k].size) return;
+        p[k].forEach((char) => {
+          this.adj[k][char] = solveOneDelta(
+            this.prev[k], this.adj[k], char, denorm(char, this.target[k][char]));
+        });
+        this.renderImage(k);
+      });
     });
   },
 
@@ -379,13 +436,18 @@ const Editor = {
       // rapido). Os valores valem para qualquer resolucao na exibicao.
       const rb = await loadPreviewData(this.session.baseImage, 130);
       const rf = await loadPreviewData(this.session.followImage, 130);
-      const mb = measure(rb);
-      const mf = measure(rf);
-      const keys = ["lum", "contrast", "saturation", "temperature", "tint", "highlights", "shadows", "sharpness"];
-      const target = {};
-      keys.forEach((k) => (target[k] = (mb[k] + mf[k]) / 2));
-      this.adj.base = solveAdjustments(rb, target);
-      this.adj.follow = solveAdjustments(rf, target);
+      const tb = measureTargets(rb);
+      const tf = measureTargets(rf);
+      // Mesmos numeros nas duas: a media das caracteristicas iniciais.
+      const avg = {};
+      this.CHARS.forEach((c) => (avg[c.key] = Math.round((tb[c.key] + tf[c.key]) / 2)));
+      this.target.base = Object.assign({}, avg);
+      this.target.follow = Object.assign({}, avg);
+      // Resolve cada imagem p/ atingir esses alvos (ficam semelhantes).
+      const tgt = {};
+      this.CHARS.forEach((c) => (tgt[METRIC_OF[c.key]] = denorm(c.key, avg[c.key])));
+      this.adj.base = solveAdjustments(rb, tgt);
+      this.adj.follow = solveAdjustments(rf, tgt);
       this.refreshSliderValues();
       this.renderBoth();
     } finally {
@@ -395,14 +457,12 @@ const Editor = {
   },
 
   resetActive() {
-    if (this.locked) {
-      this.adj.base = this.defaults();
-      this.adj.follow = this.defaults();
-      this.scheduleRender("both");
-    } else {
-      this.adj[this.which] = this.defaults();
-      this.scheduleRender(this.which);
-    }
+    const keys = this.locked ? ["base", "follow"] : [this.which];
+    keys.forEach((k) => {
+      this.target[k] = measureTargets(this.prev[k]);
+      this.adj[k] = this.defaults();
+      this.renderImage(k);
+    });
     this.refreshSliderValues();
   },
 
@@ -410,6 +470,8 @@ const Editor = {
     const s = this.session;
     s.baseAdj = this.adj.base;
     s.followAdj = this.adj.follow;
+    s.baseTarget = this.target.base;
+    s.followTarget = this.target.follow;
     s.baseImageView = this.isNeutral(this.adj.base) ? null : await bakeView(s.baseImage, this.adj.base);
     s.followImageView = this.isNeutral(this.adj.follow) ? null : await bakeView(s.followImage, this.adj.follow);
     await DB.put(s);

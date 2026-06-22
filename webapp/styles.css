@@ -227,6 +227,30 @@ html, body {
 .btn.primary { background: var(--primary); color: #fff; }
 .btn.outline { background: #fff; color: var(--primary); border: 1.5px solid var(--primary); }
 
+/* ---------- Alinhar acompanhamento (v2.0) ---------- */
+.al-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px; overflow-y: auto; }
+.al-stage {
+  position: relative; margin: 0 auto; overflow: hidden;
+  background: #000; border-radius: 8px; touch-action: none; user-select: none;
+}
+#al-follow {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; transform-origin: center center; will-change: transform;
+}
+.al-ghost {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; pointer-events: none;
+}
+.al-hint {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.55); color: #fff; padding: 4px 10px;
+  border-radius: 12px; font-size: 0.8rem; pointer-events: none;
+}
+.al-controls { background: var(--card); border-radius: 12px; padding: 10px 14px; }
+.al-slider { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 0.85rem; }
+.al-slider span { width: 72px; flex-shrink: 0; }
+.al-slider input { flex: 1; accent-color: var(--primary); }
+
 /* ---------- Editor de imagens (v2.0) ---------- */
 .ed-content { padding-bottom: 32px; }
 .ed-previews { display: flex; gap: 8px; margin-bottom: 12px; }

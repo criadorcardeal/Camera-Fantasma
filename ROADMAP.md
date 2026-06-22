@@ -24,7 +24,9 @@ Roda no Safari (iPhone) e Chrome; instalável via "Adicionar à Tela de Início"
 
 ### 1. Importar a foto de acompanhamento ✅ (implementada)
 Botão **"🖼 Importar acompanhamento"** na tela de comparação — usa a galeria ou
-a nuvem (via app Arquivos do iOS), além de tirá-la pela câmera.
+a nuvem (via app Arquivos do iOS), além de tirá-la pela câmera. Ao importar,
+abre a janela **Alinhar acompanhamento**: posiciona (arrastar) e dá zoom sobre
+a base fantasma para deixar as fotos simétricas antes de salvar.
 
 ### 2. Salvar/baixar fotos e a comparação
 Exportar para a **galeria do aparelho** e/ou **nuvem** (Google Drive, OneDrive,

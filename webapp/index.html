@@ -18,7 +18,7 @@
     <header class="topbar">
       <span class="topbar-spacer"></span>
       <h1>Fotos Fantasma</h1>
-      <span class="version-badge">v2.3</span>
+      <span class="version-badge">v2.4</span>
     </header>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -79,6 +79,28 @@
     <div class="content" id="detail-content"></div>
   </section>
 
+  <!-- ============ TELA: ALINHAR ACOMPANHAMENTO (v2.0) ============ -->
+  <section id="screen-align" class="screen">
+    <header class="topbar">
+      <button id="al-cancel" class="icon-btn dark">‹</button>
+      <h1>Alinhar acompanhamento</h1>
+      <button id="al-confirm" class="icon-btn dark">✓</button>
+    </header>
+    <div class="al-body">
+      <div class="al-stage" id="al-stage">
+        <img id="al-follow" alt="" />
+        <img id="al-ghost" class="al-ghost" alt="" />
+        <div class="al-hint">Arraste para posicionar</div>
+      </div>
+      <div class="al-controls">
+        <label class="al-slider"><span>Zoom</span>
+          <input type="range" id="al-zoom" min="0.5" max="4" step="0.01" value="1" /></label>
+        <label class="al-slider"><span>Fantasma</span>
+          <input type="range" id="al-opacity" min="0" max="1" step="0.01" value="0.5" /></label>
+      </div>
+    </div>
+  </section>
+
   <!-- ============ TELA: EDITOR DE IMAGENS (v2.0) ============ -->
   <section id="screen-editor" class="screen">
     <header class="topbar">
@@ -126,5 +148,6 @@
 
   <script src="./app.js"></script>
   <script src="./editor.js"></script>
+  <script src="./align.js"></script>
 </body>
 </html>
