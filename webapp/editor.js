@@ -275,6 +275,23 @@ function solveOneDelta(img, deltas, key, targetMetricVal) {
   return Math.round((lo + hi) / 2);
 }
 
+/* ---------- Ajuste RELATIVO (modelo antigo: deltas por foto) ----------
+   Cada imagem recebe um ajuste (delta) calculado da sua propria medida em
+   direcao a media. Os valores aparecem como ± e NAO ficam iguais entre as
+   fotos (e o comportamento que o usuario quis manter como opcao). */
+function slidersFromMetric(m, target) {
+  return {
+    exposure: Math.round(clamp(target.lum - m.lum, -100, 100)),
+    contrast: Math.round(clamp((target.contrast / (m.contrast || 1) - 1) * 100, -100, 100)),
+    saturation: Math.round(clamp((target.saturation / (m.saturation || 1) - 1) * 100, -100, 100)),
+    temperature: Math.round(clamp(target.temperature - m.temperature, -100, 100)),
+    tint: Math.round(clamp((target.tint - m.tint) / 0.75, -100, 100)),
+    highlights: Math.round(clamp((target.highlights - m.highlights) / 0.3, -100, 100)),
+    shadows: Math.round(clamp((target.shadows - m.shadows) / 0.3, -100, 100)),
+    sharpness: Math.round(clamp((target.sharpness / (m.sharpness || 1) - 1) * 50, -100, 100)),
+  };
+}
+
 /* ============================ Editor (UI) ============================ */
 const Editor = {
   CHARS: [
@@ -290,11 +307,14 @@ const Editor = {
   session: null,
   locked: false,
   which: "base",
+  mode: "absolute",                      // "absolute" | "relative"
   adj: { base: null, follow: null },     // ajustes internos (deltas) p/ applyAdjustments
   target: { base: null, follow: null },  // valores ABSOLUTOS exibidos (0-100) por caracteristica
   prev: { base: null, follow: null },
   raf: null,
+  rafR: null,
   pending: null,
+  pendingR: null,
 
   defaults() {
     return {
@@ -310,6 +330,7 @@ const Editor = {
     this.session = session;
     this.locked = false;
     this.which = "base";
+    this.mode = session.adjustMode || "absolute";
     $("#ed-lock-toggle").checked = false;
     $("#ed-which-row").style.display = "";
     $("#ed-which").querySelectorAll("button").forEach((b) =>
@@ -346,9 +367,10 @@ const Editor = {
     this.CHARS.forEach((ch) => {
       const row = document.createElement("div");
       row.className = "ed-slider";
+      const min = this.mode === "relative" ? -100 : 0;
       row.innerHTML =
         `<span class="ed-name">${ch.name}</span>` +
-        `<input type="range" min="0" max="100" step="1" data-key="${ch.key}" />` +
+        `<input type="range" min="${min}" max="100" step="1" data-key="${ch.key}" />` +
         `<span class="ed-val"></span>`;
       const input = row.querySelector("input");
       input.addEventListener("input", () =>
@@ -363,22 +385,38 @@ const Editor = {
   },
 
   refreshSliderValues() {
-    const t = this.target[this.displaySource()];
+    const rel = this.mode === "relative";
+    const data = (rel ? this.adj : this.target)[this.displaySource()];
     $("#ed-sliders").querySelectorAll(".ed-slider").forEach((row) => {
       const input = row.querySelector("input");
       const key = input.dataset.key;
-      input.value = t[key];
-      row.querySelector(".ed-val").textContent = t[key];
+      input.value = data[key];
+      row.querySelector(".ed-val").textContent =
+        rel ? (data[key] > 0 ? "+" : "") + data[key] : data[key];
     });
   },
 
   onSlider(key, val) {
     const keys = this.locked ? ["base", "follow"] : [this.which];
-    keys.forEach((k) => (this.target[k][key] = val));
+    const rel = this.mode === "relative";
+    keys.forEach((k) => { if (rel) this.adj[k][key] = val; else this.target[k][key] = val; });
     const row = [...$("#ed-sliders").querySelectorAll(".ed-slider")]
       .find((r) => r.querySelector("input").dataset.key === key);
-    if (row) row.querySelector(".ed-val").textContent = val;
-    this.queueSolve(key, keys);
+    if (row) row.querySelector(".ed-val").textContent = rel ? (val > 0 ? "+" : "") + val : val;
+    if (rel) this.scheduleRender(keys);
+    else this.queueSolve(key, keys);
+  },
+
+  // Render direto (modo relativo: o slider ja e o delta aplicado).
+  scheduleRender(keys) {
+    this.pendingR = this.pendingR || new Set();
+    keys.forEach((k) => this.pendingR.add(k));
+    if (this.rafR) return;
+    this.rafR = requestAnimationFrame(() => {
+      this.rafR = null;
+      const s = this.pendingR; this.pendingR = null;
+      s.forEach((k) => this.renderImage(k));
+    });
   },
 
   // Resolve apenas a caracteristica mexida (rapido) p/ a imagem atingir o
@@ -424,43 +462,50 @@ const Editor = {
     this.refreshSliderValues();
   },
 
-  async auto() {
-    const btn = $("#ed-auto");
-    const label = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = "Processando…";
-    // Deixa o botao repintar antes do calculo pesado.
+  async runAuto(mode) {
+    const relBtn = $("#ed-auto-rel"), absBtn = $("#ed-auto-abs");
+    const clicked = mode === "relative" ? relBtn : absBtn;
+    const label = clicked.textContent;
+    relBtn.disabled = absBtn.disabled = true;
+    clicked.textContent = "Processando…";
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     try {
-      // Resolve numa resolucao baixa (metricas sao estatisticas estaveis e fica
-      // rapido). Os valores valem para qualquer resolucao na exibicao.
+      this.mode = mode;
       const rb = await loadPreviewData(this.session.baseImage, 130);
       const rf = await loadPreviewData(this.session.followImage, 130);
-      const tb = measureTargets(rb);
-      const tf = measureTargets(rf);
-      // Mesmos numeros nas duas: a media das caracteristicas iniciais.
-      const avg = {};
-      this.CHARS.forEach((c) => (avg[c.key] = Math.round((tb[c.key] + tf[c.key]) / 2)));
-      this.target.base = Object.assign({}, avg);
-      this.target.follow = Object.assign({}, avg);
-      // Resolve cada imagem p/ atingir esses alvos (ficam semelhantes).
-      const tgt = {};
-      this.CHARS.forEach((c) => (tgt[METRIC_OF[c.key]] = denorm(c.key, avg[c.key])));
-      this.adj.base = solveAdjustments(rb, tgt);
-      this.adj.follow = solveAdjustments(rf, tgt);
-      this.refreshSliderValues();
+      if (mode === "absolute") {
+        // Mesmos numeros nas duas (a media); resolve cada uma p/ atingi-los.
+        const tb = measureTargets(rb), tf = measureTargets(rf);
+        const avg = {};
+        this.CHARS.forEach((c) => (avg[c.key] = Math.round((tb[c.key] + tf[c.key]) / 2)));
+        this.target.base = Object.assign({}, avg);
+        this.target.follow = Object.assign({}, avg);
+        const tgt = {};
+        this.CHARS.forEach((c) => (tgt[METRIC_OF[c.key]] = denorm(c.key, avg[c.key])));
+        this.adj.base = solveAdjustments(rb, tgt);
+        this.adj.follow = solveAdjustments(rf, tgt);
+      } else {
+        // Deltas proprios de cada foto em direcao a media (valores diferentes).
+        const mb = measure(rb), mf = measure(rf);
+        const keys = ["lum", "contrast", "saturation", "temperature", "tint", "highlights", "shadows", "sharpness"];
+        const target = {};
+        keys.forEach((k) => (target[k] = (mb[k] + mf[k]) / 2));
+        this.adj.base = slidersFromMetric(mb, target);
+        this.adj.follow = slidersFromMetric(mf, target);
+      }
+      this.buildSliders();
       this.renderBoth();
     } finally {
-      btn.disabled = false;
-      btn.textContent = label;
+      relBtn.disabled = absBtn.disabled = false;
+      clicked.textContent = label;
     }
   },
 
   resetActive() {
     const keys = this.locked ? ["base", "follow"] : [this.which];
     keys.forEach((k) => {
-      this.target[k] = measureTargets(this.prev[k]);
       this.adj[k] = this.defaults();
+      if (this.mode !== "relative") this.target[k] = measureTargets(this.prev[k]);
       this.renderImage(k);
     });
     this.refreshSliderValues();
@@ -468,6 +513,7 @@ const Editor = {
 
   async save() {
     const s = this.session;
+    s.adjustMode = this.mode;
     s.baseAdj = this.adj.base;
     s.followAdj = this.adj.follow;
     s.baseTarget = this.target.base;
@@ -487,7 +533,8 @@ const Editor = {
 window.addEventListener("DOMContentLoaded", () => {
   $("#ed-cancel").addEventListener("click", () => Editor.cancel());
   $("#ed-save").addEventListener("click", () => Editor.save());
-  $("#ed-auto").addEventListener("click", () => Editor.auto());
+  $("#ed-auto-rel").addEventListener("click", () => Editor.runAuto("relative"));
+  $("#ed-auto-abs").addEventListener("click", () => Editor.runAuto("absolute"));
   $("#ed-reset").addEventListener("click", () => Editor.resetActive());
   $("#ed-lock-toggle").addEventListener("change", (e) => Editor.setLocked(e.target.checked));
   $("#ed-which").querySelectorAll("button").forEach((b) =>

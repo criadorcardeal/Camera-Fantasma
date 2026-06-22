@@ -50,11 +50,12 @@ o original fica intacto para reedição.
 - Tonalidade (tint)
 - Nitidez (sharpness)
 
-**b) Botão "Ajuste Automático Completo"**
-Define, **nas duas imagens**, **todas** as características com o **valor médio
-entre os valores iniciais de cada imagem**. Ou seja: mede o valor inicial de
-cada característica em cada foto, calcula a média entre as duas e aplica esse
-mesmo valor médio às duas — deixando as imagens com aparência harmonizada.
+**b) Dois botões de ajuste automático**
+- **Ajuste Absoluto**: sliders mostram o valor absoluto da característica (0–100);
+  define o **mesmo valor (a média) nas duas fotos** — iguais nos números e
+  semelhantes na aparência.
+- **Ajuste Relativo**: sliders mostram ajustes (±) próprios de cada foto, em
+  direção à média; os números ficam diferentes entre as fotos.
 
 **c) Toggle on/off "Travar características das duas imagens"**
 - **ON**: ao mexer em uma característica de uma das imagens, a **mesma**

@@ -18,7 +18,7 @@
     <header class="topbar">
       <span class="topbar-spacer"></span>
       <h1>Fotos Fantasma</h1>
-      <span class="version-badge">v2.4</span>
+      <span class="version-badge">v2.5</span>
     </header>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -113,7 +113,11 @@
         <figure><canvas id="ed-canvas-base"></canvas><figcaption>Base</figcaption></figure>
         <figure><canvas id="ed-canvas-follow"></canvas><figcaption>Depois</figcaption></figure>
       </div>
-      <button id="ed-auto" class="btn primary">✨ Ajuste Automático Completo</button>
+      <div class="ed-auto-row">
+        <button id="ed-auto-rel" class="btn outline">Ajuste Relativo</button>
+        <button id="ed-auto-abs" class="btn primary">Ajuste Absoluto</button>
+      </div>
+      <p class="ed-auto-hint">Absoluto: mesmos valores nas duas fotos. Relativo: ajustes (±) próprios de cada foto.</p>
       <label class="ed-lock">
         <input type="checkbox" id="ed-lock-toggle" />
         <span>Travar as duas imagens <small>(mexer numa altera a outra igual)</small></span>

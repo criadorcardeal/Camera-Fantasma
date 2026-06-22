@@ -253,6 +253,9 @@ html, body {
 
 /* ---------- Editor de imagens (v2.0) ---------- */
 .ed-content { padding-bottom: 32px; }
+.ed-auto-row { display: flex; gap: 8px; margin-bottom: 4px; }
+.ed-auto-row .btn { margin-top: 0; flex: 1; }
+.ed-auto-hint { font-size: 0.74rem; color: var(--muted); margin: 0 0 8px; text-align: center; }
 .ed-previews { display: flex; gap: 8px; margin-bottom: 12px; }
 .ed-previews figure { margin: 0; flex: 1; text-align: center; }
 .ed-previews canvas {
