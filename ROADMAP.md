@@ -22,9 +22,9 @@ Roda no Safari (iPhone) e Chrome; instalável via "Adicionar à Tela de Início"
 
 ## Versão 2.0 (planejada) 🔜
 
-### 1. Importar a foto de acompanhamento
-Hoje só a foto **base** pode ser importada. Na 2.0, permitir importar também a
-foto de **acompanhamento** (galeria/nuvem), além de tirá-la pela câmera.
+### 1. Importar a foto de acompanhamento ✅ (implementada)
+Botão **"🖼 Importar acompanhamento"** na tela de comparação — usa a galeria ou
+a nuvem (via app Arquivos do iOS), além de tirá-la pela câmera.
 
 ### 2. Salvar/baixar fotos e a comparação
 Exportar para a **galeria do aparelho** e/ou **nuvem** (Google Drive, OneDrive,

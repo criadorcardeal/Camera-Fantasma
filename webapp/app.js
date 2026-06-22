@@ -353,6 +353,39 @@ function downscaleImage(file, maxSize) {
   });
 }
 
+// Abre o seletor de arquivos (galeria/nuvem via app Arquivos no iOS) e
+// devolve o arquivo escolhido. Criado sob demanda dentro do gesto do usuario.
+function pickImage() {
+  return new Promise((resolve) => {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "image/*";
+    inp.onchange = () => resolve(inp.files && inp.files[0]);
+    inp.click();
+  });
+}
+
+async function importFollowPhoto(session, file) {
+  if (!file) return;
+  let dataUrl;
+  try {
+    dataUrl = await downscaleImage(file, 1600);
+  } catch (e) {
+    alert(e.message || "Não foi possível usar esta imagem.");
+    return;
+  }
+  const distance = await openDistanceDialog(session.baseDistance);
+  if (distance == null) return;
+  session.followImage = dataUrl;
+  session.followDistance = distance;
+  session.followAt = new Date().toISOString();
+  // A imagem mudou: descarta ajustes/versao anteriores do acompanhamento.
+  session.followImageView = null;
+  session.followAdj = null;
+  await DB.put(session);
+  await openDetail(session.id);
+}
+
 async function importBasePhoto(file) {
   if (!file) return;
   let dataUrl;
@@ -432,8 +465,10 @@ async function openDetail(id) {
 
   const btnHtml = s.followImage
     ? `<button class="btn primary" id="btn-adjust">🎚 Ajustar imagens</button>
-       <button class="btn outline" id="btn-redo">Refazer foto de acompanhamento</button>`
-    : `<button class="btn primary" id="btn-follow">Tirar foto de acompanhamento</button>`;
+       <button class="btn outline" id="btn-redo">📷 Refazer acompanhamento</button>
+       <button class="btn outline" id="btn-follow-import">🖼 Importar acompanhamento</button>`
+    : `<button class="btn primary" id="btn-follow">📷 Tirar foto de acompanhamento</button>
+       <button class="btn outline" id="btn-follow-import">🖼 Importar acompanhamento</button>`;
 
   c.innerHTML = compareHtml + infoHtml + btnHtml;
 
@@ -451,6 +486,8 @@ async function openDetail(id) {
   } else {
     $("#btn-follow").addEventListener("click", () => Cam.open("follow", s));
   }
+  $("#btn-follow-import").addEventListener("click", () =>
+    pickImage().then((file) => importFollowPhoto(s, file)));
 
   showScreen("screen-detail");
 }
