@@ -96,21 +96,54 @@ const Aligner = {
 /* ---------- Controles do alinhamento ---------- */
 window.addEventListener("DOMContentLoaded", () => {
   const stage = $("#al-stage");
-  let dragging = false, lastX = 0, lastY = 0;
+  // Suporta 1 dedo (arrastar p/ posicionar) e 2 dedos (pinca p/ zoom + mover).
+  const pointers = new Map();
+  let last = { x: 0, y: 0 };
+  let pinch = { dist: 1, zoom: 1, midX: 0, midY: 0 };
+  const pts = () => [...pointers.values()];
+  const distOf = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) || 1;
+
   stage.addEventListener("pointerdown", (e) => {
-    dragging = true; lastX = e.clientX; lastY = e.clientY;
-    stage.setPointerCapture(e.pointerId);
+    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 1) {
+      last = { x: e.clientX, y: e.clientY };
+    } else if (pointers.size === 2) {
+      const [a, b] = pts();
+      pinch = { dist: distOf(a, b), zoom: Aligner.z, midX: (a.x + b.x) / 2, midY: (a.y + b.y) / 2 };
+    }
   });
+
   stage.addEventListener("pointermove", (e) => {
-    if (!dragging) return;
-    Aligner.tx += e.clientX - lastX;
-    Aligner.ty += e.clientY - lastY;
-    lastX = e.clientX; lastY = e.clientY;
-    Aligner.apply();
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size >= 2) {
+      const [a, b] = pts();
+      const d = distOf(a, b);
+      const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
+      Aligner.z = Math.max(0.5, Math.min(4, pinch.zoom * (d / pinch.dist)));
+      Aligner.tx += midX - pinch.midX;
+      Aligner.ty += midY - pinch.midY;
+      pinch.midX = midX; pinch.midY = midY;
+      $("#al-zoom").value = Aligner.z;
+      Aligner.apply();
+    } else {
+      Aligner.tx += e.clientX - last.x;
+      Aligner.ty += e.clientY - last.y;
+      last = { x: e.clientX, y: e.clientY };
+      Aligner.apply();
+    }
   });
-  const stop = () => { dragging = false; };
-  stage.addEventListener("pointerup", stop);
-  stage.addEventListener("pointercancel", stop);
+
+  const onUp = (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size === 1) {
+      const [a] = pts();
+      last = { x: a.x, y: a.y };   // continua arrastando com o dedo restante
+    }
+  };
+  stage.addEventListener("pointerup", onUp);
+  stage.addEventListener("pointercancel", onUp);
 
   $("#al-zoom").addEventListener("input", (e) => {
     Aligner.z = parseFloat(e.target.value);
