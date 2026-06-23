@@ -223,8 +223,9 @@ function solveAdjustments(img, target) {
 }
 
 /* ---------- Renderiza versao ajustada em dataURL (resolucao cheia) ---------- */
-async function bakeView(src, adj) {
-  const data = await loadPreviewData(src, 1600);
+async function bakeView(src, matchParams, adj) {
+  let data = await loadPreviewData(src, 1600);
+  if (matchParams) data = applyRelMatch(data, matchParams);
   const out = applyAdjustments(data, adj);
   const c = document.createElement("canvas");
   c.width = out.width; c.height = out.height;
@@ -275,21 +276,84 @@ function solveOneDelta(img, deltas, key, targetMetricVal) {
   return Math.round((lo + hi) / 2);
 }
 
-/* ---------- Ajuste RELATIVO (modelo antigo: deltas por foto) ----------
-   Cada imagem recebe um ajuste (delta) calculado da sua propria medida em
-   direcao a media. Os valores aparecem como ± e NAO ficam iguais entre as
-   fotos (e o comportamento que o usuario quis manter como opcao). */
-function slidersFromMetric(m, target) {
-  return {
-    exposure: Math.round(clamp(target.lum - m.lum, -100, 100)),
-    contrast: Math.round(clamp((target.contrast / (m.contrast || 1) - 1) * 100, -100, 100)),
-    saturation: Math.round(clamp((target.saturation / (m.saturation || 1) - 1) * 100, -100, 100)),
-    temperature: Math.round(clamp(target.temperature - m.temperature, -100, 100)),
-    tint: Math.round(clamp((target.tint - m.tint) / 0.75, -100, 100)),
-    highlights: Math.round(clamp((target.highlights - m.highlights) / 0.3, -100, 100)),
-    shadows: Math.round(clamp((target.shadows - m.shadows) / 0.3, -100, 100)),
-    sharpness: Math.round(clamp((target.sharpness / (m.sharpness || 1) - 1) * 50, -100, 100)),
-  };
+/* ---------- Ajuste RELATIVO = casamento de cor (porte da skill) ----------
+   Reproduz a parte fotometrica da skill "comparacao-fotografica":
+   equilibrio de branco gray-world medido na PELE, depois iguala o tom de
+   pele/iluminacao do acompanhamento ao da base por deslocamento em LAB (medido
+   na pele) - preservando os vasos (so desloca a media, nao comprime o detalhe).
+   Os parametros sao guardados para reaplicar em qualquer resolucao. */
+function rgb2lab(r, g, b) {
+  let R = r / 255, G = g / 255, B = b / 255;
+  R = R > 0.04045 ? Math.pow((R + 0.055) / 1.055, 2.4) : R / 12.92;
+  G = G > 0.04045 ? Math.pow((G + 0.055) / 1.055, 2.4) : G / 12.92;
+  B = B > 0.04045 ? Math.pow((B + 0.055) / 1.055, 2.4) : B / 12.92;
+  let X = (R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047;
+  let Y = (R * 0.2126 + G * 0.7152 + B * 0.0722);
+  let Z = (R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883;
+  const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const fx = f(X), fy = f(Y), fz = f(Z);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+function lab2rgb(L, a, b) {
+  const fy = (L + 16) / 116, fx = fy + a / 500, fz = fy - b / 200;
+  const fi = (t) => { const t3 = t * t * t; return t3 > 0.008856 ? t3 : (t - 16 / 116) / 7.787; };
+  let X = fi(fx) * 0.95047, Y = fi(fy), Z = fi(fz) * 1.08883;
+  let R = X * 3.2406 - Y * 1.5372 - Z * 0.4986;
+  let G = -X * 0.9689 + Y * 1.8758 + Z * 0.0415;
+  let B = X * 0.0557 - Y * 0.2040 + Z * 1.0570;
+  const g = (t) => (t > 0.0031308 ? 1.055 * Math.pow(t, 1 / 2.4) - 0.055 : 12.92 * t);
+  return [g(R) * 255, g(G) * 255, g(B) * 255];
+}
+function isSkin(r, g, b) {
+  const y = 0.299 * r + 0.587 * g + 0.114 * b;
+  const cr = (r - y) * 0.713 + 128;
+  const cb = (b - y) * 0.564 + 128;
+  return cr >= 135 && cr <= 180 && cb >= 85 && cb <= 135 && y > 40;
+}
+function skinLabMean(data, wb) {
+  const s = data.data; let n = 0, sL = 0, sa = 0, sb = 0;
+  for (let i = 0; i < s.length; i += 4) {
+    const r = Math.min(255, s[i] * wb.r), g = Math.min(255, s[i + 1] * wb.g), b = Math.min(255, s[i + 2] * wb.b);
+    if (isSkin(r, g, b)) { const lab = rgb2lab(r, g, b); sL += lab[0]; sa += lab[1]; sb += lab[2]; n++; }
+  }
+  if (n < 50) return null;
+  return [sL / n, sa / n, sb / n];
+}
+// Calcula os parametros: base (ref) so equilibrio de branco; follow recebe WB +
+// deslocamento LAB para casar o tom de pele/iluminacao com a base.
+function computeRelMatch(baseData, followData) {
+  // Base e a referencia (nao muda). O acompanhamento recebe um deslocamento da
+  // media de pele em LAB para casar tom/iluminacao com a base (com limites, p/
+  // nao distorcer). So a media e deslocada -> preserva o detalhe (vasos).
+  const ID = { r: 1, g: 1, b: 1 };
+  const baseLab = skinLabMean(baseData, ID);
+  const followLab = skinLabMean(followData, ID);
+  let labShift = null;
+  if (baseLab && followLab) {
+    const cl = (v, m) => Math.max(-m, Math.min(m, v));
+    labShift = {
+      dL: cl(baseLab[0] - followLab[0], 55),
+      da: cl(baseLab[1] - followLab[1], 45),
+      db: cl(baseLab[2] - followLab[2], 45),
+    };
+  }
+  return { base: { wb: ID }, follow: { wb: ID, labShift } };
+}
+function applyRelMatch(imgData, p) {
+  const s = imgData.data;
+  const out = new Uint8ClampedArray(s.length);
+  const wb = (p && p.wb) || { r: 1, g: 1, b: 1 };
+  const sh = p && p.labShift;
+  for (let i = 0; i < s.length; i += 4) {
+    let r = s[i] * wb.r, g = s[i + 1] * wb.g, b = s[i + 2] * wb.b;
+    if (sh) {
+      const lab = rgb2lab(Math.min(255, r), Math.min(255, g), Math.min(255, b));
+      const rgb = lab2rgb(lab[0] + sh.dL, lab[1] + sh.da, lab[2] + sh.db);
+      r = rgb[0]; g = rgb[1]; b = rgb[2];
+    }
+    out[i] = r; out[i + 1] = g; out[i + 2] = b; out[i + 3] = s[i + 3];
+  }
+  return new ImageData(out, imgData.width, imgData.height);
 }
 
 /* ============================ Editor (UI) ============================ */
@@ -310,7 +374,9 @@ const Editor = {
   mode: "absolute",                      // "absolute" | "relative"
   adj: { base: null, follow: null },     // ajustes internos (deltas) p/ applyAdjustments
   target: { base: null, follow: null },  // valores ABSOLUTOS exibidos (0-100) por caracteristica
-  prev: { base: null, follow: null },
+  prev: { base: null, follow: null },    // imagem original (preview) de cada foto
+  baked: { base: null, follow: null },   // imagem ja com casamento de cor (modo relativo)
+  relMatch: null,                        // parametros do casamento de cor (skill)
   raf: null,
   rafR: null,
   pending: null,
@@ -357,6 +423,13 @@ const Editor = {
         this.adj[k] = this.defaults();
       }
     });
+    // Restaura o casamento de cor (modo relativo) salvo, se houver.
+    this.baked = { base: null, follow: null };
+    this.relMatch = session.relMatch || null;
+    if (this.relMatch) {
+      this.baked.base = applyRelMatch(this.prev.base, this.relMatch.base);
+      this.baked.follow = applyRelMatch(this.prev.follow, this.relMatch.follow);
+    }
     this.buildSliders();
     this.renderBoth();
   },
@@ -440,7 +513,7 @@ const Editor = {
   },
 
   renderImage(key) {
-    const src = this.prev[key];
+    const src = this.baked[key] || this.prev[key];
     if (!src) return;
     const out = applyAdjustments(src, this.adj[key]);
     const c = $("#ed-canvas-" + key);
@@ -471,10 +544,11 @@ const Editor = {
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     try {
       this.mode = mode;
-      const rb = await loadPreviewData(this.session.baseImage, 130);
-      const rf = await loadPreviewData(this.session.followImage, 130);
       if (mode === "absolute") {
         // Mesmos numeros nas duas (a media); resolve cada uma p/ atingi-los.
+        this.baked.base = null; this.baked.follow = null; this.relMatch = null;
+        const rb = await loadPreviewData(this.session.baseImage, 130);
+        const rf = await loadPreviewData(this.session.followImage, 130);
         const tb = measureTargets(rb), tf = measureTargets(rf);
         const avg = {};
         this.CHARS.forEach((c) => (avg[c.key] = Math.round((tb[c.key] + tf[c.key]) / 2)));
@@ -485,13 +559,13 @@ const Editor = {
         this.adj.base = solveAdjustments(rb, tgt);
         this.adj.follow = solveAdjustments(rf, tgt);
       } else {
-        // Deltas proprios de cada foto em direcao a media (valores diferentes).
-        const mb = measure(rb), mf = measure(rf);
-        const keys = ["lum", "contrast", "saturation", "temperature", "tint", "highlights", "shadows", "sharpness"];
-        const target = {};
-        keys.forEach((k) => (target[k] = (mb[k] + mf[k]) / 2));
-        this.adj.base = slidersFromMetric(mb, target);
-        this.adj.follow = slidersFromMetric(mf, target);
+        // RELATIVO = casamento de cor (skill): base e a referencia; o
+        // acompanhamento recebe WB + deslocamento de tom de pele p/ casar.
+        this.relMatch = computeRelMatch(this.prev.base, this.prev.follow);
+        this.baked.base = applyRelMatch(this.prev.base, this.relMatch.base);
+        this.baked.follow = applyRelMatch(this.prev.follow, this.relMatch.follow);
+        this.adj.base = this.defaults();
+        this.adj.follow = this.defaults();
       }
       this.buildSliders();
       this.renderBoth();
@@ -505,9 +579,11 @@ const Editor = {
     const keys = this.locked ? ["base", "follow"] : [this.which];
     keys.forEach((k) => {
       this.adj[k] = this.defaults();
+      this.baked[k] = null;
       if (this.mode !== "relative") this.target[k] = measureTargets(this.prev[k]);
       this.renderImage(k);
     });
+    this.relMatch = null;
     this.refreshSliderValues();
   },
 
@@ -518,8 +594,14 @@ const Editor = {
     s.followAdj = this.adj.follow;
     s.baseTarget = this.target.base;
     s.followTarget = this.target.follow;
-    s.baseImageView = this.isNeutral(this.adj.base) ? null : await bakeView(s.baseImage, this.adj.base);
-    s.followImageView = this.isNeutral(this.adj.follow) ? null : await bakeView(s.followImage, this.adj.follow);
+    s.relMatch = this.relMatch;
+    // A base e referencia (nao muda no casamento); so ganha versao se tiver
+    // ajuste manual. O acompanhamento ganha versao se houve casamento ou ajuste.
+    const mFollow = (this.relMatch && this.relMatch.follow.labShift) ? this.relMatch.follow : null;
+    s.baseImageView = this.isNeutral(this.adj.base)
+      ? null : await bakeView(s.baseImage, null, this.adj.base);
+    s.followImageView = (mFollow || !this.isNeutral(this.adj.follow))
+      ? await bakeView(s.followImage, mFollow, this.adj.follow) : null;
     await DB.put(s);
     await openDetail(s.id);
   },

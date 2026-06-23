@@ -56,8 +56,10 @@ o original fica intacto para reedição.
 - **Ajuste Absoluto**: sliders mostram o valor absoluto da característica (0–100);
   define o **mesmo valor (a média) nas duas fotos** — iguais nos números e
   semelhantes na aparência.
-- **Ajuste Relativo**: sliders mostram ajustes (±) próprios de cada foto, em
-  direção à média; os números ficam diferentes entre as fotos.
+- **Ajuste Relativo**: casa a **cor e iluminação** do acompanhamento com a base
+  (porte em JS da skill `comparacao-fotografica`: equilíbrio na pele + igualar o
+  tom de pele em LAB, preservando os vasos). A base é a referência e não muda.
+  Sliders ± ficam disponíveis para ajuste fino manual por cima.
 
 **c) Toggle on/off "Travar características das duas imagens"**
 - **ON**: ao mexer em uma característica de uma das imagens, a **mesma**
