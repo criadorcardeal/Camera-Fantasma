@@ -308,8 +308,10 @@ const Cam = {
         followImage: null,
         followDistance: null,
         followAt: null,
+        creditState: "reserved",
       };
       await DB.put(session);
+      Credits.reserve();
       this.stop();
       await openDetail(session.id);
     } else {
@@ -399,8 +401,10 @@ async function importBasePhoto(file) {
     followImage: null,
     followDistance: null,
     followAt: null,
+    creditState: "reserved",
   };
   await DB.put(session);
+  Credits.reserve();
   await openDetail(session.id);
 }
 
@@ -454,6 +458,13 @@ async function openDetail(id) {
       <div class="row"><b>Foto base</b><span>${fmtDate(s.createdAt)} • ${Math.round(s.baseDistance)} cm</span></div>
       ${s.followImage ? `<div class="row"><b>Acompanhamento</b><span>${fmtDate(s.followAt)} • ${Math.round(s.followDistance)} cm</span></div>` : ""}
       <div class="row"><b>Captura (câmera)</b><span>Brilho ${s.filters.brightness.toFixed(2)} • Contraste ${s.filters.contrast.toFixed(2)} • Saturação ${s.filters.saturate.toFixed(2)}</span></div>
+      <div class="row"><b>Status</b><span>${
+        s.creditState === "confirmed"
+          ? "Concluída ✓ (crédito usado)"
+          : s.creditState === "reserved"
+            ? "Em aberto — salve/compartilhe para concluir (crédito reservado)"
+            : "—"
+      }</span></div>
     </div>`;
 
   const shareBtn = `<button class="btn outline" id="btn-share">📤 Salvar / Compartilhar</button>`;
@@ -542,8 +553,20 @@ function renderCompare(mode) {
 
 /* ---------------- Eventos globais ---------------- */
 function wireEvents() {
-  $("#btn-new").addEventListener("click", () => Cam.open("base"));
-  $("#btn-import").addEventListener("click", () => $("#import-input").click());
+  $("#btn-new").addEventListener("click", () => {
+    if (!Credits.canStart()) {
+      Credits.promptBuy("Você está sem créditos. Compre para fazer uma nova comparação.");
+      return;
+    }
+    Cam.open("base");
+  });
+  $("#btn-import").addEventListener("click", () => {
+    if (!Credits.canStart()) {
+      Credits.promptBuy("Você está sem créditos. Compre para fazer uma nova comparação.");
+      return;
+    }
+    $("#import-input").click();
+  });
   $("#import-input").addEventListener("change", async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = ""; // permite reimportar o mesmo arquivo depois
@@ -574,6 +597,8 @@ function wireEvents() {
   $("#detail-delete").addEventListener("click", async () => {
     if (!_detailSession) return;
     if (confirm("Excluir esta comparação? As fotos serão apagadas do aparelho.")) {
+      // Devolve o crédito se a comparação não foi concluída (abandonada).
+      if (_detailSession.creditState === "reserved") Credits.refund();
       await DB.remove(_detailSession.id);
       _detailSession = null;
       showScreen("screen-home");

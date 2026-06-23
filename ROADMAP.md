@@ -74,8 +74,22 @@ o original fica intacto para reedição.
 
 ---
 
-## Versão paga (futuro)
+## Versão paga (em andamento)
 
+### Créditos — protótipo do fluxo ✅ (v3.3)
+Sem versão gratuita: criar uma comparação exige crédito.
+- **Reserva** 1 crédito ao abrir/criar a comparação; **confirma** ao salvar/
+  compartilhar; **devolve** se abandonar (excluir antes de concluir).
+- Pacotes de **10 créditos**. Barra de créditos na tela inicial com saldo e
+  botão **Comprar**.
+- **Administração** (engrenagem + PIN): muda o **preço** do pacote e o PIN.
+- ⚠️ **Protótipo client-side**: saldo no aparelho (localStorage), compra sem
+  cobrança real. Falta o backend (contas + saldo no servidor) e o pagamento
+  via **Mercado Pago** (Pix/cartão/boleto + webhook que credita após pagar).
+
+### Próximos (versão paga)
+
+- Backend de contas + saldo de créditos no servidor + pagamento Mercado Pago.
 - Armazenar foto com **nome e código**.
 - **Banco de dados separado** por grupo de fotos do mesmo objeto.
 - Exportar grupos para **animações antes/depois**.

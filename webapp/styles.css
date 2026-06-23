@@ -51,6 +51,28 @@ html, body {
 
 .content { flex: 1; overflow-y: auto; padding: 12px; padding-bottom: 96px; }
 
+/* ---------- Barra de créditos (v3.3) ---------- */
+.credits-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; background: #eef3f6;
+  border-bottom: 1px solid #dde5ea;
+}
+#cred-balance { font-weight: 700; color: var(--primary); }
+#cred-balance.cred-zero { color: #c0392b; }
+.cred-actions { display: flex; align-items: center; gap: 8px; }
+.cred-buy {
+  background: var(--primary); color: #fff; border: none;
+  border-radius: 16px; padding: 6px 14px; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer;
+}
+.cred-admin {
+  background: transparent; border: none; font-size: 1.1rem;
+  cursor: pointer; opacity: 0.6; padding: 2px 6px;
+}
+.buy-price { font-size: 1.1rem; font-weight: 700; color: var(--primary); margin: 4px 0; }
+.buy-note { font-size: 0.8rem; color: var(--muted); }
+#buy-msg { color: #c0392b; font-weight: 600; }
+
 /* ---------- Home list ---------- */
 .card {
   background: var(--card);

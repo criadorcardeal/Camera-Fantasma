@@ -1,10 +1,11 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-const CACHE = "fotos-fantasma-v13";
+const CACHE = "fotos-fantasma-v14";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
+  "./credits.js",
   "./app.js",
   "./editor.js",
   "./align.js",

@@ -18,8 +18,15 @@
     <header class="topbar">
       <span class="topbar-spacer"></span>
       <h1>Fotos Fantasma</h1>
-      <span class="version-badge">v3.2</span>
+      <span class="version-badge">v3.3</span>
     </header>
+    <div class="credits-bar">
+      <span id="cred-balance">🪙 0 créditos</span>
+      <span class="cred-actions">
+        <button id="cred-buy" class="cred-buy">Comprar</button>
+        <button id="cred-admin" class="cred-admin" title="Administração">⚙</button>
+      </span>
+    </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
       <button id="btn-import" class="fab fab-secondary">🖼 Importar</button>
@@ -134,6 +141,35 @@
     </div>
   </section>
 
+  <!-- ============ DIÁLOGO: COMPRAR CRÉDITOS (v3.3) ============ -->
+  <dialog id="buy-dialog">
+    <h3>Comprar créditos</h3>
+    <p id="buy-msg" hidden></p>
+    <p id="buy-price" class="buy-price"></p>
+    <p class="buy-note">Cada comparação consome 1 crédito (reservado ao abrir,
+      confirmado ao salvar/compartilhar). <b>Protótipo:</b> a compra adiciona
+      créditos sem cobrança real — o pagamento (Mercado Pago) entra na próxima fase.</p>
+    <menu>
+      <button id="buy-close">Fechar</button>
+      <button id="buy-confirm" class="primary">Comprar 10 (protótipo)</button>
+    </menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: ADMINISTRAÇÃO (v3.3) ============ -->
+  <dialog id="admin-dialog">
+    <h3>Administração</h3>
+    <label>Preço do pacote de 10 créditos (R$)
+      <input type="text" id="admin-price" inputmode="decimal" />
+    </label>
+    <label>Novo PIN do admin (opcional)
+      <input type="text" id="admin-pin" inputmode="numeric" autocomplete="off" />
+    </label>
+    <menu>
+      <button id="admin-close">Cancelar</button>
+      <button id="admin-save" class="primary">Salvar</button>
+    </menu>
+  </dialog>
+
   <!-- ============ DIÁLOGO: SALVAR / COMPARTILHAR (v3.0) ============ -->
   <dialog id="share-dialog">
     <h3>Salvar / Compartilhar</h3>
@@ -164,6 +200,7 @@
     </form>
   </dialog>
 
+  <script src="./credits.js"></script>
   <script src="./app.js"></script>
   <script src="./editor.js"></script>
   <script src="./align.js"></script>

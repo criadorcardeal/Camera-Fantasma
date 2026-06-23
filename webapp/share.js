@@ -78,6 +78,7 @@ const Share = {
   files: {},
 
   async open(session) {
+    this.session = session;
     this.files = {};
     const dlg = $("#share-dialog");
     const status = $("#share-status");
@@ -109,6 +110,11 @@ const Share = {
     const file = this.files[what];
     $("#share-dialog").close();
     if (file) shareFile(file);
+    // Salvar/compartilhar COMPLETA a comparacao -> confirma o credito reservado.
+    if (this.session && this.session.creditState === "reserved") {
+      this.session.creditState = "confirmed";
+      DB.put(this.session);
+    }
   },
 };
 
