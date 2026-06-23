@@ -587,6 +587,28 @@ window.addEventListener("DOMContentLoaded", async () => {
   wireEvents();
   await renderHome();
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    // updateViaCache:none -> o navegador sempre busca o sw.js fresco (detecta
+    // versao nova mais rapido).
+    navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" })
+      .then((reg) => {
+        // Quando uma versao nova terminar de instalar e ja houver um app
+        // rodando, recarrega sozinho para aplicar a atualizacao (sem apagar
+        // nada). Nao recarrega na primeira instalacao (sem controller antes).
+        reg.addEventListener("updatefound", () => {
+          const nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener("statechange", () => {
+            if (nw.state === "installed" && navigator.serviceWorker.controller) {
+              window.location.reload();
+            }
+          });
+        });
+        reg.update().catch(() => {});
+        // Verifica atualizacao toda vez que o app volta para o primeiro plano.
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") reg.update().catch(() => {});
+        });
+      })
+      .catch(() => {});
   }
 });
