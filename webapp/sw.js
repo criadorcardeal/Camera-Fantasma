@@ -1,9 +1,9 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* v3.6.4: botao "Alinhamento automatico" na tela de alinhar/reposicionar —
-   detecta a silhueta (parte do corpo) nas 2 fotos e gira/escala/move o
-   acompanhamento p/ empilhar na base (momentos + refino por IoU das mascaras). */
-const CACHE = "fotos-fantasma-v33";
+/* v3.6.5: alinhamento automatico calibrado p/ fotos clinicas reais — deteccao
+   de PELE (clara a escura) no lugar da diferenca-de-fundo (funciona com a perna
+   encostando na borda e fundos variados), maior mancha + preenchimento de buracos. */
+const CACHE = "fotos-fantasma-v34";
 const ASSETS = [
   "./",
   "./index.html",

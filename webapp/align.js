@@ -30,11 +30,18 @@ function alCoverRender(img, W, H) {
   return ctx.getImageData(0, 0, W, H);
 }
 
-// Heurística simples de pele (YCrCb), reforça a silhueta de membros.
-function alIsSkin(r, g, b) {
+// Detecção de PELE robusta (tons claros a castanho-escuro): combina uma regra
+// RGB (estilo Kovac) com YCrCb. Como a pele é "quente" (R>G>B, com espalhamento),
+// rejeita bem os fundos comuns nas fotos clínicas: cinza/azul do quarto, campo
+// azul, calça preta, cano metálico. Funciona mesmo com a perna encostando na
+// borda (não depende de estimar o fundo pelas bordas).
+function alSkinScore(r, g, b) {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
   const cr = 128 + (0.5 * r - 0.418688 * g - 0.081312 * b);
   const cb = 128 + (-0.168736 * r - 0.331264 * g + 0.5 * b);
-  return cr >= 135 && cr <= 180 && cb >= 85 && cb <= 135;
+  const ycc = cr >= 135 && cr <= 182 && cb >= 80 && cb <= 135;
+  const rgb = r > 55 && g > 25 && b > 10 && (mx - mn) > 12 && r > g && r >= b - 4 && (r - g) >= 7;
+  return ycc && rgb;
 }
 
 // Limiar de Otsu sobre um histograma de 256 níveis.
@@ -75,10 +82,37 @@ function alLargestComponent(mask, W, H) {
   return { mask: out, area: bestArea };
 }
 
-// Máscara de primeiro plano (silhueta) de um ImageData.
-function alForegroundMask(imgd) {
+// Preenche buracos internos de uma máscara (veias, marcas de caneta, brilhos):
+// tudo que é 0 mas NÃO alcança a borda da imagem vira 1.
+function alFillHoles(mask, W, H) {
+  const out = mask.slice();
+  const outside = new Uint8Array(W * H);
+  const stack = [];
+  for (let x = 0; x < W; x++) {
+    if (!mask[x]) stack.push(x);
+    const b = (H - 1) * W + x; if (!mask[b]) stack.push(b);
+  }
+  for (let y = 0; y < H; y++) {
+    const l = y * W; if (!mask[l]) stack.push(l);
+    const r = y * W + W - 1; if (!mask[r]) stack.push(r);
+  }
+  while (stack.length) {
+    const q = stack.pop(); if (outside[q]) continue; outside[q] = 1;
+    const x = q % W, y = (q / W) | 0;
+    if (x > 0 && !mask[q - 1] && !outside[q - 1]) stack.push(q - 1);
+    if (x < W - 1 && !mask[q + 1] && !outside[q + 1]) stack.push(q + 1);
+    if (y > 0 && !mask[q - W] && !outside[q - W]) stack.push(q - W);
+    if (y < H - 1 && !mask[q + W] && !outside[q + W]) stack.push(q + W);
+  }
+  for (let p = 0; p < W * H; p++) if (!mask[p] && !outside[p]) out[p] = 1;
+  return out;
+}
+
+// Máscara por diferença do fundo (fallback): estima o fundo pelas bordas e
+// limiariza pela distância de cor (Otsu). Usada só quando a pele quase não é
+// detectada (ex.: iluminação muito atípica).
+function alBgDiffMask(imgd) {
   const W = imgd.width, H = imgd.height, d = imgd.data, N = W * H;
-  // Cor média do fundo a partir de uma moldura nas bordas.
   const bw = Math.max(2, Math.round(Math.min(W, H) * 0.06));
   let br = 0, bg = 0, bb = 0, bn = 0;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -87,13 +121,11 @@ function alForegroundMask(imgd) {
     }
   }
   br /= bn; bg /= bn; bb /= bn;
-  // Pontuação = distância ao fundo (com reforço de pele); normaliza e Otsu.
   const score = new Float32Array(N);
   let smin = 1e9, smax = -1e9;
   for (let p = 0, i = 0; p < N; p++, i += 4) {
     const dr = d[i] - br, dg = d[i + 1] - bg, db = d[i + 2] - bb;
-    let s = Math.sqrt(dr * dr + dg * dg + db * db);
-    if (alIsSkin(d[i], d[i + 1], d[i + 2])) s = Math.max(s, 70);
+    const s = Math.sqrt(dr * dr + dg * dg + db * db);
     score[p] = s; if (s < smin) smin = s; if (s > smax) smax = s;
   }
   const hist = new Int32Array(256);
@@ -103,7 +135,25 @@ function alForegroundMask(imgd) {
   const th = alOtsu(hist, N);
   const mask = new Uint8Array(N);
   for (let p = 0; p < N; p++) mask[p] = q[p] > th ? 1 : 0;
-  return alLargestComponent(mask, W, H);
+  return mask;
+}
+
+// Máscara de primeiro plano (silhueta do membro): PRIMÁRIO = pele (robusto p/
+// fundos variados e perna encostando na borda); FALLBACK = diferença do fundo.
+// Depois pega a maior mancha conexa e preenche os buracos internos.
+function alForegroundMask(imgd) {
+  const W = imgd.width, H = imgd.height, d = imgd.data, N = W * H;
+  const skin = new Uint8Array(N);
+  let sc = 0;
+  for (let p = 0, i = 0; p < N; p++, i += 4) {
+    if (alSkinScore(d[i], d[i + 1], d[i + 2])) { skin[p] = 1; sc++; }
+  }
+  const comp = (sc > N * 0.02)
+    ? alLargestComponent(skin, W, H)
+    : alLargestComponent(alBgDiffMask(imgd), W, H);
+  const mask = alFillHoles(comp.mask, W, H);
+  let area = 0; for (let p = 0; p < N; p++) area += mask[p];
+  return { mask, area };
 }
 
 // Momentos da máscara: centro, orientação (eixo principal) e raio RMS (tamanho).
