@@ -1,10 +1,9 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* v3.6.3: nome (marca d'agua) na montagem com o mesmo tamanho das midias;
-   aviso ao fechar o perfil no X com alteracoes nao salvas; tela inicial com
-   avatar e badge trocados de lugar e sem o tipo de dispositivo.
-   v31->v32: avatar do perfil com o mesmo tamanho (40px) na ComparaCam e Montagem. */
-const CACHE = "fotos-fantasma-v32";
+/* v3.6.4: botao "Alinhamento automatico" na tela de alinhar/reposicionar —
+   detecta a silhueta (parte do corpo) nas 2 fotos e gira/escala/move o
+   acompanhamento p/ empilhar na base (momentos + refino por IoU das mascaras). */
+const CACHE = "fotos-fantasma-v33";
 const ASSETS = [
   "./",
   "./index.html",

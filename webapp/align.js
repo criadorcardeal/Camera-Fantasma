@@ -8,6 +8,142 @@
    confirmar, gera a foto de acompanhamento ja enquadrada igual a base.
    (loadImageEl, $, showScreen, DB, openDetail, openLabelDialog sao globais.)
    ========================================================================= */
+/* =========================================================================
+   Alinhamento automático (visão computacional em canvas, sem libs).
+   Ideia: detecta a SILHUETA (parte do corpo) em cada foto por segmentação de
+   primeiro plano (diferença do fundo das bordas + reforço de pele), pega a maior
+   mancha, e calcula por MOMENTOS o centro, a orientação (eixo principal) e o
+   tamanho de cada silhueta. Disso sai uma transformação de SEMELHANÇA (girar,
+   escalar, transladar) que empilha o acompanhamento sobre a base; um refino por
+   sobreposição de máscaras (IoU) resolve a ambiguidade de 180° e ajusta.
+   ========================================================================= */
+
+// Desenha a imagem COBRINDO (cover) um quadro W×H e devolve os pixels.
+function alCoverRender(img, W, H) {
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const scale = Math.max(W / iw, H / ih);
+  const sw = W / scale, sh = H / scale;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, 0, 0, W, H);
+  return ctx.getImageData(0, 0, W, H);
+}
+
+// Heurística simples de pele (YCrCb), reforça a silhueta de membros.
+function alIsSkin(r, g, b) {
+  const cr = 128 + (0.5 * r - 0.418688 * g - 0.081312 * b);
+  const cb = 128 + (-0.168736 * r - 0.331264 * g + 0.5 * b);
+  return cr >= 135 && cr <= 180 && cb >= 85 && cb <= 135;
+}
+
+// Limiar de Otsu sobre um histograma de 256 níveis.
+function alOtsu(hist, total) {
+  let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let sumB = 0, wB = 0, best = 0, th = 0;
+  for (let i = 0; i < 256; i++) {
+    wB += hist[i]; if (!wB) continue;
+    const wF = total - wB; if (!wF) break;
+    sumB += i * hist[i];
+    const mB = sumB / wB, mF = (sum - sumB) / wF;
+    const between = wB * wF * (mB - mF) * (mB - mF);
+    if (between > best) { best = between; th = i; }
+  }
+  return th;
+}
+
+// Maior componente conexa (4-viz) de uma máscara binária.
+function alLargestComponent(mask, W, H) {
+  const lbl = new Int32Array(W * H).fill(0);
+  const out = new Uint8Array(W * H);
+  const stack = new Int32Array(W * H);
+  let bestArea = 0, bestId = 0, id = 0;
+  for (let p = 0; p < W * H; p++) {
+    if (!mask[p] || lbl[p]) continue;
+    id++; let sp = 0, area = 0; stack[sp++] = p; lbl[p] = id;
+    while (sp) {
+      const q = stack[--sp]; area++;
+      const x = q % W, y = (q / W) | 0;
+      if (x > 0 && mask[q - 1] && !lbl[q - 1]) { lbl[q - 1] = id; stack[sp++] = q - 1; }
+      if (x < W - 1 && mask[q + 1] && !lbl[q + 1]) { lbl[q + 1] = id; stack[sp++] = q + 1; }
+      if (y > 0 && mask[q - W] && !lbl[q - W]) { lbl[q - W] = id; stack[sp++] = q - W; }
+      if (y < H - 1 && mask[q + W] && !lbl[q + W]) { lbl[q + W] = id; stack[sp++] = q + W; }
+    }
+    if (area > bestArea) { bestArea = area; bestId = id; }
+  }
+  for (let p = 0; p < W * H; p++) out[p] = (lbl[p] === bestId) ? 1 : 0;
+  return { mask: out, area: bestArea };
+}
+
+// Máscara de primeiro plano (silhueta) de um ImageData.
+function alForegroundMask(imgd) {
+  const W = imgd.width, H = imgd.height, d = imgd.data, N = W * H;
+  // Cor média do fundo a partir de uma moldura nas bordas.
+  const bw = Math.max(2, Math.round(Math.min(W, H) * 0.06));
+  let br = 0, bg = 0, bb = 0, bn = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (x < bw || y < bw || x >= W - bw || y >= H - bw) {
+      const i = (y * W + x) * 4; br += d[i]; bg += d[i + 1]; bb += d[i + 2]; bn++;
+    }
+  }
+  br /= bn; bg /= bn; bb /= bn;
+  // Pontuação = distância ao fundo (com reforço de pele); normaliza e Otsu.
+  const score = new Float32Array(N);
+  let smin = 1e9, smax = -1e9;
+  for (let p = 0, i = 0; p < N; p++, i += 4) {
+    const dr = d[i] - br, dg = d[i + 1] - bg, db = d[i + 2] - bb;
+    let s = Math.sqrt(dr * dr + dg * dg + db * db);
+    if (alIsSkin(d[i], d[i + 1], d[i + 2])) s = Math.max(s, 70);
+    score[p] = s; if (s < smin) smin = s; if (s > smax) smax = s;
+  }
+  const hist = new Int32Array(256);
+  const norm = smax > smin ? 255 / (smax - smin) : 0;
+  const q = new Uint8Array(N);
+  for (let p = 0; p < N; p++) { const v = Math.round((score[p] - smin) * norm); q[p] = v; hist[v]++; }
+  const th = alOtsu(hist, N);
+  const mask = new Uint8Array(N);
+  for (let p = 0; p < N; p++) mask[p] = q[p] > th ? 1 : 0;
+  return alLargestComponent(mask, W, H);
+}
+
+// Momentos da máscara: centro, orientação (eixo principal) e raio RMS (tamanho).
+function alMoments(mask, W, H) {
+  let n = 0, sx = 0, sy = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (mask[y * W + x]) { n++; sx += x; sy += y; }
+  }
+  if (!n) return null;
+  const cx = sx / n, cy = sy / n;
+  let m20 = 0, m11 = 0, m02 = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (mask[y * W + x]) { const dx = x - cx, dy = y - cy; m20 += dx * dx; m11 += dx * dy; m02 += dy * dy; }
+  }
+  return { cx, cy, n, theta: 0.5 * Math.atan2(2 * m11, m20 - m02), S: Math.sqrt((m20 + m02) / n) };
+}
+
+// Translação (tx,ty) que leva o centro do acompanhamento ao centro da base,
+// dado z e rotação (graus), com rotação/escala em torno do centro do quadro.
+function alSolveT(B, F, z, rotDeg, cx, cy) {
+  const r = rotDeg * Math.PI / 180, cos = Math.cos(r), sin = Math.sin(r);
+  const dx = F.cx - cx, dy = F.cy - cy;
+  return { tx: B.cx - cx - z * (cos * dx - sin * dy), ty: B.cy - cy - z * (sin * dx + cos * dy) };
+}
+
+// Sobreposição (IoU) da máscara do acompanhamento transformada com a da base.
+function alMaskIoU(fmask, bmask, W, H, z, rotDeg, tx, ty, cx, cy) {
+  const r = rotDeg * Math.PI / 180, cos = Math.cos(r), sin = Math.sin(r);
+  let inter = 0, uni = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const bIn = bmask[y * W + x];
+    const qx = x - cx - tx, qy = y - cy - ty;         // inversa da transformação
+    const ix = Math.round((cos * qx + sin * qy) / z + cx);
+    const iy = Math.round((-sin * qx + cos * qy) / z + cy);
+    const fIn = (ix >= 0 && iy >= 0 && ix < W && iy < H) ? fmask[iy * W + ix] : 0;
+    if (bIn || fIn) { uni++; if (bIn && fIn) inter++; }
+  }
+  return uni ? inter / uni : 0;
+}
+
 const Aligner = {
   session: null,
   followUrl: null,
@@ -96,6 +232,73 @@ const Aligner = {
 
   async cancel() {
     await openDetail(this.session.id);
+  },
+
+  // Alinhamento automático: detecta as silhuetas e empilha o acompanhamento
+  // sobre a base (gira/escala/move), fazendo o que o usuário faz manualmente.
+  async autoAlign() {
+    const btn = $("#al-auto");
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = "Analisando…";
+    // Deixa o botão repintar antes do processamento pesado.
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    try {
+      const baseImg = await loadImageEl(this.session.baseImage);
+      const followImg = await loadImageEl(this.followUrl);
+      const aspect = (this.baseW / this.baseH) || 0.75;
+      const W0 = 200, H0 = Math.max(1, Math.round(W0 / aspect));
+      const bMask = alForegroundMask(alCoverRender(baseImg, W0, H0));
+      const fMask = alForegroundMask(alCoverRender(followImg, W0, H0));
+      const minArea = W0 * H0 * 0.01;
+      if (bMask.area < minArea || fMask.area < minArea) {
+        alert("Não foi possível detectar a silhueta nas fotos. Ajuste manualmente.");
+        return;
+      }
+      const B = alMoments(bMask.mask, W0, H0);
+      const F = alMoments(fMask.mask, W0, H0);
+      const cx = W0 / 2, cy = H0 / 2;
+      const z0 = Math.max(0.5, Math.min(4, B.S / F.S));
+      const rot0 = (B.theta - F.theta) * 180 / Math.PI;
+
+      // Estimativa inicial + resolve a ambiguidade de 180° pela sobreposição.
+      let best = null;
+      for (const flip of [0, 180]) {
+        const rot = rot0 + flip;
+        const t = alSolveT(B, F, z0, rot, cx, cy);
+        const iou = alMaskIoU(fMask.mask, bMask.mask, W0, H0, z0, rot, t.tx, t.ty, cx, cy);
+        if (!best || iou > best.iou) best = { z: z0, rot, tx: t.tx, ty: t.ty, iou };
+      }
+      // Refino local em escala e rotação (recentraliza a cada tentativa).
+      const zf = [0.82, 0.9, 0.96, 1, 1.05, 1.12, 1.22];
+      const dr = [-10, -6, -3, 0, 3, 6, 10];
+      for (const zm of zf) {
+        const z = Math.max(0.5, Math.min(4, z0 * zm));
+        for (const d of dr) {
+          const rot = best.rot + d;
+          const t = alSolveT(B, F, z, rot, cx, cy);
+          const iou = alMaskIoU(fMask.mask, bMask.mask, W0, H0, z, rot, t.tx, t.ty, cx, cy);
+          if (iou > best.iou) best = { z, rot, tx: t.tx, ty: t.ty, iou };
+        }
+      }
+
+      // Converte do quadro W0×H0 para os pixels do palco.
+      const rect = $("#al-stage").getBoundingClientRect();
+      const fac = (rect.width || W0) / W0;
+      this.z = Math.max(0.5, Math.min(4, best.z));
+      this.rot = ((best.rot + 180) % 360 + 360) % 360 - 180;   // normaliza -180..180
+      this.tx = best.tx * fac;
+      this.ty = best.ty * fac;
+      $("#al-zoom").value = this.z;
+      $("#al-rotate").value = Math.round(this.rot);
+      this.apply();
+      if (best.iou < 0.12) {
+        alert("Alinhamento automático com baixa confiança — confira e ajuste se precisar.");
+      }
+    } catch (e) {
+      alert("Não foi possível fazer o alinhamento automático. Ajuste manualmente.");
+    } finally {
+      btn.disabled = false; btn.textContent = label;
+    }
   },
 };
 
@@ -212,6 +415,7 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   $("#al-cancel").addEventListener("click", () => Aligner.cancel());
   $("#al-confirm").addEventListener("click", () => Aligner.confirm());
+  $("#al-auto").addEventListener("click", () => Aligner.autoAlign());
   window.addEventListener("resize", () => {
     if ($("#screen-align").classList.contains("active")) Aligner.layoutStage();
   });

@@ -350,6 +350,7 @@ html, body {
 
 /* ---------- Alinhar acompanhamento (v2.0) ---------- */
 .al-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px; overflow-y: auto; }
+.al-auto { margin-top: 0; }
 .al-stage {
   position: relative; margin: 0 auto; overflow: hidden;
   background: #000; border-radius: 8px; touch-action: none; user-select: none;
