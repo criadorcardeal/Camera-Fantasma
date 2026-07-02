@@ -18,12 +18,13 @@
     <header class="topbar">
       <span class="topbar-spacer"></span>
       <h1>Fotos Fantasma</h1>
-      <span class="version-badge">v3.5</span>
+      <span class="version-badge">v3.5.1</span>
     </header>
     <div class="credits-bar">
       <span id="cred-balance">🪙 0 créditos</span>
       <span class="cred-actions">
         <button id="cred-buy" class="cred-buy">Comprar</button>
+        <button id="cred-profile" class="cred-profile" title="Perfil">👤</button>
         <button id="cred-admin" class="cred-admin" title="Administração">⚙</button>
       </span>
     </div>
@@ -220,6 +221,41 @@
     </form>
   </dialog>
 
+  <!-- ============ DIÁLOGO: PERFIL DO USUÁRIO (v3.5.1) ============ -->
+  <dialog id="profile-dialog">
+    <h3>Perfil</h3>
+    <label>Nome
+      <input type="text" id="prof-name" placeholder="Ex.: Dr. Ricardo Lacerda" autocomplete="off" />
+    </label>
+    <label>Logo</label>
+    <div class="prof-logo-row">
+      <img id="prof-logo-prev" class="prof-logo-prev" alt="" />
+      <div class="prof-logo-btns">
+        <button id="prof-logo-pick" type="button">Escolher imagem</button>
+        <button id="prof-logo-remove" type="button">Remover</button>
+      </div>
+    </div>
+    <label class="prof-toggle">
+      <input type="checkbox" id="prof-enabled" />
+      <span>Aplicar nome/logo nas fotos</span>
+    </label>
+    <label>Posição na foto</label>
+    <div class="prof-pos-grid" id="prof-pos-grid">
+      <button data-pos="tl">↖</button><button data-pos="tc">↑</button><button data-pos="tr">↗</button>
+      <button data-pos="ml">←</button><button data-pos="mm">•</button><button data-pos="mr">→</button>
+      <button data-pos="bl">↙</button><button data-pos="bc">↓</button><button data-pos="br">↘</button>
+    </div>
+    <label>Transparência</label>
+    <div class="prof-range-row">
+      <input type="range" id="prof-transp" min="0" max="90" step="5" value="30" />
+      <span class="prof-range-val" id="prof-transp-val">30%</span>
+    </div>
+    <menu>
+      <button id="prof-close">Cancelar</button>
+      <button id="prof-save" class="primary">Salvar</button>
+    </menu>
+  </dialog>
+
   <!-- ============ DIÁLOGO: NOVA COMPARAÇÃO ============ -->
   <dialog id="new-dialog">
     <h3>Nova comparação</h3>
@@ -234,6 +270,7 @@
   <script src="./app.js"></script>
   <script src="./editor.js"></script>
   <script src="./align.js"></script>
+  <script src="./profile.js"></script>
   <script src="./share.js"></script>
 </body>
 </html>

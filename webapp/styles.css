@@ -374,6 +374,8 @@ html, body {
 /* ---------- Dialog ---------- */
 dialog {
   border: none; border-radius: 16px; padding: 20px; width: min(90vw, 340px);
+  /* Janelas maiores que a tela ganham rolagem vertical. */
+  max-height: 90dvh; overflow-y: auto;
 }
 dialog::backdrop { background: rgba(0,0,0,0.5); }
 dialog h3 { margin: 0 0 12px; }
@@ -384,6 +386,55 @@ dialog menu { display: flex; gap: 8px; justify-content: flex-end; padding: 16px 
 dialog menu button { padding: 10px 16px; border-radius: 8px; border: none; background: #e3e8eb; cursor: pointer; }
 dialog menu button.primary { background: var(--primary); color: #fff; }
 #dist-target { font-weight: 700; color: var(--primary); }
+
+/* ---------- Perfil do usuário (v3.5.1) ---------- */
+.cred-profile { background: transparent; border: none; font-size: 1.1rem; cursor: pointer; opacity: 0.7; padding: 2px 6px; }
+.prof-logo-row { display: flex; align-items: center; gap: 12px; margin: 6px 0; }
+.prof-logo-prev {
+  width: 60px; height: 60px; border-radius: 8px; object-fit: contain;
+  background: #eef3f6; border: 1px solid #dde5ea; flex-shrink: 0;
+}
+.prof-logo-row .prof-logo-btns { display: flex; flex-direction: column; gap: 6px; }
+.prof-logo-row button {
+  padding: 6px 12px; border-radius: 8px; border: 1.5px solid var(--primary);
+  background: #fff; color: var(--primary); font-size: 0.85rem; font-weight: 600; cursor: pointer;
+}
+.prof-pos-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+  width: 120px; margin: 4px 0 8px;
+}
+.prof-pos-grid button {
+  aspect-ratio: 4/3; border: 1.5px solid #ccd4d9; border-radius: 6px;
+  background: #fff; cursor: pointer; padding: 0; font-size: 0.9rem; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+}
+.prof-pos-grid button.sel { border-color: var(--primary); background: var(--primary); color: #fff; }
+.prof-range-row { display: flex; align-items: center; gap: 10px; }
+.prof-range-row input[type=range] { flex: 1; accent-color: var(--primary); }
+.prof-range-row .prof-range-val { width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.prof-toggle { display: flex; align-items: center; gap: 10px; font-weight: 600; margin: 6px 0; }
+.prof-toggle input { width: 20px; height: 20px; accent-color: var(--primary); }
+
+/* Marca d'água (nome + logo) sobreposta no palco de comparação */
+.wm {
+  position: absolute; z-index: 5; display: flex; align-items: center; gap: 6px;
+  pointer-events: none; max-width: 60%;
+}
+.wm img { height: 44px; width: auto; }
+.wm span {
+  color: #fff; font-size: 0.8rem; font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wm-tl { top: 8px; left: 8px; }
+.wm-tc { top: 8px; left: 50%; transform: translateX(-50%); }
+.wm-tr { top: 8px; right: 8px; }
+.wm-ml { top: 50%; left: 8px; transform: translateY(-50%); }
+.wm-mm { top: 50%; left: 50%; transform: translate(-50%,-50%); }
+.wm-mr { top: 50%; right: 8px; transform: translateY(-50%); }
+.wm-bl { bottom: 8px; left: 8px; }
+.wm-bc { bottom: 8px; left: 50%; transform: translateX(-50%); }
+.wm-br { bottom: 8px; right: 8px; }
 
 /* ---------- Salvar / Compartilhar (v3.0) ---------- */
 .share-hint { font-size: 0.82rem; color: var(--muted); margin: 0 0 10px; }

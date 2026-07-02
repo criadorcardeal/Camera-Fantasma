@@ -550,7 +550,7 @@ async function openDetail(id) {
          <button data-mode="overlay">Sobrepor</button>
        </div>
        <div id="cmp-host"></div>`
-    : `<div class="compare-stage" id="cmp-host"><img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}</div>`;
+    : `<div class="compare-stage" id="cmp-host"><img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config())}</div>`;
 
   const statusTxt = s.creditState === "confirmed"
     ? "Concluída ✓ (crédito usado)"
@@ -650,7 +650,7 @@ function refreshCompareCaptions() {
   if (!s) return;
   if (!s.followImage) {
     const host = $("#cmp-host");
-    if (host) host.innerHTML = `<img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}`;
+    if (host) host.innerHTML = `<img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config())}`;
     return;
   }
   const active = $("#cmp-seg") && $("#cmp-seg").querySelector("button.active");
@@ -663,10 +663,11 @@ function renderCompare(mode) {
   const show = s.showLabels;
   const capB = capHtml(s.baseLabel, "cap-left", show);
   const capF = capHtml(s.followLabel, "cap-right", show);
+  const wm = Profile.wmHtml(Profile.config());
   if (mode === "side") {
     host.innerHTML = `<div class="side-by-side">
-        <div class="side-cell"><img src="${baseSrc(s)}" />${capHtml(s.baseLabel, "cap-center", show)}</div>
-        <div class="side-cell"><img src="${followSrc(s)}" />${capHtml(s.followLabel, "cap-center", show)}</div>
+        <div class="side-cell"><img src="${baseSrc(s)}" />${capHtml(s.baseLabel, "cap-center", show)}${wm}</div>
+        <div class="side-cell"><img src="${followSrc(s)}" />${capHtml(s.followLabel, "cap-center", show)}${wm}</div>
       </div>`;
     return;
   }
@@ -675,7 +676,7 @@ function renderCompare(mode) {
       <div class="compare-stage">
         <img src="${baseSrc(s)}" />
         <img src="${followSrc(s)}" id="ov-after" style="opacity:0.5" />
-        ${capB}${capF}
+        ${capB}${capF}${wm}
       </div>
       <div class="seg" style="margin-top:8px;background:transparent;padding:0">
         <input type="range" min="0" max="1" step="0.01" value="0.5" id="ov-range" style="width:100%" />
@@ -691,7 +692,7 @@ function renderCompare(mode) {
       <img src="${baseSrc(s)}" />
       <div class="after-clip" style="position:absolute;inset:0;width:50%"><img src="${followSrc(s)}" style="width:200%;max-width:none" id="cur-after"/></div>
       <div class="compare-handle" id="cur-handle" style="left:50%"></div>
-      ${capB}${capF}
+      ${capB}${capF}${wm}
     </div>`;
   const stage = $("#curtain");
   const clip = stage.querySelector(".after-clip");

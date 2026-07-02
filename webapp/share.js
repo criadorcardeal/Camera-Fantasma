@@ -67,22 +67,12 @@ function drawChip(ctx, text, x, y, align) {
   ctx.restore();
 }
 
-// Renderiza uma foto com o rotulo "impresso" no rodape (dataURL JPEG).
-async function renderPhotoWithFooter(src, label) {
-  const img = await loadImageEl(src);
-  const W = img.naturalWidth, H = img.naturalHeight;
-  const c = document.createElement("canvas");
-  c.width = W; c.height = H;
-  const ctx = c.getContext("2d");
-  ctx.drawImage(img, 0, 0);
-  drawFooterBar(ctx, label, 0, H, W, Math.max(28, Math.round(H * 0.07)));
-  return c.toDataURL("image/jpeg", 0.92);
-}
-
 // Monta a imagem da comparacao (Base | Acompanhamento) com rotulos e datas.
 async function generateComparisonImage(s) {
   const baseImg = await loadImageEl(baseSrc(s));
   const followImg = await loadImageEl(followSrc(s));
+  const prof = Profile.config();
+  const logoImg = (prof.enabled && prof.logo) ? await loadImageEl(prof.logo).catch(() => null) : null;
   const aspect = (baseImg.naturalWidth / baseImg.naturalHeight) || 0.75;
   const cellW = 760;
   const cellH = Math.round(cellW / aspect);
@@ -119,6 +109,9 @@ async function generateComparisonImage(s) {
     if (s.baseLabel) drawFooterBar(ctx, s.baseLabel, pad, y + cellH, cellW, fh);
     if (s.followLabel) drawFooterBar(ctx, s.followLabel, pad + cellW + gap, y + cellH, cellW, fh);
   }
+  // Marca d'agua (nome/logo) em cada foto, se ligada.
+  Profile.drawWatermark(ctx, pad, y, cellW, cellH, prof, logoImg);
+  Profile.drawWatermark(ctx, pad + cellW + gap, y, cellW, cellH, prof, logoImg);
 
   return c.toDataURL("image/jpeg", 0.92);
 }
@@ -151,6 +144,8 @@ async function generateVideo(s, kind) {
 
   const baseImg = await loadImageEl(baseSrc(s));
   const followImg = await loadImageEl(followSrc(s));
+  const prof = Profile.config();
+  const logoImg = (prof.enabled && prof.logo) ? await loadImageEl(prof.logo).catch(() => null) : null;
 
   // Resolucao com base no aspecto da foto base (dimensoes pares p/ o codec).
   const aspect = (baseImg.naturalWidth / baseImg.naturalHeight) || 0.75;
@@ -192,6 +187,8 @@ async function generateVideo(s, kind) {
       if (s.baseLabel) drawChip(ctx, s.baseLabel, 12, H - 12, "left");
       if (s.followLabel) drawChip(ctx, s.followLabel, W - 12, H - 12, "right");
     }
+    // Marca d'agua (nome/logo), se ligada.
+    Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
   };
 
   drawFrame(0);
@@ -268,12 +265,26 @@ const Share = {
     dlg.showModal();
     // Prepara os arquivos ANTES de liberar as opcoes, para o compartilhamento
     // acontecer imediatamente no clique (exigencia do iOS).
-    const withFooter = (src, label) => (session.showLabels && label)
-      ? renderPhotoWithFooter(src, label) : Promise.resolve(src);
+    const prof = Profile.config();
+    const logoImg = (prof.enabled && prof.logo) ? await loadImageEl(prof.logo).catch(() => null) : null;
+    const wmOn = prof.enabled && (prof.name || logoImg);
+    const prep = async (src, label) => {
+      const wantFooter = session.showLabels && label;
+      if (!wantFooter && !wmOn) return src;
+      const img = await loadImageEl(src);
+      const W = img.naturalWidth, H = img.naturalHeight;
+      const c = document.createElement("canvas");
+      c.width = W; c.height = H;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      if (wantFooter) drawFooterBar(ctx, label, 0, H, W, Math.max(28, Math.round(H * 0.07)));
+      Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
+      return c.toDataURL("image/jpeg", 0.92);
+    };
     try {
-      this.files.base = await dataUrlToFile(await withFooter(baseSrc(session), session.baseLabel), "foto-base.jpg");
+      this.files.base = await dataUrlToFile(await prep(baseSrc(session), session.baseLabel), "foto-base.jpg");
       if (hasFollow) {
-        this.files.follow = await dataUrlToFile(await withFooter(followSrc(session), session.followLabel), "acompanhamento.jpg");
+        this.files.follow = await dataUrlToFile(await prep(followSrc(session), session.followLabel), "acompanhamento.jpg");
         const cmp = await generateComparisonImage(session);
         this.files.compare = await dataUrlToFile(cmp, "comparacao.jpg");
       }

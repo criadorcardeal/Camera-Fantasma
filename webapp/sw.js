@@ -1,7 +1,6 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* re-deploy v3.5 (o deploy anterior do Pages falhou por timeout transitorio) */
-const CACHE = "fotos-fantasma-v17";
+const CACHE = "fotos-fantasma-v18";
 const ASSETS = [
   "./",
   "./index.html",
@@ -10,6 +9,7 @@ const ASSETS = [
   "./app.js",
   "./editor.js",
   "./align.js",
+  "./profile.js",
   "./share.js",
   "./manifest.webmanifest",
   "./icon.svg",
