@@ -90,11 +90,35 @@ html, body {
 .card .info b { display: block; font-size: 0.95rem; }
 .card .info span { color: var(--muted); font-size: 0.82rem; }
 
+/* Swipe-para-excluir (arrastar o card para a esquerda) */
+.card-swipe {
+  position: relative; overflow: hidden; border-radius: 12px; margin-bottom: 10px;
+}
+.card-del-bg {
+  position: absolute; inset: 0; background: #c0392b; color: #fff;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 22px; font-weight: 700; gap: 8px;
+}
+.card-swipe .card { margin-bottom: 0; touch-action: pan-y; will-change: transform; }
+
 .empty {
   text-align: center;
   color: var(--muted);
   padding: 40px 20px;
 }
+
+/* Pergunta no pop-up Nova comparação */
+.new-q { font-size: 0.9rem; color: var(--muted); margin: 0 0 10px; }
+
+/* Card de rótulo recolhível (seta de expansão) */
+.label-head {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+}
+.label-head .label-toggle { flex: 1; margin: 0; }
+.label-head .chev { color: var(--muted); transition: transform 0.15s; }
+.label-card.open .label-head .chev { transform: rotate(180deg); }
+.label-fields { max-height: 0; overflow: hidden; transition: max-height 0.15s; }
+.label-card.open .label-fields { max-height: 260px; }
 .empty .big { font-size: 3rem; }
 
 .fab-row {
@@ -256,9 +280,8 @@ html, body {
 .label-card { background: var(--card); border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
 .label-toggle { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; font-weight: 600; }
 .label-toggle input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--primary); }
-.label-fields { margin-top: 8px; }
-.label-fields.hidden-soft { display: none; }
 .label-fields label { display: block; font-size: 0.78rem; color: var(--muted); margin: 6px 0 2px; font-weight: 600; }
+.label-fields > *:first-child { margin-top: 8px; }
 .label-fields input {
   width: 100%; padding: 8px 10px; border: 1px solid #ccd4d9;
   border-radius: 8px; font-size: 0.9rem;
@@ -288,6 +311,11 @@ html, body {
 }
 .btn.primary { background: var(--primary); color: #fff; }
 .btn.outline { background: #fff; color: var(--primary); border: 1.5px solid var(--primary); }
+
+.lock-note {
+  background: #fbeecb; color: #7a5b00; border-radius: 10px;
+  padding: 10px 12px; margin-top: 12px; font-size: 0.85rem; font-weight: 600;
+}
 
 /* Linhas de 2 botões lado a lado + card de acompanhamento */
 .act-card { background: var(--card); border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
@@ -355,6 +383,14 @@ html, body {
 }
 .ed-lock input { width: 22px; height: 22px; flex-shrink: 0; accent-color: var(--primary); }
 .ed-lock small { color: var(--muted); display: block; }
+/* Linha "Zerar ajustes" (metade) + "Travar" ao lado */
+.ed-reset-row { display: flex; gap: 10px; align-items: stretch; margin-top: 8px; }
+.ed-reset-row .btn { margin-top: 0; flex: 1; }
+.ed-lock-inline {
+  flex: 1; margin: 0; padding: 8px 10px; align-items: center;
+  border: 1.5px solid var(--primary); border-radius: 12px; background: #fff;
+  font-size: 0.85rem; font-weight: 600; gap: 8px;
+}
 .ed-which-row {
   display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
   font-size: 0.9rem; color: var(--muted);

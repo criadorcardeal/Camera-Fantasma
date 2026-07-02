@@ -74,13 +74,13 @@ const fmtDateOnly = (iso) => {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 
-// Texto do rodapé de uma foto: rótulo + data de aquisição (conforme o perfil).
-function footerText(label, iso) {
+// Rótulo automático: já vem preenchido com a data de aquisição da foto, para o
+// usuário poder editar ou apagar. Formato conforme o perfil (none/date/datetime).
+function autoDateLabel() {
   const mode = Profile.config().footerDate;   // none | date | datetime
-  let dateStr = "";
-  if (iso && mode !== "none") dateStr = mode === "datetime" ? fmtDate(iso) : fmtDateOnly(iso);
-  if (label && dateStr) return label + "  •  " + dateStr;
-  return label || dateStr;
+  if (mode === "none") return "";
+  const iso = new Date().toISOString();
+  return mode === "datetime" ? fmtDate(iso) : fmtDateOnly(iso);
 }
 
 // Usa a versao com ajustes aplicados (se existir) ou a original.
@@ -141,6 +141,9 @@ async function renderHome() {
   }
   el.innerHTML = "";
   for (const s of list) {
+    const wrap = document.createElement("div");
+    wrap.className = "card-swipe";
+    wrap.innerHTML = `<div class="card-del-bg">🗑 Excluir</div>`;
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
@@ -150,9 +153,47 @@ async function renderHome() {
         <span>${s.followImage ? "Base + acompanhamento" : "Só foto base"} • ${Math.round(s.baseDistance)} cm</span>
       </div>
       <div>${s.followImage ? "🔀" : "➕"}</div>`;
-    card.addEventListener("click", () => openDetail(s.id));
-    el.appendChild(card);
+    wrap.appendChild(card);
+    el.appendChild(wrap);
+    attachSwipeDelete(card, s);
   }
+}
+
+// Arraste o card para a esquerda para excluir (com confirmação e devolução de
+// crédito se a comparação não foi concluída).
+function attachSwipeDelete(card, s) {
+  let startX = 0, dx = 0, dragging = false, moved = false;
+  const THRESH = 90;
+  card.addEventListener("pointerdown", (e) => {
+    dragging = true; moved = false; startX = e.clientX; dx = 0;
+    card.style.transition = "none";
+    try { card.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  card.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    dx = Math.min(0, e.clientX - startX);   // só para a esquerda
+    if (Math.abs(dx) > 6) moved = true;
+    card.style.transform = `translateX(${dx}px)`;
+  });
+  const end = async () => {
+    if (!dragging) return;
+    dragging = false;
+    card.style.transition = "transform 0.15s";
+    if (dx <= -THRESH && confirm("Excluir esta comparação? As fotos serão apagadas do aparelho.")) {
+      card.style.transform = "translateX(-100%)";
+      if (s.creditState === "reserved") Credits.refund();
+      await DB.remove(s.id);
+      await renderHome();
+    } else {
+      card.style.transform = "translateX(0)";
+    }
+  };
+  card.addEventListener("pointerup", end);
+  card.addEventListener("pointercancel", end);
+  card.addEventListener("click", (e) => {
+    if (moved) { e.preventDefault(); e.stopPropagation(); return; }
+    openDetail(s.id);
+  });
 }
 
 /* ---------------- Câmera ---------------- */
@@ -389,9 +430,10 @@ const Cam = {
     bakeCameraFilter(ctx, canvas.width, canvas.height, f);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
 
+    // Prefill do rótulo com a data de aquisição (editável/removível).
     const seed = this.mode === "base"
-      ? (this.session && this.session.baseLabel) || ""
-      : (this.session && this.session.followLabel) || "";
+      ? autoDateLabel()
+      : ((this.session && this.session.followLabel) || autoDateLabel());
     const res = await openDistanceDialog(this.target, seed);
     if (res == null) return; // usuario escolheu refazer
     const { distance, label } = res;
@@ -492,7 +534,7 @@ async function importBasePhoto(file) {
     alert(e.message || "Não foi possível usar esta imagem.");
     return;
   }
-  const res = await openDistanceDialog(null, "");
+  const res = await openDistanceDialog(null, autoDateLabel());
   if (res == null) return;
   const session = {
     id: String(Date.now()),
@@ -564,7 +606,7 @@ async function openDetail(id) {
          <button data-mode="overlay">Sobrepor</button>
        </div>
        <div id="cmp-host"></div>`
-    : `<div class="compare-stage" id="cmp-host"><img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(footerText(s.baseLabel, s.createdAt), "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config())}</div>`;
+    : `<div class="compare-stage" id="cmp-host"><img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config())}</div>`;
 
   const statusTxt = s.creditState === "confirmed"
     ? "Concluída ✓ (crédito usado)"
@@ -585,13 +627,19 @@ async function openDetail(id) {
       </div>
     </div>`;
 
+  // Depois de salvo/compartilhado (crédito confirmado), as fotos ficam travadas.
+  const locked = s.creditState === "confirmed";
+
   const labelHtml = `
-    <div class="label-card">
-      <label class="label-toggle">
-        <input type="checkbox" id="lbl-toggle" ${s.showLabels ? "checked" : ""} />
-        <span>Mostrar rótulo no rodapé das fotos</span>
-      </label>
-      <div class="label-fields ${s.showLabels ? "" : "hidden-soft"}" id="lbl-fields">
+    <div class="label-card" id="label-card">
+      <div class="label-head">
+        <label class="label-toggle">
+          <input type="checkbox" id="lbl-toggle" ${s.showLabels ? "checked" : ""} />
+          <span>Mostrar rótulo no rodapé das fotos</span>
+        </label>
+        <span class="chev" id="lbl-chev">▾</span>
+      </div>
+      <div class="label-fields" id="lbl-fields">
         <label>Rótulo da foto base
           <input type="text" id="lbl-base" value="${escAttr(s.baseLabel || "")}" placeholder="Ex.: Perna direita" autocomplete="off" />
         </label>
@@ -601,7 +649,7 @@ async function openDetail(id) {
       </div>
     </div>`;
 
-  const acCard = `
+  const acCard = locked ? "" : `
     <div class="act-card">
       <div class="act-title">Acompanhamento</div>
       <div class="btn-row">
@@ -610,13 +658,17 @@ async function openDetail(id) {
       </div>
     </div>`;
 
+  const lockNote = locked
+    ? `<p class="lock-note">🔒 Comparação concluída — as fotos não podem mais ser alteradas.</p>`
+    : "";
+
   const secondRow = `
     <div class="btn-row" style="margin-top:12px">
-      ${hasFollow ? `<button class="btn primary" id="btn-adjust">🎚 Ajustar imagens</button>` : ""}
+      ${(hasFollow && !locked) ? `<button class="btn primary" id="btn-adjust">🎚 Ajustar imagens</button>` : ""}
       <button class="btn primary" id="btn-share">📤 Salvar</button>
     </div>`;
 
-  c.innerHTML = compareHtml + infoHtml + labelHtml + acCard + secondRow;
+  c.innerHTML = compareHtml + infoHtml + labelHtml + lockNote + acCard + secondRow;
 
   // Ativa a tela ANTES de montar a comparação, para o palco já ter largura
   // (a cortina depende de clientWidth para dimensionar a foto de acompanhamento).
@@ -631,20 +683,22 @@ async function openDetail(id) {
         renderCompare(b.dataset.mode);
       });
     });
-    $("#btn-adjust").addEventListener("click", () => Editor.open(s));
   }
-  $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
-  $("#btn-follow-import").addEventListener("click", () =>
+  if ($("#btn-adjust")) $("#btn-adjust").addEventListener("click", () => Editor.open(s));
+  if ($("#btn-redo")) $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
+  if ($("#btn-follow-import")) $("#btn-follow-import").addEventListener("click", () =>
     pickImage().then((file) => importFollowPhoto(s, file)));
   $("#btn-share").addEventListener("click", () => Share.open(s));
 
   // Card de dados recolhível (recolhido mostra só o Status).
   $("#info-head").addEventListener("click", () => $("#info-block").classList.toggle("open"));
 
+  // Card de rótulo: seta de expansão abre/fecha os campos de edição.
+  $("#lbl-chev").addEventListener("click", () => $("#label-card").classList.toggle("open"));
+
   // Rótulos: liga/desliga rodapé e edição por comparação.
   $("#lbl-toggle").addEventListener("change", async (e) => {
     s.showLabels = e.target.checked;
-    $("#lbl-fields").classList.toggle("hidden-soft", !s.showLabels);
     await DB.put(s);
     refreshCompareCaptions();
   });
@@ -666,7 +720,7 @@ function refreshCompareCaptions() {
   if (!s) return;
   if (!s.followImage) {
     const host = $("#cmp-host");
-    if (host) host.innerHTML = `<img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(footerText(s.baseLabel, s.createdAt), "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config())}`;
+    if (host) host.innerHTML = `<img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config())}`;
     return;
   }
   const active = $("#cmp-seg") && $("#cmp-seg").querySelector("button.active");
@@ -677,15 +731,13 @@ function renderCompare(mode) {
   const s = _detailSession;
   const host = $("#cmp-host");
   const show = s.showLabels;
-  const baseFt = footerText(s.baseLabel, s.createdAt);
-  const followFt = footerText(s.followLabel, s.followAt);
-  const capB = capHtml(baseFt, "cap-left", show);
-  const capF = capHtml(followFt, "cap-right", show);
+  const capB = capHtml(s.baseLabel, "cap-left", show);
+  const capF = capHtml(s.followLabel, "cap-right", show);
   const wm = Profile.wmHtml(Profile.config());
   if (mode === "side") {
     host.innerHTML = `<div class="side-by-side">
-        <div class="side-cell"><img src="${baseSrc(s)}" />${capHtml(baseFt, "cap-center", show)}${wm}</div>
-        <div class="side-cell"><img src="${followSrc(s)}" />${capHtml(followFt, "cap-center", show)}${wm}</div>
+        <div class="side-cell"><img src="${baseSrc(s)}" />${capHtml(s.baseLabel, "cap-center", show)}${wm}</div>
+        <div class="side-cell"><img src="${followSrc(s)}" />${capHtml(s.followLabel, "cap-center", show)}${wm}</div>
       </div>`;
     return;
   }
@@ -774,17 +826,6 @@ function wireEvents() {
   $("#detail-back").addEventListener("click", async () => {
     showScreen("screen-home");
     await renderHome();
-  });
-  $("#detail-delete").addEventListener("click", async () => {
-    if (!_detailSession) return;
-    if (confirm("Excluir esta comparação? As fotos serão apagadas do aparelho.")) {
-      // Devolve o crédito se a comparação não foi concluída (abandonada).
-      if (_detailSession.creditState === "reserved") Credits.refund();
-      await DB.remove(_detailSession.id);
-      _detailSession = null;
-      showScreen("screen-home");
-      await renderHome();
-    }
   });
 }
 

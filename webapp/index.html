@@ -18,7 +18,7 @@
     <header class="topbar">
       <span class="topbar-spacer"></span>
       <h1>Fotos Fantasma</h1>
-      <span class="version-badge">v3.5.3</span>
+      <span class="version-badge">v3.5.4</span>
     </header>
     <div class="credits-bar">
       <span id="cred-balance">🪙 0 créditos</span>
@@ -82,7 +82,7 @@
     <header class="topbar">
       <button id="detail-back" class="icon-btn dark">‹</button>
       <h1>Comparação</h1>
-      <button id="detail-delete" class="icon-btn dark">🗑</button>
+      <span class="topbar-spacer"></span>
     </header>
     <div class="content" id="detail-content"></div>
   </section>
@@ -103,6 +103,8 @@
       <div class="al-controls">
         <label class="al-slider"><span>Zoom</span>
           <input type="range" id="al-zoom" min="0.5" max="4" step="0.01" value="1" /></label>
+        <label class="al-slider"><span>Girar</span>
+          <input type="range" id="al-rotate" min="-180" max="180" step="1" value="0" /></label>
         <label class="al-slider"><span>Fantasma</span>
           <input type="range" id="al-opacity" min="0" max="1" step="0.01" value="0.5" /></label>
       </div>
@@ -125,11 +127,14 @@
         <button id="ed-auto-rel" class="btn outline">Ajuste Relativo</button>
         <button id="ed-auto-abs" class="btn primary">Ajuste Absoluto</button>
       </div>
-      <p class="ed-auto-hint">Absoluto: mesmos valores nas duas fotos. Relativo: ajustes (±) próprios de cada foto.</p>
-      <label class="ed-lock">
-        <input type="checkbox" id="ed-lock-toggle" />
-        <span>Travar as duas imagens <small>(mexer numa altera a outra igual)</small></span>
-      </label>
+      <div class="ed-reset-row">
+        <button id="ed-reset" class="btn outline">Zerar ajustes</button>
+        <label class="ed-lock ed-lock-inline">
+          <input type="checkbox" id="ed-lock-toggle" />
+          <span>Travar as 2 imagens</span>
+        </label>
+      </div>
+      <p class="ed-auto-hint">Absoluto: mesmos valores nas duas fotos. Relativo: ajustes (±) próprios de cada foto. Travar: mexer numa altera a outra igual.</p>
       <div class="ed-which-row" id="ed-which-row">
         <span>Editando:</span>
         <div class="seg ed-seg" id="ed-which">
@@ -138,7 +143,6 @@
         </div>
       </div>
       <div id="ed-sliders"></div>
-      <button id="ed-reset" class="btn outline">Zerar ajustes</button>
     </div>
   </section>
 
@@ -282,7 +286,7 @@
         <input type="range" id="prof-footer-size" min="60" max="180" step="10" value="100" />
       </label>
     </div>
-    <label>Data no rodapé
+    <label>Data automática no rótulo
       <select id="prof-footer-date">
         <option value="none">Não incluir</option>
         <option value="date">Somente data</option>
@@ -299,9 +303,10 @@
   <!-- ============ DIÁLOGO: NOVA COMPARAÇÃO ============ -->
   <dialog id="new-dialog">
     <h3>Nova comparação</h3>
+    <p class="new-q">Como você quer escolher a foto base?</p>
     <menu class="opt-menu">
-      <button id="new-camera">📷 Nova foto</button>
-      <button id="new-import">🖼 Importar</button>
+      <button id="new-camera">📷 Tirar nova foto</button>
+      <button id="new-import">🖼 Importar da galeria</button>
     </menu>
     <menu><button id="new-close">Fechar</button></menu>
   </dialog>

@@ -106,12 +106,11 @@ async function generateComparisonImage(s) {
   drawCover(ctx, baseImg, pad, y, cellW, cellH);
   drawCover(ctx, followImg, pad + cellW + gap, y, cellW, cellH);
 
-  // Rotulo (rodape) de cada foto, se ligado (rotulo + data de aquisicao).
+  // Rotulo (rodape) de cada foto, se ligado.
   if (s.showLabels) {
     const fh = Math.max(30, Math.round(cellH * 0.07 * prof.footerScale));
-    const bft = footerText(s.baseLabel, s.createdAt), fft = footerText(s.followLabel, s.followAt);
-    if (bft) drawFooterBar(ctx, bft, pad, y + cellH, cellW, fh, prof.footerFamily);
-    if (fft) drawFooterBar(ctx, fft, pad + cellW + gap, y + cellH, cellW, fh, prof.footerFamily);
+    if (s.baseLabel) drawFooterBar(ctx, s.baseLabel, pad, y + cellH, cellW, fh, prof.footerFamily);
+    if (s.followLabel) drawFooterBar(ctx, s.followLabel, pad + cellW + gap, y + cellH, cellW, fh, prof.footerFamily);
   }
   // Marca d'agua (nome/logo) em cada foto, se ligada.
   Profile.drawWatermark(ctx, pad, y, cellW, cellH, prof, logoImg);
@@ -189,9 +188,8 @@ async function generateVideo(s, kind) {
     // Rotulo (rodape) de cada foto, se ligado: base a esquerda, acomp. a direita.
     if (s.showLabels) {
       const fs = Math.max(14, Math.round(H * 0.028 * prof.footerScale));
-      const bft = footerText(s.baseLabel, s.createdAt), fft = footerText(s.followLabel, s.followAt);
-      if (bft) drawChip(ctx, bft, 12, H - 12, "left", prof.footerFamily, fs);
-      if (fft) drawChip(ctx, fft, W - 12, H - 12, "right", prof.footerFamily, fs);
+      if (s.baseLabel) drawChip(ctx, s.baseLabel, 12, H - 12, "left", prof.footerFamily, fs);
+      if (s.followLabel) drawChip(ctx, s.followLabel, W - 12, H - 12, "right", prof.footerFamily, fs);
     }
     // Marca d'agua (nome/logo), se ligada.
     Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
@@ -288,9 +286,9 @@ const Share = {
       return c.toDataURL("image/jpeg", 0.92);
     };
     try {
-      this.files.base = await dataUrlToFile(await prep(baseSrc(session), footerText(session.baseLabel, session.createdAt)), "foto-base.jpg");
+      this.files.base = await dataUrlToFile(await prep(baseSrc(session), session.baseLabel), "foto-base.jpg");
       if (hasFollow) {
-        this.files.follow = await dataUrlToFile(await prep(followSrc(session), footerText(session.followLabel, session.followAt)), "acompanhamento.jpg");
+        this.files.follow = await dataUrlToFile(await prep(followSrc(session), session.followLabel), "acompanhamento.jpg");
         const cmp = await generateComparisonImage(session);
         this.files.compare = await dataUrlToFile(cmp, "comparacao.jpg");
       }

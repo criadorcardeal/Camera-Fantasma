@@ -11,14 +11,15 @@
 const Aligner = {
   session: null,
   followUrl: null,
-  z: 1, tx: 0, ty: 0,
+  z: 1, tx: 0, ty: 0, rot: 0,
   baseW: 1, baseH: 1,
 
   async open(session, followUrl) {
     this.session = session;
     this.followUrl = followUrl;
-    this.z = 1; this.tx = 0; this.ty = 0;
+    this.z = 1; this.tx = 0; this.ty = 0; this.rot = 0;
     $("#al-zoom").value = 1;
+    $("#al-rotate").value = 0;
     $("#al-opacity").value = 0.5;
     try {
       const baseImg = await loadImageEl(session.baseImage);
@@ -46,7 +47,7 @@ const Aligner = {
 
   apply() {
     $("#al-follow").style.transform =
-      `translate(${this.tx}px, ${this.ty}px) scale(${this.z})`;
+      `translate(${this.tx}px, ${this.ty}px) scale(${this.z}) rotate(${this.rot}deg)`;
   },
 
   async confirm() {
@@ -62,18 +63,23 @@ const Aligner = {
     const coverScale = Math.max(Wc / Wi, Hc / Hi);
     const dw = Wi * coverScale * this.z * f;
     const dh = Hi * coverScale * this.z * f;
-    const dx = OUTW / 2 + this.tx * f - dw / 2;
-    const dy = OUTH / 2 + this.ty * f - dh / 2;
 
     const c = document.createElement("canvas");
     c.width = OUTW; c.height = OUTH;
     const ctx = c.getContext("2d");
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, OUTW, OUTH);
-    ctx.drawImage(followImg, dx, dy, dw, dh);
+    // Aplica a rotação em torno do centro da imagem (igual ao preview CSS).
+    const cxp = OUTW / 2 + this.tx * f;
+    const cyp = OUTH / 2 + this.ty * f;
+    ctx.save();
+    ctx.translate(cxp, cyp);
+    ctx.rotate(this.rot * Math.PI / 180);
+    ctx.drawImage(followImg, -dw / 2, -dh / 2, dw, dh);
+    ctx.restore();
     const aligned = c.toDataURL("image/jpeg", 0.9);
 
-    const res = await openDistanceDialog(this.session.baseDistance, this.session.followLabel || "");
+    const res = await openDistanceDialog(this.session.baseDistance, this.session.followLabel || autoDateLabel());
     if (res == null) { await openDetail(this.session.id); return; }
 
     const s = this.session;
@@ -196,6 +202,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
   $("#al-zoom").addEventListener("input", (e) => {
     Aligner.z = parseFloat(e.target.value);
+    Aligner.apply();
+  });
+  $("#al-rotate").addEventListener("input", (e) => {
+    Aligner.rot = parseFloat(e.target.value);
     Aligner.apply();
   });
   $("#al-opacity").addEventListener("input", (e) => {
