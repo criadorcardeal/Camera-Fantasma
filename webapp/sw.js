@@ -1,5 +1,6 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
+/* re-deploy v3.6.2 (publicacao do Pages falhou por erro transitorio). */
 /* v3.6.2: avatar da logo tambem na Montagem; editor com "Acompanhamento";
    export de fotos separadas com rotulo em chip; removidos os campos de
    registro de distancia (dialogo virou so rotulo). */
