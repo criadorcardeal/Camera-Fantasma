@@ -296,7 +296,7 @@ const Aligner = {
       const baseImg = await loadImageEl(this.session.baseImage);
       const followImg = await loadImageEl(this.followUrl);
       const aspect = (this.baseW / this.baseH) || 0.75;
-      const W0 = 200, H0 = Math.max(1, Math.round(W0 / aspect));
+      const W0 = 240, H0 = Math.max(1, Math.round(W0 / aspect));
       const bMask = alForegroundMask(alCoverRender(baseImg, W0, H0));
       const fMask = alForegroundMask(alCoverRender(followImg, W0, H0));
       const minArea = W0 * H0 * 0.01;
@@ -308,26 +308,44 @@ const Aligner = {
       const F = alMoments(fMask.mask, W0, H0);
       const cx = W0 / 2, cy = H0 / 2;
       const z0 = Math.max(0.5, Math.min(4, B.S / F.S));
-      const rot0 = (B.theta - F.theta) * 180 / Math.PI;
+      // Diferença de orientação dos eixos principais, normalizada p/ [-90,90].
+      // Uma foto de acompanhamento nunca está de cabeça p/ baixo em relação à
+      // base, então NÃO tentamos a inversão de 180° (que, num membro alongado e
+      // quase simétrico, teria sobreposição parecida e viraria a perna).
+      let rot0 = (B.theta - F.theta) * 180 / Math.PI;
+      rot0 = ((rot0 % 180) + 180) % 180; if (rot0 > 90) rot0 -= 180;
+      const iouAt = (z, rot, tx, ty) => alMaskIoU(fMask.mask, bMask.mask, W0, H0, z, rot, tx, ty, cx, cy);
 
-      // Estimativa inicial + resolve a ambiguidade de 180° pela sobreposição.
+      // Estimativa inicial por momentos + varredura grossa de escala (a diferença
+      // de silhueta entre as fotos pode enviesar z0).
       let best = null;
-      for (const flip of [0, 180]) {
-        const rot = rot0 + flip;
-        const t = alSolveT(B, F, z0, rot, cx, cy);
-        const iou = alMaskIoU(fMask.mask, bMask.mask, W0, H0, z0, rot, t.tx, t.ty, cx, cy);
-        if (!best || iou > best.iou) best = { z: z0, rot, tx: t.tx, ty: t.ty, iou };
+      for (const zm of [0.8, 0.9, 1, 1.1, 1.22]) {
+        const z = Math.max(0.4, Math.min(5, z0 * zm));
+        const t = alSolveT(B, F, z, rot0, cx, cy);
+        const iou = iouAt(z, rot0, t.tx, t.ty);
+        if (!best || iou > best.iou) best = { z, rot: rot0, tx: t.tx, ty: t.ty, iou };
       }
-      // Refino local em escala e rotação (recentraliza a cada tentativa).
-      const zf = [0.82, 0.9, 0.96, 1, 1.05, 1.12, 1.22];
-      const dr = [-10, -6, -3, 0, 3, 6, 10];
-      for (const zm of zf) {
-        const z = Math.max(0.5, Math.min(4, z0 * zm));
-        for (const d of dr) {
-          const rot = best.rot + d;
-          const t = alSolveT(B, F, z, rot, cx, cy);
-          const iou = alMaskIoU(fMask.mask, bMask.mask, W0, H0, z, rot, t.tx, t.ty, cx, cy);
-          if (iou > best.iou) best = { z, rot, tx: t.tx, ty: t.ty, iou };
+
+      // Refino FINO: sobe o "morro" da sobreposição (IoU) ajustando as 4
+      // variáveis — zoom, rotação e as duas translações — com passos que
+      // encolhem até o encaixe travar. É o que aproxima de verdade os contornos.
+      // A rotação fica limitada a ±90° (evita a solução invertida).
+      const step = { z: 0.06, rot: 5, tx: W0 * 0.04, ty: H0 * 0.04 };
+      for (let pass = 0; pass < 60; pass++) {
+        let improved = false;
+        for (const key of ["tx", "ty", "z", "rot"]) {
+          for (const dir of [1, -1]) {
+            const cand = { z: best.z, rot: best.rot, tx: best.tx, ty: best.ty };
+            cand[key] += dir * step[key];
+            if (cand.z < 0.4 || cand.z > 5) continue;
+            if (cand.rot < -90 || cand.rot > 90) continue;
+            const iou = iouAt(cand.z, cand.rot, cand.tx, cand.ty);
+            if (iou > best.iou + 1e-4) { best = { ...cand, iou }; improved = true; }
+          }
+        }
+        if (!improved) {
+          step.z *= 0.5; step.rot *= 0.5; step.tx *= 0.5; step.ty *= 0.5;
+          if (step.rot < 0.25) break;   // passos minúsculos: convergiu
         }
       }
 

@@ -1,9 +1,10 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* v3.6.5: alinhamento automatico calibrado p/ fotos clinicas reais — deteccao
-   de PELE (clara a escura) no lugar da diferenca-de-fundo (funciona com a perna
-   encostando na borda e fundos variados), maior mancha + preenchimento de buracos. */
-const CACHE = "fotos-fantasma-v34";
+/* v3.6.6: alinhamento automatico mais exato — refino fino por otimizacao
+   (hill-climb) das 4 variaveis (zoom/rotacao/2 translacoes) maximizando a
+   sobreposicao das silhuetas; rotacao limitada a +-90 (nunca inverte a perna);
+   resolucao de trabalho maior. */
+const CACHE = "fotos-fantasma-v35";
 const ASSETS = [
   "./",
   "./index.html",
