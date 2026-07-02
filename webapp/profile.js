@@ -84,7 +84,19 @@ const Profile = {
     this._loadDragLogo();
     this._syncNameBox();
     this._applyPreviewOpacity();
+    // Abre "limpo": Cancelar/Salvar só habilitam quando houver alguma mudança.
+    this._dirty = false;
+    $("#prof-close").disabled = true;
+    $("#prof-save").disabled = true;
     $("#profile-dialog").showModal();
+  },
+
+  // Marca que houve alteração e habilita os botões Cancelar/Salvar.
+  _markDirty() {
+    if (this._dirty) return;
+    this._dirty = true;
+    $("#prof-close").disabled = false;
+    $("#prof-save").disabled = false;
   },
 
   // Reflete a transparencia escolhida na previa da logo e do nome (so na imagem;
@@ -296,8 +308,13 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#cred-profile").addEventListener("click", () => Profile.open());
   const profBtn = $("#detail-profile");
   if (profBtn) profBtn.addEventListener("click", () => Profile.open());
+  // X (topo direito) e Cancelar fecham SEM salvar.
+  $("#prof-x").addEventListener("click", () => $("#profile-dialog").close());
   $("#prof-close").addEventListener("click", () => $("#profile-dialog").close());
   $("#prof-save").addEventListener("click", () => Profile.save());
+  // Qualquer mudança nos campos do diálogo habilita Cancelar/Salvar.
+  $("#profile-dialog").addEventListener("input", () => Profile._markDirty());
+  $("#profile-dialog").addEventListener("change", () => Profile._markDirty());
   $("#prof-transp").addEventListener("input", (e) => {
     $("#prof-transp-val").textContent = e.target.value + "%";
     Profile._applyPreviewOpacity();
@@ -316,6 +333,7 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#prof-name-on").addEventListener("change", () => Profile._syncNameBox());
   $("#prof-logo-remove").addEventListener("click", () => {
     Profile._logo = ""; Profile._refreshLogoPrev(); Profile._loadDragLogo();
+    Profile._markDirty();
   });
   $("#prof-logo-pick").addEventListener("click", () => {
     const inp = document.createElement("input");
@@ -327,6 +345,7 @@ window.addEventListener("DOMContentLoaded", () => {
         Profile._logo = await downscaleLogo(f, 400);
         Profile._refreshLogoPrev();
         Profile._loadDragLogo();
+        Profile._markDirty();
       } catch (e) { alert(e.message || "Não foi possível usar esta imagem."); }
     };
     inp.click();
@@ -353,6 +372,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   window.addEventListener("pointermove", (e) => {
     if (!mode || !start) return;
+    Profile._markDirty();
     if (mode === "logo") {
       Profile._lx = start.lx + (e.clientX - start.px) / start.sw;
       Profile._ly = start.ly + (e.clientY - start.py) / start.sh;

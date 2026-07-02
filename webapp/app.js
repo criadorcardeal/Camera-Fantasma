@@ -278,6 +278,8 @@ const Cam = {
   },
 
   async open(mode, session) {
+    // Tela para onde voltar se a câmera não for autorizada (ou falhar).
+    this._returnScreen = (document.querySelector(".screen.active") || {}).id || "screen-home";
     this.mode = mode;
     this.session = session || null;
     this.torchOn = false;
@@ -297,14 +299,17 @@ const Cam = {
       $("#distance-chip").textContent =
         `Distância-alvo: ${Math.round(this.target)} cm (mantenha 40–60 cm)`;
     } else {
+      // Modo "base": foto nova (session null) ou refazer a base de uma
+      // comparação existente (session preenchida).
       ghost.removeAttribute("src");
       ghost.style.display = "none";
       $("#ghost-wrap").style.display = "none";
-      this.target = null;
-      $("#cam-title").textContent = "Foto base";
-      $("#f-brightness").value = 1;
-      $("#f-contrast").value = 1;
-      $("#f-saturate").value = 1;
+      this.target = session ? session.baseDistance : null;
+      $("#cam-title").textContent = session ? "Refazer foto base" : "Foto base";
+      const f = (session && session.filters) || { brightness: 1, contrast: 1, saturate: 1 };
+      $("#f-brightness").value = f.brightness;
+      $("#f-contrast").value = f.contrast;
+      $("#f-saturate").value = f.saturate;
       $("#distance-chip").textContent = "Mantenha 40–60 cm do local";
     }
     $("#ghost").style.opacity = $("#ghost-opacity").value;
@@ -348,9 +353,12 @@ const Cam = {
         }
       }, 1000);
     } catch (e) {
-      this.showError(
+      // Sem permissão (ou câmera indisponível): avisa e volta para a tela anterior.
+      this.stop();
+      showScreen(this._returnScreen || "screen-home");
+      alert(
         "Não foi possível acessar a câmera. Verifique a permissão da câmera " +
-        "para este site nas configurações do navegador.\n\n(" + e.message + ")"
+        "para este site nas configurações do navegador."
       );
     }
   },
@@ -438,7 +446,18 @@ const Cam = {
     if (res == null) return; // usuario escolheu refazer
     const { distance, label } = res;
 
-    if (this.mode === "base") {
+    if (this.mode === "base" && this.session) {
+      // Refazer a foto base de uma comparação já existente (não cria sessão nova).
+      const s = this.session;
+      s.baseImage = dataUrl;
+      s.baseDistance = distance;
+      s.baseLabel = label;
+      s.filters = f;
+      delete s.baseImageView;   // descarta ajuste anterior da base
+      await DB.put(s);
+      this.stop();
+      await openDetail(s.id);
+    } else if (this.mode === "base") {
       const session = {
         id: String(Date.now()),
         createdAt: new Date().toISOString(),
@@ -525,7 +544,7 @@ async function importFollowPhoto(session, file) {
   Aligner.open(session, dataUrl);
 }
 
-async function importBasePhoto(file) {
+async function importBasePhoto(file, session) {
   if (!file) return;
   let dataUrl;
   try {
@@ -534,9 +553,21 @@ async function importBasePhoto(file) {
     alert(e.message || "Não foi possível usar esta imagem.");
     return;
   }
+  // Substituir a base de uma comparação já existente.
+  if (session) {
+    const res = await openDistanceDialog(session.baseDistance, session.baseLabel || autoDateLabel());
+    if (res == null) return;
+    session.baseImage = dataUrl;
+    session.baseDistance = res.distance;
+    session.baseLabel = res.label;
+    delete session.baseImageView;
+    await DB.put(session);
+    await openDetail(session.id);
+    return;
+  }
   const res = await openDistanceDialog(null, autoDateLabel());
   if (res == null) return;
-  const session = {
+  const newSession = {
     id: String(Date.now()),
     createdAt: new Date().toISOString(),
     baseImage: dataUrl,
@@ -550,9 +581,9 @@ async function importBasePhoto(file) {
     followAt: null,
     creditState: "reserved",
   };
-  await DB.put(session);
+  await DB.put(newSession);
   Credits.reserve();
-  await openDetail(session.id);
+  await openDetail(newSession.id);
 }
 
 /* ---------------- Diálogo de distância + rótulo ----------------
@@ -649,6 +680,16 @@ async function openDetail(id) {
       </div>
     </div>`;
 
+  // Card da foto base (Refazer/Importar agem sobre a foto base).
+  const baseCard = locked ? "" : `
+    <div class="act-card">
+      <div class="act-title">Base</div>
+      <div class="btn-row">
+        <button class="btn outline" id="btn-base-redo">📷 Refazer</button>
+        <button class="btn outline" id="btn-base-import">🖼 Importar</button>
+      </div>
+    </div>`;
+
   const acCard = locked ? "" : `
     <div class="act-card">
       <div class="act-title">Acompanhamento</div>
@@ -662,13 +703,14 @@ async function openDetail(id) {
     ? `<p class="lock-note">🔒 Comparação concluída — as fotos não podem mais ser alteradas.</p>`
     : "";
 
-  const secondRow = `
+  // O botão de comparar só aparece quando existem as 2 fotos (base + acompanhamento).
+  const secondRow = hasFollow ? `
     <div class="btn-row" style="margin-top:12px">
-      ${(hasFollow && !locked) ? `<button class="btn primary" id="btn-adjust">🎚 Ajustar imagens</button>` : ""}
-      <button class="btn primary" id="btn-share">📤 Salvar</button>
-    </div>`;
+      ${!locked ? `<button class="btn primary" id="btn-adjust">🎚 Ajustar imagens</button>` : ""}
+      <button class="btn primary" id="btn-share">🔀 Comparar</button>
+    </div>` : "";
 
-  c.innerHTML = compareHtml + infoHtml + labelHtml + lockNote + acCard + secondRow;
+  c.innerHTML = compareHtml + infoHtml + labelHtml + lockNote + baseCard + acCard + secondRow;
 
   // Ativa a tela ANTES de montar a comparação, para o palco já ter largura
   // (a cortina depende de clientWidth para dimensionar a foto de acompanhamento).
@@ -690,7 +732,10 @@ async function openDetail(id) {
   if ($("#btn-redo")) $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
   if ($("#btn-follow-import")) $("#btn-follow-import").addEventListener("click", () =>
     pickImage().then((file) => importFollowPhoto(s, file)));
-  $("#btn-share").addEventListener("click", () => confirmThenSave(s));
+  if ($("#btn-base-redo")) $("#btn-base-redo").addEventListener("click", () => Cam.open("base", s));
+  if ($("#btn-base-import")) $("#btn-base-import").addEventListener("click", () =>
+    pickImage().then((file) => importBasePhoto(file, s)));
+  if ($("#btn-share")) $("#btn-share").addEventListener("click", () => confirmThenSave(s));
 
   // Card de dados recolhível (recolhido mostra só o Status).
   $("#info-head").addEventListener("click", () => $("#info-block").classList.toggle("open"));

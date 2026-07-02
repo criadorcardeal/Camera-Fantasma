@@ -18,7 +18,7 @@
     <header class="topbar">
       <span class="topbar-spacer"></span>
       <h1>Fotos Fantasma</h1>
-      <span class="version-badge">v3.5.6</span>
+      <span class="version-badge">v3.5.7</span>
     </header>
     <div class="credits-bar">
       <span id="cred-balance">🪙 0 créditos</span>
@@ -81,7 +81,7 @@
   <section id="screen-detail" class="screen">
     <header class="topbar">
       <button id="detail-back" class="icon-btn dark">‹</button>
-      <h1>Comparação</h1>
+      <h1>Montagem</h1>
       <button id="detail-profile" class="icon-btn dark" title="Perfil">👤</button>
     </header>
     <div class="content" id="detail-content"></div>
@@ -227,6 +227,7 @@
 
   <!-- ============ DIÁLOGO: PERFIL DO USUÁRIO (v3.5.1) ============ -->
   <dialog id="profile-dialog">
+    <button id="prof-x" class="dialog-x" type="button" aria-label="Fechar sem salvar">✕</button>
     <h3>Perfil</h3>
     <label>Nome
       <input type="text" id="prof-name" placeholder="Seu nome" autocomplete="off" />
@@ -295,9 +296,16 @@
     </label>
 
     <menu>
-      <button id="prof-close">Cancelar</button>
-      <button id="prof-save" class="primary">Salvar</button>
+      <button id="prof-close" disabled>Cancelar</button>
+      <button id="prof-save" class="primary" disabled>Salvar</button>
     </menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: MÍDIA SALVA (v3.5.7) ============ -->
+  <dialog id="saved-dialog" class="saved-dialog">
+    <div class="saved-ic">✅</div>
+    <h3 id="saved-title">Foto salva!</h3>
+    <menu><button id="saved-ok" class="primary">OK</button></menu>
   </dialog>
 
   <!-- ============ DIÁLOGO: AVISO AO SALVAR (v3.5.6) ============ -->

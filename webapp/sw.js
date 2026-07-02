@@ -1,9 +1,9 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* v3.5.6: aviso ao salvar (1a vez), slider da cortina abaixo das fotos, editar
-   logo/nome sobre as fotos (mover/redimensionar/girar), placeholder "Seu nome",
-   checkboxes mostram/ocultam a previa no perfil. */
-const CACHE = "fotos-fantasma-v25";
+/* v3.5.7: popup "midia salva", botao Comparar so com 2 fotos, janela "Montagem"
+   com card Base, camera negada volta a tela anterior, perfil com X e botoes que
+   so habilitam quando ha alteracao. */
+const CACHE = "fotos-fantasma-v26";
 const ASSETS = [
   "./",
   "./index.html",

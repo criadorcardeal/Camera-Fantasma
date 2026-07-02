@@ -15,19 +15,32 @@ async function dataUrlToFile(dataUrl, name) {
 }
 
 // Compartilha imediatamente (sem await antes) para preservar o gesto do iOS.
+// Resolve true quando salvou/compartilhou; false se o usuário cancelou.
 function shareFile(file) {
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    navigator.share({ files: [file], title: file.name }).catch(() => {});
-  } else {
-    const url = URL.createObjectURL(file);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return navigator.share({ files: [file], title: file.name }).then(() => true).catch(() => false);
   }
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return Promise.resolve(true);
+}
+
+// Pop-up de confirmação após salvar/baixar a mídia.
+function showSavedPopup(what) {
+  const isVideo = /^video/.test(what);
+  const t = $("#saved-title");
+  if (t) t.textContent = isVideo ? "Vídeo salvo!" : "Foto salva!";
+  const dlg = $("#saved-dialog");
+  if (!dlg) return;
+  dlg.showModal();
+  clearTimeout(showSavedPopup._t);
+  showSavedPopup._t = setTimeout(() => { if (dlg.open) dlg.close(); }, 2400);
 }
 
 function drawCover(ctx, img, x, y, w, h) {
@@ -332,7 +345,7 @@ const Share = {
   handle(what) {
     const file = this.files[what];
     $("#share-dialog").close();
-    if (file) shareFile(file);
+    if (file) shareFile(file).then((ok) => { if (ok) showSavedPopup(what); });
     // Salvar/compartilhar COMPLETA a comparacao -> confirma o credito reservado.
     if (this.session && this.session.creditState === "reserved") {
       this.session.creditState = "confirmed";
@@ -349,4 +362,5 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#share-cat-foto").addEventListener("click", () => Share.nav("foto"));
   $("#share-cat-video").addEventListener("click", () => Share.nav("video"));
   $("#share-close").addEventListener("click", () => $("#share-dialog").close());
+  $("#saved-ok").addEventListener("click", () => $("#saved-dialog").close());
 });
