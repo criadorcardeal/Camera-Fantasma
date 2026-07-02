@@ -18,7 +18,7 @@
     <header class="topbar">
       <span class="topbar-spacer"></span>
       <h1>Fotos Fantasma</h1>
-      <span class="version-badge">v3.4</span>
+      <span class="version-badge">v3.5</span>
     </header>
     <div class="credits-bar">
       <span id="cred-balance">🪙 0 créditos</span>
@@ -29,8 +29,7 @@
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
-      <button id="btn-import" class="fab fab-secondary">🖼 Importar</button>
-      <button id="btn-new" class="fab">📷 Nova foto</button>
+      <button id="btn-compare" class="fab">➕ Nova comparação</button>
     </div>
     <input type="file" id="import-input" accept="image/*" hidden />
   </section>
@@ -38,6 +37,7 @@
   <!-- ============ TELA: CÂMERA ============ -->
   <section id="screen-camera" class="screen camera">
     <video id="video" playsinline autoplay muted></video>
+    <canvas id="cam-fx" hidden></canvas>
     <img id="ghost" class="ghost" alt="" />
     <canvas id="canvas" hidden></canvas>
 
@@ -210,11 +210,24 @@
         <input type="number" id="dist-input" inputmode="numeric" value="50" min="1" />
       </label>
       <small>Recomendado: 40 a 60 cm</small>
+      <label>Rótulo (rodapé da foto)
+        <input type="text" id="dist-label" placeholder="Ex.: Perna direita" autocomplete="off" />
+      </label>
       <menu>
         <button value="cancel" id="dist-cancel">Refazer</button>
         <button value="ok" id="dist-ok" class="primary">Salvar</button>
       </menu>
     </form>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: NOVA COMPARAÇÃO ============ -->
+  <dialog id="new-dialog">
+    <h3>Nova comparação</h3>
+    <menu class="opt-menu">
+      <button id="new-camera">📷 Nova foto</button>
+      <button id="new-import">🖼 Importar</button>
+    </menu>
+    <menu><button id="new-close">Fechar</button></menu>
   </dialog>
 
   <script src="./credits.js"></script>

@@ -128,7 +128,7 @@ html, body {
   width: 100%; height: 100%;
   object-fit: cover;
 }
-.ghost { pointer-events: none; opacity: 0.5; }
+.ghost { pointer-events: none; opacity: 0.5; z-index: 2; }
 
 .cam-top {
   position: absolute; top: 0; left: 0; right: 0;
@@ -237,9 +237,49 @@ html, body {
 .side-by-side { display: flex; gap: 3px; }
 .side-by-side img { position: relative; width: 50%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; }
 
-.info-block { background: var(--card); border-radius: 12px; padding: 12px; margin-top: 12px; }
-.info-block .row { display: flex; padding: 4px 0; font-size: 0.9rem; }
-.info-block .row b { width: 130px; flex-shrink: 0; }
+.info-block { background: var(--card); border-radius: 12px; padding: 6px 12px; margin-top: 12px; }
+.info-block .row { display: flex; padding: 4px 0; font-size: 0.82rem; }
+.info-block .row b { width: 120px; flex-shrink: 0; }
+.info-block .row span { color: var(--muted); }
+/* Cabeçalho do card recolhível: mostra só o Status quando fechado */
+.info-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; cursor: pointer; font-size: 0.85rem;
+}
+.info-head .status-txt { flex: 1; font-weight: 600; }
+.info-head .chev { color: var(--muted); transition: transform 0.15s; font-size: 0.9rem; }
+.info-block.open .info-head .chev { transform: rotate(180deg); }
+.info-rows { max-height: 0; overflow: hidden; }
+.info-block.open .info-rows { max-height: 180px; overflow-y: auto; padding-top: 4px; border-top: 1px solid #eef1f3; margin-top: 2px; }
+
+/* Rótulos (rodapé das fotos) */
+.label-card { background: var(--card); border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
+.label-toggle { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; font-weight: 600; }
+.label-toggle input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--primary); }
+.label-fields { margin-top: 8px; }
+.label-fields.hidden-soft { display: none; }
+.label-fields label { display: block; font-size: 0.78rem; color: var(--muted); margin: 6px 0 2px; font-weight: 600; }
+.label-fields input {
+  width: 100%; padding: 8px 10px; border: 1px solid #ccd4d9;
+  border-radius: 8px; font-size: 0.9rem;
+}
+
+/* Rodapé de rótulo dentro do palco de comparação */
+.cap {
+  position: absolute; bottom: 6px; z-index: 4; pointer-events: none;
+  background: rgba(0,0,0,0.55); color: #fff; font-size: 0.72rem;
+  padding: 3px 8px; border-radius: 10px; max-width: 46%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cap.cap-left { left: 6px; }
+.cap.cap-right { right: 6px; }
+.cap.cap-center { left: 50%; transform: translateX(-50%); max-width: 90%; }
+.side-cell { position: relative; width: 50%; }
+.side-cell img { width: 100%; }
+.side-cell .cap { max-width: calc(100% - 12px); }
+
+/* Campo de rótulo no diálogo de distância */
+#dist-label { font-size: 1rem; }
 
 .btn {
   display: block; width: 100%; margin-top: 14px;
@@ -248,6 +288,26 @@ html, body {
 }
 .btn.primary { background: var(--primary); color: #fff; }
 .btn.outline { background: #fff; color: var(--primary); border: 1.5px solid var(--primary); }
+
+/* Linhas de 2 botões lado a lado + card de acompanhamento */
+.act-card { background: var(--card); border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
+.act-card > .act-title { font-size: 0.8rem; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+.btn-row { display: flex; gap: 10px; }
+.btn-row .btn { flex: 1; margin-top: 0; padding: 12px; font-size: 0.92rem; }
+
+/* Pop-up "Nova comparação" (opções) */
+.opt-menu { display: flex; flex-direction: column; gap: 10px; padding: 0; margin: 4px 0 0; }
+.opt-menu button {
+  width: 100%; text-align: left; padding: 14px 16px; border-radius: 12px;
+  border: 1.5px solid var(--primary); background: #fff; color: var(--primary);
+  font-size: 1rem; font-weight: 600; cursor: pointer;
+}
+
+/* Canvas de pré-visualização com filtro (câmera) */
+#cam-fx {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; z-index: 1;
+}
 
 /* ---------- Alinhar acompanhamento (v2.0) ---------- */
 .al-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px; overflow-y: auto; }

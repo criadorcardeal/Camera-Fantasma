@@ -37,6 +37,48 @@ function drawCover(ctx, img, x, y, w, h) {
   ctx.drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, x, y, w, h);
 }
 
+// Barra de rodape (rotulo) centrada na base de uma regiao [x, y-h .. y], largura w.
+function drawFooterBar(ctx, text, x, y, w, h) {
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(x, y - h, w, h);
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `600 ${Math.round(h * 0.44)}px -apple-system, Arial, sans-serif`;
+  ctx.fillText(text, x + w / 2, y - h / 2, w - 20);
+  ctx.restore();
+}
+
+// Chip de rotulo (usado nos videos): ancorado a esquerda ou direita.
+function drawChip(ctx, text, x, y, align) {
+  ctx.save();
+  ctx.font = "600 20px -apple-system, Arial, sans-serif";
+  const padX = 10, h = 30;
+  const tw = Math.min(ctx.measureText(text).width, 300);
+  const w = tw + padX * 2;
+  const bx = align === "right" ? x - w : x;
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fillRect(bx, y - h, w, h);
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, bx + padX, y - h / 2, tw);
+  ctx.restore();
+}
+
+// Renderiza uma foto com o rotulo "impresso" no rodape (dataURL JPEG).
+async function renderPhotoWithFooter(src, label) {
+  const img = await loadImageEl(src);
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d");
+  ctx.drawImage(img, 0, 0);
+  drawFooterBar(ctx, label, 0, H, W, Math.max(28, Math.round(H * 0.07)));
+  return c.toDataURL("image/jpeg", 0.92);
+}
+
 // Monta a imagem da comparacao (Base | Acompanhamento) com rotulos e datas.
 async function generateComparisonImage(s) {
   const baseImg = await loadImageEl(baseSrc(s));
@@ -70,6 +112,13 @@ async function generateComparisonImage(s) {
   const y = pad + headerH;
   drawCover(ctx, baseImg, pad, y, cellW, cellH);
   drawCover(ctx, followImg, pad + cellW + gap, y, cellW, cellH);
+
+  // Rotulo (rodape) de cada foto, se ligado.
+  if (s.showLabels) {
+    const fh = Math.max(30, Math.round(cellH * 0.07));
+    if (s.baseLabel) drawFooterBar(ctx, s.baseLabel, pad, y + cellH, cellW, fh);
+    if (s.followLabel) drawFooterBar(ctx, s.followLabel, pad + cellW + gap, y + cellH, cellW, fh);
+  }
 
   return c.toDataURL("image/jpeg", 0.92);
 }
@@ -137,6 +186,11 @@ async function generateVideo(s, kind) {
         ctx.fillStyle = "rgba(255,255,255,0.9)";
         ctx.fillRect(clipW - 1, 0, 3, H);
       }
+    }
+    // Rotulo (rodape) de cada foto, se ligado: base a esquerda, acomp. a direita.
+    if (s.showLabels) {
+      if (s.baseLabel) drawChip(ctx, s.baseLabel, 12, H - 12, "left");
+      if (s.followLabel) drawChip(ctx, s.followLabel, W - 12, H - 12, "right");
     }
   };
 
@@ -214,10 +268,12 @@ const Share = {
     dlg.showModal();
     // Prepara os arquivos ANTES de liberar as opcoes, para o compartilhamento
     // acontecer imediatamente no clique (exigencia do iOS).
+    const withFooter = (src, label) => (session.showLabels && label)
+      ? renderPhotoWithFooter(src, label) : Promise.resolve(src);
     try {
-      this.files.base = await dataUrlToFile(baseSrc(session), "foto-base.jpg");
+      this.files.base = await dataUrlToFile(await withFooter(baseSrc(session), session.baseLabel), "foto-base.jpg");
       if (hasFollow) {
-        this.files.follow = await dataUrlToFile(followSrc(session), "acompanhamento.jpg");
+        this.files.follow = await dataUrlToFile(await withFooter(followSrc(session), session.followLabel), "acompanhamento.jpg");
         const cmp = await generateComparisonImage(session);
         this.files.compare = await dataUrlToFile(cmp, "comparacao.jpg");
       }

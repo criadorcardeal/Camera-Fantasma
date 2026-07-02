@@ -73,6 +73,38 @@ const fmtDate = (iso) => {
 const baseSrc = (s) => s.baseImageView || s.baseImage;
 const followSrc = (s) => s.followImageView || s.followImage;
 
+// Aplica brilho/contraste/saturacao (mesma semantica do CSS filter) direto nos
+// pixels de um canvas. Usado na CAPTURA porque em alguns iPhones o ctx.filter
+// nao surte efeito — assim o ajuste sempre fica "impresso" na foto.
+function bakeCameraFilter(ctx, w, h, f) {
+  const b = f.brightness, c = f.contrast, sat = f.saturate;
+  if (Math.abs(b - 1) < 0.005 && Math.abs(c - 1) < 0.005 && Math.abs(sat - 1) < 0.005) return;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let r = d[i], g = d[i + 1], bl = d[i + 2];
+    // brilho
+    r *= b; g *= b; bl *= b;
+    // contraste (ponto medio 127.5, como o CSS)
+    r = (r - 127.5) * c + 127.5;
+    g = (g - 127.5) * c + 127.5;
+    bl = (bl - 127.5) * c + 127.5;
+    // saturacao (luminancia Rec.709, como o CSS)
+    const l = 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+    r = l + (r - l) * sat;
+    g = l + (g - l) * sat;
+    bl = l + (bl - l) * sat;
+    d[i] = r < 0 ? 0 : r > 255 ? 255 : r;
+    d[i + 1] = g < 0 ? 0 : g > 255 ? 255 : g;
+    d[i + 2] = bl < 0 ? 0 : bl > 255 ? 255 : bl;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+const escHtml = (v) => String(v == null ? "" : v)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const escAttr = (v) => escHtml(v).replace(/"/g, "&quot;");
+
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   $("#" + id).classList.add("active");
@@ -87,9 +119,9 @@ async function renderHome() {
       <div class="empty">
         <div class="big">📷</div>
         <h2>Nenhuma comparação ainda</h2>
-        <p>Toque em "Nova foto base" para registrar a primeira foto.
-        Na próxima consulta, use o Ghost Overlay para tirar a foto de
-        acompanhamento no mesmo enquadramento.</p>
+        <p>Toque em "Nova comparação" para registrar a primeira foto
+        (tirar ou importar). Na próxima consulta, use o Ghost Overlay para
+        tirar a foto de acompanhamento no mesmo enquadramento.</p>
       </div>`;
     return;
   }
@@ -128,10 +160,14 @@ const Cam = {
   filterString(f) {
     return `brightness(${f.brightness}) contrast(${f.contrast}) saturate(${f.saturate})`;
   },
+  isNeutral(f) {
+    return Math.abs(f.brightness - 1) < 0.005 &&
+           Math.abs(f.contrast - 1) < 0.005 &&
+           Math.abs(f.saturate - 1) < 0.005;
+  },
+
   applyLiveFilter() {
-    // No iOS/Safari, aplicar filtro CSS direto no <video> ao vivo deixa a
-    // imagem preta. Por isso o ajuste NAO vai no preview: ele e "impresso" na
-    // foto no momento da captura. Aqui so atualizamos os rotulos dos sliders.
+    // Atualiza os rotulos dos sliders.
     const set = (id, name) => {
       const inp = $(id);
       inp.parentElement.querySelector("span").textContent =
@@ -140,6 +176,50 @@ const Cam = {
     set("#f-brightness", "Brilho");
     set("#f-contrast", "Contraste");
     set("#f-saturate", "Saturação");
+
+    // Pre-visualizacao ao vivo: aplicar filtro CSS direto no <video> deixa a
+    // imagem preta no iOS. A solucao e ESPELHAR o video num canvas e aplicar o
+    // filtro CSS no canvas (elemento), o que funciona no Safari. Enquanto o
+    // ajuste esta neutro, mostramos o video puro (mais fluido).
+    const f = this.filters();
+    const fx = $("#cam-fx");
+    if (this.isNeutral(f)) {
+      this.stopPreview();
+      fx.hidden = true;
+    } else {
+      fx.style.filter = this.filterString(f);
+      fx.hidden = false;
+      this.startPreview();
+    }
+  },
+
+  startPreview() {
+    if (this._previewRAF) return;
+    const video = $("#video");
+    const fx = $("#cam-fx");
+    const ctx = fx.getContext("2d");
+    let last = 0;
+    const loop = (t) => {
+      this._previewRAF = requestAnimationFrame(loop);
+      if (fx.hidden || !video.videoWidth) return;
+      if (t - last < 40) return;           // ~24 fps
+      last = t;
+      // Canvas em baixa resolucao (lado maior ~480) so p/ espelhar o video.
+      const scale = Math.min(1, 480 / Math.max(video.videoWidth, video.videoHeight));
+      const w = Math.round(video.videoWidth * scale);
+      const h = Math.round(video.videoHeight * scale);
+      if (fx.width !== w || fx.height !== h) { fx.width = w; fx.height = h; }
+      ctx.drawImage(video, 0, 0, w, h);     // sem filtro no contexto: o filtro
+                                            // vai no CSS do elemento canvas.
+    };
+    this._previewRAF = requestAnimationFrame(loop);
+  },
+
+  stopPreview() {
+    if (this._previewRAF) {
+      cancelAnimationFrame(this._previewRAF);
+      this._previewRAF = null;
+    }
   },
 
   async open(mode, session) {
@@ -255,6 +335,8 @@ const Cam = {
   },
 
   stop() {
+    this.stopPreview();
+    $("#cam-fx").hidden = true;
     if (this.stream) {
       this.stream.getTracks().forEach((t) => t.stop());
       this.stream = null;
@@ -288,15 +370,17 @@ const Cam = {
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
     const f = this.filters();
-    // ctx.filter "imprime" o ajuste de brilho/contraste/saturacao na imagem
-    // final (suportado no Safari 17+). Se nao suportado, a foto sai sem o
-    // ajuste, mas o preview ja mostrava o resultado.
-    try { ctx.filter = this.filterString(f); } catch (_) {}
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // "Imprime" brilho/contraste/saturacao nos pixels (confiavel em todo iPhone).
+    bakeCameraFilter(ctx, canvas.width, canvas.height, f);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
 
-    const distance = await openDistanceDialog(this.target);
-    if (distance == null) return; // usuario escolheu refazer
+    const seed = this.mode === "base"
+      ? (this.session && this.session.baseLabel) || ""
+      : (this.session && this.session.followLabel) || "";
+    const res = await openDistanceDialog(this.target, seed);
+    if (res == null) return; // usuario escolheu refazer
+    const { distance, label } = res;
 
     if (this.mode === "base") {
       const session = {
@@ -304,6 +388,9 @@ const Cam = {
         createdAt: new Date().toISOString(),
         baseImage: dataUrl,
         baseDistance: distance,
+        baseLabel: label,
+        followLabel: "",
+        showLabels: false,
         filters: f,
         followImage: null,
         followDistance: null,
@@ -318,6 +405,7 @@ const Cam = {
       const s = this.session;
       s.followImage = dataUrl;
       s.followDistance = distance;
+      s.followLabel = label;
       s.followAt = new Date().toISOString();
       await DB.put(s);
       this.stop();
@@ -390,13 +478,16 @@ async function importBasePhoto(file) {
     alert(e.message || "Não foi possível usar esta imagem.");
     return;
   }
-  const distance = await openDistanceDialog(null);
-  if (distance == null) return;
+  const res = await openDistanceDialog(null, "");
+  if (res == null) return;
   const session = {
     id: String(Date.now()),
     createdAt: new Date().toISOString(),
     baseImage: dataUrl,
-    baseDistance: distance,
+    baseDistance: res.distance,
+    baseLabel: res.label,
+    followLabel: "",
+    showLabels: false,
     filters: { brightness: 1, contrast: 1, saturate: 1 },
     followImage: null,
     followDistance: null,
@@ -408,13 +499,16 @@ async function importBasePhoto(file) {
   await openDetail(session.id);
 }
 
-/* ---------------- Diálogo de distância ---------------- */
-function openDistanceDialog(target) {
+/* ---------------- Diálogo de distância + rótulo ----------------
+   Resolve { distance, label } ou null (usuário escolheu refazer). */
+function openDistanceDialog(target, labelValue) {
   return new Promise((resolve) => {
     const dlg = $("#dist-dialog");
     const input = $("#dist-input");
+    const labelInp = $("#dist-label");
     const tEl = $("#dist-target");
     input.value = target != null ? Math.round(target) : 50;
+    labelInp.value = labelValue || "";
     if (target != null) {
       tEl.hidden = false;
       tEl.textContent = `Meta para igualar a foto base: ${Math.round(target)} cm`;
@@ -425,7 +519,10 @@ function openDistanceDialog(target) {
       dlg.removeEventListener("close", onClose);
       if (dlg.returnValue === "ok") {
         const v = parseFloat(String(input.value).replace(",", "."));
-        resolve(isNaN(v) ? (target != null ? target : 50) : v);
+        resolve({
+          distance: isNaN(v) ? (target != null ? target : 50) : v,
+          label: labelInp.value.trim(),
+        });
       } else {
         resolve(null);
       }
@@ -444,40 +541,74 @@ async function openDetail(id) {
   _detailSession = s;
   const c = $("#detail-content");
 
-  const compareHtml = s.followImage
+  const hasFollow = !!s.followImage;
+
+  const compareHtml = hasFollow
     ? `<div class="seg" id="cmp-seg">
          <button data-mode="curtain" class="active">Cortina</button>
          <button data-mode="side">Lado a lado</button>
          <button data-mode="overlay">Sobrepor</button>
        </div>
        <div id="cmp-host"></div>`
-    : `<div class="compare-stage"><img src="${baseSrc(s)}" style="object-fit:contain" /></div>`;
+    : `<div class="compare-stage" id="cmp-host"><img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}</div>`;
+
+  const statusTxt = s.creditState === "confirmed"
+    ? "Concluída ✓ (crédito usado)"
+    : s.creditState === "reserved"
+      ? "Em aberto — salve para concluir"
+      : "—";
 
   const infoHtml = `
-    <div class="info-block">
-      <div class="row"><b>Foto base</b><span>${fmtDate(s.createdAt)} • ${Math.round(s.baseDistance)} cm</span></div>
-      ${s.followImage ? `<div class="row"><b>Acompanhamento</b><span>${fmtDate(s.followAt)} • ${Math.round(s.followDistance)} cm</span></div>` : ""}
-      <div class="row"><b>Captura (câmera)</b><span>Brilho ${s.filters.brightness.toFixed(2)} • Contraste ${s.filters.contrast.toFixed(2)} • Saturação ${s.filters.saturate.toFixed(2)}</span></div>
-      <div class="row"><b>Status</b><span>${
-        s.creditState === "confirmed"
-          ? "Concluída ✓ (crédito usado)"
-          : s.creditState === "reserved"
-            ? "Em aberto — salve/compartilhe para concluir (crédito reservado)"
-            : "—"
-      }</span></div>
+    <div class="info-block" id="info-block">
+      <div class="info-head" id="info-head">
+        <b>Status:</b><span class="status-txt">${statusTxt}</span>
+        <span class="chev">▾</span>
+      </div>
+      <div class="info-rows">
+        <div class="row"><b>Foto base</b><span>${fmtDate(s.createdAt)} • ${Math.round(s.baseDistance)} cm</span></div>
+        ${hasFollow ? `<div class="row"><b>Acompanhamento</b><span>${fmtDate(s.followAt)} • ${Math.round(s.followDistance)} cm</span></div>` : ""}
+        <div class="row"><b>Captura (câmera)</b><span>Brilho ${s.filters.brightness.toFixed(2)} • Contraste ${s.filters.contrast.toFixed(2)} • Saturação ${s.filters.saturate.toFixed(2)}</span></div>
+      </div>
     </div>`;
 
-  const shareBtn = `<button class="btn outline" id="btn-share">📤 Salvar / Compartilhar</button>`;
-  const btnHtml = (s.followImage
-    ? `<button class="btn primary" id="btn-adjust">🎚 Ajustar imagens</button>
-       <button class="btn outline" id="btn-redo">📷 Refazer acompanhamento</button>
-       <button class="btn outline" id="btn-follow-import">🖼 Importar acompanhamento</button>`
-    : `<button class="btn primary" id="btn-follow">📷 Tirar foto de acompanhamento</button>
-       <button class="btn outline" id="btn-follow-import">🖼 Importar acompanhamento</button>`) + shareBtn;
+  const labelHtml = `
+    <div class="label-card">
+      <label class="label-toggle">
+        <input type="checkbox" id="lbl-toggle" ${s.showLabels ? "checked" : ""} />
+        <span>Mostrar rótulo no rodapé das fotos</span>
+      </label>
+      <div class="label-fields ${s.showLabels ? "" : "hidden-soft"}" id="lbl-fields">
+        <label>Rótulo da foto base
+          <input type="text" id="lbl-base" value="${escAttr(s.baseLabel || "")}" placeholder="Ex.: Perna direita" autocomplete="off" />
+        </label>
+        ${hasFollow ? `<label>Rótulo do acompanhamento
+          <input type="text" id="lbl-follow" value="${escAttr(s.followLabel || "")}" placeholder="Ex.: Perna direita" autocomplete="off" />
+        </label>` : ""}
+      </div>
+    </div>`;
 
-  c.innerHTML = compareHtml + infoHtml + btnHtml;
+  const acCard = `
+    <div class="act-card">
+      <div class="act-title">Acompanhamento</div>
+      <div class="btn-row">
+        <button class="btn outline" id="btn-redo">${hasFollow ? "📷 Refazer" : "📷 Tirar"}</button>
+        <button class="btn outline" id="btn-follow-import">🖼 Importar</button>
+      </div>
+    </div>`;
 
-  if (s.followImage) {
+  const secondRow = `
+    <div class="btn-row" style="margin-top:12px">
+      ${hasFollow ? `<button class="btn primary" id="btn-adjust">🎚 Ajustar imagens</button>` : ""}
+      <button class="btn primary" id="btn-share">📤 Salvar</button>
+    </div>`;
+
+  c.innerHTML = compareHtml + infoHtml + labelHtml + acCard + secondRow;
+
+  // Ativa a tela ANTES de montar a comparação, para o palco já ter largura
+  // (a cortina depende de clientWidth para dimensionar a foto de acompanhamento).
+  showScreen("screen-detail");
+
+  if (hasFollow) {
     renderCompare("curtain");
     $("#cmp-seg").querySelectorAll("button").forEach((b) => {
       b.addEventListener("click", () => {
@@ -487,23 +618,56 @@ async function openDetail(id) {
       });
     });
     $("#btn-adjust").addEventListener("click", () => Editor.open(s));
-    $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
-  } else {
-    $("#btn-follow").addEventListener("click", () => Cam.open("follow", s));
   }
+  $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
   $("#btn-follow-import").addEventListener("click", () =>
     pickImage().then((file) => importFollowPhoto(s, file)));
   $("#btn-share").addEventListener("click", () => Share.open(s));
 
-  showScreen("screen-detail");
+  // Card de dados recolhível (recolhido mostra só o Status).
+  $("#info-head").addEventListener("click", () => $("#info-block").classList.toggle("open"));
+
+  // Rótulos: liga/desliga rodapé e edição por comparação.
+  $("#lbl-toggle").addEventListener("change", async (e) => {
+    s.showLabels = e.target.checked;
+    $("#lbl-fields").classList.toggle("hidden-soft", !s.showLabels);
+    await DB.put(s);
+    refreshCompareCaptions();
+  });
+  const onLabelInput = async (key, val) => { s[key] = val.trim(); await DB.put(s); refreshCompareCaptions(); };
+  $("#lbl-base").addEventListener("input", (e) => onLabelInput("baseLabel", e.target.value));
+  if (hasFollow) $("#lbl-follow").addEventListener("input", (e) => onLabelInput("followLabel", e.target.value));
+}
+
+// Legenda (rodapé) opcional dentro do palco de comparação.
+function capHtml(text, cls, show) {
+  return show && text ? `<div class="cap ${cls}">${escHtml(text)}</div>` : "";
+}
+
+// Recolhe o modo de comparação ativo e re-renderiza (para atualizar legendas).
+function refreshCompareCaptions() {
+  const s = _detailSession;
+  if (!s) return;
+  if (!s.followImage) {
+    const host = $("#cmp-host");
+    if (host) host.innerHTML = `<img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}`;
+    return;
+  }
+  const active = $("#cmp-seg") && $("#cmp-seg").querySelector("button.active");
+  renderCompare(active ? active.dataset.mode : "curtain");
 }
 
 function renderCompare(mode) {
   const s = _detailSession;
   const host = $("#cmp-host");
+  const show = s.showLabels;
+  const capB = capHtml(s.baseLabel, "cap-left", show);
+  const capF = capHtml(s.followLabel, "cap-right", show);
   if (mode === "side") {
     host.innerHTML = `<div class="side-by-side">
-        <img src="${baseSrc(s)}" /><img src="${followSrc(s)}" /></div>`;
+        <div class="side-cell"><img src="${baseSrc(s)}" />${capHtml(s.baseLabel, "cap-center", show)}</div>
+        <div class="side-cell"><img src="${followSrc(s)}" />${capHtml(s.followLabel, "cap-center", show)}</div>
+      </div>`;
     return;
   }
   if (mode === "overlay") {
@@ -511,6 +675,7 @@ function renderCompare(mode) {
       <div class="compare-stage">
         <img src="${baseSrc(s)}" />
         <img src="${followSrc(s)}" id="ov-after" style="opacity:0.5" />
+        ${capB}${capF}
       </div>
       <div class="seg" style="margin-top:8px;background:transparent;padding:0">
         <input type="range" min="0" max="1" step="0.01" value="0.5" id="ov-range" style="width:100%" />
@@ -526,6 +691,7 @@ function renderCompare(mode) {
       <img src="${baseSrc(s)}" />
       <div class="after-clip" style="position:absolute;inset:0;width:50%"><img src="${followSrc(s)}" style="width:200%;max-width:none" id="cur-after"/></div>
       <div class="compare-handle" id="cur-handle" style="left:50%"></div>
+      ${capB}${capF}
     </div>`;
   const stage = $("#curtain");
   const clip = stage.querySelector(".after-clip");
@@ -553,20 +719,16 @@ function renderCompare(mode) {
 
 /* ---------------- Eventos globais ---------------- */
 function wireEvents() {
-  $("#btn-new").addEventListener("click", () => {
+  $("#btn-compare").addEventListener("click", () => {
     if (!Credits.canStart()) {
       Credits.promptBuy("Você está sem créditos. Compre para fazer uma nova comparação.");
       return;
     }
-    Cam.open("base");
+    $("#new-dialog").showModal();
   });
-  $("#btn-import").addEventListener("click", () => {
-    if (!Credits.canStart()) {
-      Credits.promptBuy("Você está sem créditos. Compre para fazer uma nova comparação.");
-      return;
-    }
-    $("#import-input").click();
-  });
+  $("#new-camera").addEventListener("click", () => { $("#new-dialog").close(); Cam.open("base"); });
+  $("#new-import").addEventListener("click", () => { $("#new-dialog").close(); $("#import-input").click(); });
+  $("#new-close").addEventListener("click", () => $("#new-dialog").close());
   $("#import-input").addEventListener("change", async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = ""; // permite reimportar o mesmo arquivo depois

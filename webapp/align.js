@@ -73,12 +73,13 @@ const Aligner = {
     ctx.drawImage(followImg, dx, dy, dw, dh);
     const aligned = c.toDataURL("image/jpeg", 0.9);
 
-    const distance = await openDistanceDialog(this.session.baseDistance);
-    if (distance == null) { await openDetail(this.session.id); return; }
+    const res = await openDistanceDialog(this.session.baseDistance, this.session.followLabel || "");
+    if (res == null) { await openDetail(this.session.id); return; }
 
     const s = this.session;
     s.followImage = aligned;
-    s.followDistance = distance;
+    s.followDistance = res.distance;
+    s.followLabel = res.label;
     s.followAt = new Date().toISOString();
     // Nova imagem: zera ajustes/versao anteriores do acompanhamento.
     s.followImageView = null;
