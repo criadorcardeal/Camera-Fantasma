@@ -1,0 +1,6 @@
+# Cloudflare Pages - controle de cache.
+# O Cloudflare Pages purga o CDN a cada deploy (sem atraso). Aqui garantimos que
+# o navegador sempre revalide o shell do app (HTML/JS/CSS/SW) -> versao nova na hora.
+# O offline continua garantido pelo Service Worker (cache proprio).
+/*
+  Cache-Control: no-cache
