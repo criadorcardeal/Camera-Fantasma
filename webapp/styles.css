@@ -334,3 +334,7 @@ dialog menu button.primary { background: var(--primary); color: #fff; }
   border: 1.5px solid var(--primary); background: #fff; color: var(--primary);
   font-size: 0.95rem; font-weight: 600; cursor: pointer;
 }
+.share-menu button:disabled { opacity: 0.55; cursor: default; }
+.share-menu button.share-back {
+  border-color: var(--muted); color: var(--muted); font-weight: 500;
+}

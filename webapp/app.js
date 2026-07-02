@@ -612,22 +612,24 @@ window.addEventListener("DOMContentLoaded", async () => {
   wireEvents();
   await renderHome();
   if ("serviceWorker" in navigator) {
-    // updateViaCache:none -> o navegador sempre busca o sw.js fresco (detecta
-    // versao nova mais rapido).
+    // Recarrega SOMENTE quando o novo Service Worker efetivamente ASSUME a pagina
+    // (evento controllerchange). O sw.js faz skipWaiting()+clients.claim(), entao
+    // ao instalar uma versao nova ele assume na hora e dispara este evento -> ai
+    // recarregamos e a pagina passa a ser servida pelo worker novo (nao pelo
+    // antigo). Corrige o iOS "standalone", onde recarregar no estado 'installed'
+    // (worker antigo ainda no controle) mantinha a versao velha.
+    // Nao recarrega na primeira instalacao: se nao havia controller ao carregar,
+    // o controllerchange e apenas o claim inicial.
+    const hadController = !!navigator.serviceWorker.controller;
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing || !hadController) return;
+      refreshing = true;
+      window.location.reload();
+    });
+    // updateViaCache:none -> o navegador sempre busca o sw.js fresco.
     navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" })
       .then((reg) => {
-        // Quando uma versao nova terminar de instalar e ja houver um app
-        // rodando, recarrega sozinho para aplicar a atualizacao (sem apagar
-        // nada). Nao recarrega na primeira instalacao (sem controller antes).
-        reg.addEventListener("updatefound", () => {
-          const nw = reg.installing;
-          if (!nw) return;
-          nw.addEventListener("statechange", () => {
-            if (nw.state === "installed" && navigator.serviceWorker.controller) {
-              window.location.reload();
-            }
-          });
-        });
         reg.update().catch(() => {});
         // Verifica atualizacao toda vez que o app volta para o primeiro plano.
         document.addEventListener("visibilitychange", () => {

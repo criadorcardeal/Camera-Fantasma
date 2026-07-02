@@ -176,12 +176,28 @@
     <p class="share-hint">No iPhone: escolha <b>Salvar em Fotos</b> (galeria) ou
       <b>Salvar em Arquivos</b> (iCloud, Google Drive, OneDrive, Dropbox).</p>
     <div id="share-status" class="share-status"></div>
-    <menu class="share-menu">
-      <button id="share-opt-base" data-what="base" hidden>🦵 Foto base</button>
+
+    <!-- Nível 1: categorias -->
+    <menu class="share-menu" id="share-cats">
+      <button id="share-cat-foto">📷 Foto</button>
+      <button id="share-cat-video">🎬 Vídeo</button>
+    </menu>
+
+    <!-- Nível 2a: fotos -->
+    <menu class="share-menu" id="share-sub-foto" hidden>
+      <button data-what="base">🦵 Foto base</button>
       <button id="share-opt-follow" data-what="follow" hidden>📷 Foto de acompanhamento</button>
       <button id="share-opt-compare" data-what="compare" hidden>🔀 Comparação (lado a lado)</button>
-      <button id="share-opt-video" data-what="video" hidden>🎬 Vídeo Cortina (2s)</button>
+      <button class="share-back" data-back>← Voltar</button>
     </menu>
+
+    <!-- Nível 2b: vídeos -->
+    <menu class="share-menu" id="share-sub-video" hidden>
+      <button id="share-opt-curtain" data-what="video-curtain">🎬 Cortina</button>
+      <button id="share-opt-overlay" data-what="video-overlay">🎬 Sobrepostos</button>
+      <button class="share-back" data-back>← Voltar</button>
+    </menu>
+
     <menu><button id="share-close">Fechar</button></menu>
   </dialog>
 

@@ -91,9 +91,12 @@ function pickVideoMime() {
   return "";
 }
 
-// Gera um video (2s) da cortina varrendo da foto base para a de acompanhamento.
+// Gera um video (2s) da transicao da foto base para a de acompanhamento.
+//   kind "curtain"  -> cortina varrendo da esquerda para a direita.
+//   kind "overlay"  -> fotos sobrepostas; o acompanhamento aparece por cima
+//                      com a transparencia indo de 100% a 0% (surge sobre a base).
 // Usa as mesmas fontes exibidas na tela (baseSrc/followSrc, ja com ajustes).
-async function generateCurtainVideo(s) {
+async function generateVideo(s, kind) {
   const mime = pickVideoMime();
   if (!mime) throw new Error("Gravação de vídeo não suportada neste navegador.");
 
@@ -109,11 +112,20 @@ async function generateCurtainVideo(s) {
   c.width = W; c.height = H;
   const ctx = c.getContext("2d");
 
+  // ratio: 0 = so a base; 1 = so o acompanhamento.
   const drawFrame = (ratio) => {
+    ctx.globalAlpha = 1;
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, W, H);
     drawCover(ctx, baseImg, 0, 0, W, H);
-    if (ratio > 0) {
+    if (ratio <= 0) return;
+    if (kind === "overlay") {
+      // Acompanhamento surge sobre a base (transparencia 100% -> 0%).
+      ctx.globalAlpha = ratio;
+      drawCover(ctx, followImg, 0, 0, W, H);
+      ctx.globalAlpha = 1;
+    } else {
+      // Cortina: recorta a faixa esquerda e desenha o acompanhamento.
       const clipW = Math.round(ratio * W);
       ctx.save();
       ctx.beginPath();
@@ -134,14 +146,15 @@ async function generateCurtainVideo(s) {
   const chunks = [];
   rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
 
-  const HOLD = 300, SWEEP = 1400, TOTAL = 2000; // 0,3s base + 1,4s varredura + 0,3s acompanhamento
+  const HOLD = 300, SWEEP = 1400, TOTAL = 2000; // 0,3s base + 1,4s transicao + 0,3s acompanhamento
   const ext = mime.indexOf("mp4") !== -1 ? "mp4" : "webm";
+  const fname = (kind === "overlay" ? "video-sobrepostos." : "video-cortina.") + ext;
 
   return new Promise((resolve, reject) => {
     rec.onstop = () => {
       try {
         const blob = new Blob(chunks, { type: rec.mimeType || mime });
-        resolve(new File([blob], "video-cortina." + ext, { type: blob.type }));
+        resolve(new File([blob], fname, { type: blob.type }));
       } catch (e) { reject(e); }
     };
     rec.onerror = (e) => reject(e.error || new Error("Falha na gravação."));
@@ -171,22 +184,39 @@ async function generateCurtainVideo(s) {
 const Share = {
   files: {},
 
+  // Alterna entre os niveis do menu: "root" (Foto/Video), "foto" e "video".
+  nav(view) {
+    $("#share-cats").hidden = view !== "root";
+    $("#share-sub-foto").hidden = view !== "foto";
+    $("#share-sub-video").hidden = view !== "video";
+  },
+
   async open(session) {
     this.session = session;
     this.files = {};
     const dlg = $("#share-dialog");
     const status = $("#share-status");
-    const vbtn = $("#share-opt-video");
-    ["#share-opt-base", "#share-opt-follow", "#share-opt-compare", "#share-opt-video"].forEach((s) => {
-      $(s).hidden = true;
-    });
+    const hasFollow = !!session.followImage;
+    const canVideo = hasFollow && !!pickVideoMime();
+
+    // Estado inicial: mostra as categorias; esconde as opcoes condicionais.
+    this.nav("root");
+    $("#share-cat-video").hidden = !canVideo;
+    $("#share-opt-follow").hidden = !hasFollow;
+    $("#share-opt-compare").hidden = !hasFollow;
+    const curtain = $("#share-opt-curtain");
+    const overlay = $("#share-opt-overlay");
+    [curtain, overlay].forEach((b) => { b.disabled = true; });
+    curtain.textContent = "🎬 Cortina — gerando…";
+    overlay.textContent = "🎬 Sobrepostos — gerando…";
+
     status.textContent = "Preparando…";
     dlg.showModal();
     // Prepara os arquivos ANTES de liberar as opcoes, para o compartilhamento
     // acontecer imediatamente no clique (exigencia do iOS).
     try {
       this.files.base = await dataUrlToFile(baseSrc(session), "foto-base.jpg");
-      if (session.followImage) {
+      if (hasFollow) {
         this.files.follow = await dataUrlToFile(followSrc(session), "acompanhamento.jpg");
         const cmp = await generateComparisonImage(session);
         this.files.compare = await dataUrlToFile(cmp, "comparacao.jpg");
@@ -195,29 +225,29 @@ const Share = {
       status.textContent = "Não foi possível preparar as imagens.";
       return;
     }
-    $("#share-opt-base").hidden = false;
-    $("#share-opt-follow").hidden = !session.followImage;
-    $("#share-opt-compare").hidden = !session.followImage;
     status.textContent = "";
 
-    // O video da cortina leva ~2s reais para gravar. Gera em segundo plano e so
-    // libera o botao quando o arquivo ja estiver pronto (mantem o clique sincrono
-    // exigido pelo iOS). Nao bloqueia o compartilhamento das fotos.
-    if (session.followImage && pickVideoMime()) {
-      vbtn.hidden = false;
-      vbtn.disabled = true;
-      vbtn.textContent = "🎬 Gerando vídeo…";
-      generateCurtainVideo(session)
-        .then((file) => {
-          if (this.session !== session) return; // dialogo ja foi reaberto/fechado
-          this.files.video = file;
-          vbtn.disabled = false;
-          vbtn.textContent = "🎬 Vídeo Cortina (2s)";
-        })
-        .catch(() => {
-          if (this.session !== session) return;
-          vbtn.hidden = true;
-        });
+    // Cada video leva ~2s reais para gravar. Gera em segundo plano (em paralelo)
+    // e so libera cada botao quando o arquivo ja estiver pronto — mantem o clique
+    // sincrono exigido pelo iOS. Nao bloqueia o compartilhamento das fotos.
+    if (canVideo) {
+      const jobs = [
+        { kind: "curtain", key: "video-curtain", btn: curtain, label: "🎬 Cortina" },
+        { kind: "overlay", key: "video-overlay", btn: overlay, label: "🎬 Sobrepostos" },
+      ];
+      jobs.forEach((j) => {
+        generateVideo(session, j.kind)
+          .then((file) => {
+            if (this.session !== session) return; // dialogo reaberto/fechado
+            this.files[j.key] = file;
+            j.btn.disabled = false;
+            j.btn.textContent = j.label + " (2s)";
+          })
+          .catch(() => {
+            if (this.session !== session) return;
+            j.btn.textContent = j.label + " — indisponível";
+          });
+      });
     }
   },
 
@@ -236,5 +266,9 @@ const Share = {
 window.addEventListener("DOMContentLoaded", () => {
   $("#share-dialog").querySelectorAll("[data-what]").forEach((b) =>
     b.addEventListener("click", () => Share.handle(b.dataset.what)));
+  $("#share-dialog").querySelectorAll("[data-back]").forEach((b) =>
+    b.addEventListener("click", () => Share.nav("root")));
+  $("#share-cat-foto").addEventListener("click", () => Share.nav("foto"));
+  $("#share-cat-video").addEventListener("click", () => Share.nav("video"));
   $("#share-close").addEventListener("click", () => $("#share-dialog").close());
 });
