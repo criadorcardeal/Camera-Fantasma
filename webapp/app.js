@@ -606,7 +606,7 @@ async function openDetail(id) {
          <button data-mode="overlay">Sobrepor</button>
        </div>
        <div id="cmp-host"></div>`
-    : `<div class="compare-stage" id="cmp-host"><img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config())}</div>`;
+    : `<div class="compare-stage" id="cmp-host"><img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}</div>`;
 
   const statusTxt = s.creditState === "confirmed"
     ? "Concluída ✓ (crédito usado)"
@@ -684,11 +684,13 @@ async function openDetail(id) {
       });
     });
   }
+  enableWmEdit();
+
   if ($("#btn-adjust")) $("#btn-adjust").addEventListener("click", () => Editor.open(s));
   if ($("#btn-redo")) $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
   if ($("#btn-follow-import")) $("#btn-follow-import").addEventListener("click", () =>
     pickImage().then((file) => importFollowPhoto(s, file)));
-  $("#btn-share").addEventListener("click", () => Share.open(s));
+  $("#btn-share").addEventListener("click", () => confirmThenSave(s));
 
   // Card de dados recolhível (recolhido mostra só o Status).
   $("#info-head").addEventListener("click", () => $("#info-block").classList.toggle("open"));
@@ -707,6 +709,116 @@ async function openDetail(id) {
   if (hasFollow) $("#lbl-follow").addEventListener("input", (e) => onLabelInput("followLabel", e.target.value));
 }
 
+// Aviso antes de salvar: a comparação será concluída e as fotos travadas.
+// Mostra o popup só até o usuário marcar "Não avisar mais isso" (ff_no_save_warn)
+// e apenas quando a comparação ainda não foi concluída.
+function confirmThenSave(s) {
+  const optedOut = localStorage.getItem("ff_no_save_warn") === "1";
+  if (optedOut || s.creditState === "confirmed") { Share.open(s); return; }
+  const dlg = $("#save-warn-dialog");
+  $("#save-warn-check").checked = false;
+  const proceed = () => {
+    if ($("#save-warn-check").checked) localStorage.setItem("ff_no_save_warn", "1");
+    cleanup(); dlg.close(); Share.open(s);
+  };
+  const cancel = () => { cleanup(); dlg.close(); };
+  function cleanup() {
+    $("#save-warn-ok").removeEventListener("click", proceed);
+    $("#save-warn-cancel").removeEventListener("click", cancel);
+  }
+  $("#save-warn-ok").addEventListener("click", proceed);
+  $("#save-warn-cancel").addEventListener("click", cancel);
+  dlg.showModal();
+}
+
+// Editor da marca d'água DIRETO sobre as fotos da Comparação: arraste o corpo
+// para mover, a alça inferior-direita para redimensionar e a alça superior para
+// girar — vale para a logo e para o nome. Ajusta o perfil (todas as fotos usam).
+// Delegação no #cmp-host (persiste entre os modos cortina/lado a lado/sobrepor).
+function enableWmEdit() {
+  const host = $("#cmp-host");
+  if (!host || host._wmEditOn) return;
+  host._wmEditOn = true;
+  let g = null;
+
+  // Atualiza ao vivo TODAS as cópias do elemento (o modo lado a lado tem duas).
+  const applyLive = (type, p) => {
+    host.querySelectorAll(".wm-" + type).forEach((el) => {
+      if (p.x != null) el.style.left = (p.x * 100) + "%";
+      if (p.y != null) el.style.top = (p.y * 100) + "%";
+      if (p.rot != null) el.style.transform = "rotate(" + p.rot + "deg)";
+      if (type === "logo" && p.w != null) el.style.width = (p.w * 100) + "%";
+      if (type === "name" && p.scale != null) {
+        const t = el.querySelector(".wm-name-txt");
+        if (t) t.style.fontSize = "calc(0.95rem * " + p.scale + ")";
+      }
+    });
+  };
+
+  host.addEventListener("pointerdown", (e) => {
+    const el = e.target.closest(".wm-edit");
+    if (!el) return;
+    e.preventDefault(); e.stopPropagation();
+    const type = el.dataset.wm;                    // "logo" | "name"
+    const handle = e.target.closest(".wm-h");
+    const mode = handle ? handle.dataset.h : "move"; // "rot" | "res" | "move"
+    const srect = el.parentElement.getBoundingClientRect();
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    const c = Profile.config();
+    g = {
+      type, mode, sw: srect.width, sh: srect.height, cx, cy,
+      px: e.clientX, py: e.clientY,
+      x0: type === "logo" ? c.logoX : c.nameX,
+      y0: type === "logo" ? c.logoY : c.nameY,
+      rot0: type === "logo" ? (c.logoRot || 0) : (c.nameRot || 0),
+      w0: c.logoW, scale0: c.nameScale,
+      wFrac: rect.width / srect.width, hFrac: rect.height / srect.height,
+      startDist: Math.hypot(e.clientX - cx, e.clientY - cy) || 1,
+      startAng: Math.atan2(e.clientY - cy, e.clientX - cx),
+      cur: {},
+    };
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+
+  host.addEventListener("pointermove", (e) => {
+    if (!g) return;
+    if (g.mode === "move") {
+      let x = g.x0 + (e.clientX - g.px) / g.sw;
+      let y = g.y0 + (e.clientY - g.py) / g.sh;
+      x = Math.max(-0.75 * g.wFrac, Math.min(1 - 0.25 * g.wFrac, x));
+      y = Math.max(-0.75 * g.hFrac, Math.min(1 - 0.25 * g.hFrac, y));
+      g.cur = g.type === "logo" ? { logoX: x, logoY: y } : { nameX: x, nameY: y };
+      applyLive(g.type, { x, y });
+    } else if (g.mode === "res") {
+      const factor = Math.hypot(e.clientX - g.cx, e.clientY - g.cy) / g.startDist;
+      if (g.type === "logo") {
+        const w = Math.max(0.05, Math.min(2, g.w0 * factor));
+        g.cur = { logoW: w }; applyLive("logo", { w });
+      } else {
+        const sc = Math.max(0.3, Math.min(5, g.scale0 * factor));
+        g.cur = { nameScale: sc }; applyLive("name", { scale: sc });
+      }
+    } else if (g.mode === "rot") {
+      const ang = Math.atan2(e.clientY - g.cy, e.clientX - g.cx);
+      const rot = Math.round(g.rot0 + (ang - g.startAng) * 180 / Math.PI);
+      g.cur = g.type === "logo" ? { logoRot: rot } : { nameRot: rot };
+      applyLive(g.type, { rot });
+    }
+  });
+
+  const end = () => {
+    if (!g) return;
+    if (Object.keys(g.cur).length) {
+      Profile.setWm(g.cur);
+      refreshCompareCaptions();   // re-render sincroniza alças e mantém a opacidade
+    }
+    g = null;
+  };
+  host.addEventListener("pointerup", end);
+  host.addEventListener("pointercancel", end);
+}
+
 // Legenda (rodapé) opcional dentro do palco de comparação (com fonte do perfil).
 function capHtml(text, cls, show) {
   if (!(show && text)) return "";
@@ -720,7 +832,7 @@ function refreshCompareCaptions() {
   if (!s) return;
   if (!s.followImage) {
     const host = $("#cmp-host");
-    if (host) host.innerHTML = `<img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config())}`;
+    if (host) host.innerHTML = `<img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}`;
     return;
   }
   const active = $("#cmp-seg") && $("#cmp-seg").querySelector("button.active");
@@ -733,7 +845,7 @@ function renderCompare(mode) {
   const show = s.showLabels;
   const capB = capHtml(s.baseLabel, "cap-left", show);
   const capF = capHtml(s.followLabel, "cap-right", show);
-  const wm = Profile.wmHtml(Profile.config());
+  const wm = Profile.wmHtml(Profile.config(), true);
   if (mode === "side") {
     host.innerHTML = `<div class="side-by-side">
         <div class="side-cell"><img src="${baseSrc(s)}" />${capHtml(s.baseLabel, "cap-center", show)}${wm}</div>
@@ -756,36 +868,32 @@ function renderCompare(mode) {
     });
     return;
   }
-  // cortina (curtain)
+  // cortina (curtain): o corte é controlado por um slider ABAIXO das fotos
+  // (igual ao Sobrepor). Sobre a foto fica só uma linha fina indicando o corte.
   host.innerHTML = `
     <div class="compare-stage" id="curtain">
       <img src="${baseSrc(s)}" />
       <div class="after-clip" style="position:absolute;inset:0;width:50%"><img src="${followSrc(s)}" style="width:200%;max-width:none" id="cur-after"/></div>
-      <div class="compare-handle" id="cur-handle" style="left:50%"></div>
+      <div class="curtain-line" id="cur-line" style="left:50%"></div>
       ${capB}${capF}${wm}
+    </div>
+    <div class="seg" style="margin-top:8px;background:transparent;padding:0">
+      <input type="range" min="0" max="1" step="0.01" value="0.5" id="cur-range" style="width:100%" />
     </div>`;
   const stage = $("#curtain");
   const clip = stage.querySelector(".after-clip");
   const after = $("#cur-after");
-  const handle = $("#cur-handle");
+  const line = $("#cur-line");
   const setSplit = (ratio) => {
     ratio = Math.max(0, Math.min(1, ratio));
     const w = stage.clientWidth;
     clip.style.width = (ratio * 100) + "%";
     after.style.width = w + "px";
     after.style.maxWidth = "none";
-    handle.style.left = (ratio * 100) + "%";
+    line.style.left = (ratio * 100) + "%";
   };
   setSplit(0.5);
-  let dragging = false;
-  const pos = (e) => {
-    const rect = stage.getBoundingClientRect();
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    setSplit(x / rect.width);
-  };
-  stage.addEventListener("pointerdown", (e) => { dragging = true; pos(e); });
-  stage.addEventListener("pointermove", (e) => { if (dragging) pos(e); });
-  window.addEventListener("pointerup", () => { dragging = false; });
+  $("#cur-range").addEventListener("input", (e) => setSplit(parseFloat(e.target.value)));
 }
 
 /* ---------------- Eventos globais ---------------- */

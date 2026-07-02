@@ -1,8 +1,9 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* v3.5.5 ajustes: video 4s (vai e volta) com marca d'agua desde o inicio, nome
-   com contorno (legivel em fotos claras), sem reposicionamento da logo na tela. */
-const CACHE = "fotos-fantasma-v23";
+/* v3.5.5 (2a leva): aviso ao salvar (1a vez), slider da cortina abaixo das fotos,
+   editar logo/nome sobre as fotos (mover/redimensionar/girar), placeholder "Seu
+   nome", checkboxes mostram/ocultam a previa no perfil. */
+const CACHE = "fotos-fantasma-v24";
 const ASSETS = [
   "./",
   "./index.html",

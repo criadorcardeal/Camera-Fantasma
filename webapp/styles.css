@@ -248,15 +248,11 @@ html, body {
 }
 .compare-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .compare-stage .after-clip { overflow: hidden; }
-.compare-handle {
-  position: absolute; top: 0; bottom: 0; width: 2px; background: #fff;
-  box-shadow: 0 0 6px rgba(0,0,0,0.5);
-}
-.compare-handle::after {
-  content: "⇆";
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-  background: #fff; color: #000; border-radius: 50%;
-  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+/* Linha fina do corte da cortina (só indica a divisão; sem knob). */
+.curtain-line {
+  position: absolute; top: 0; bottom: 0; width: 2px; z-index: 4;
+  background: rgba(255,255,255,0.9); box-shadow: 0 0 4px rgba(0,0,0,0.5);
+  pointer-events: none; transform: translateX(-1px);
 }
 .side-by-side { display: flex; gap: 3px; }
 .side-by-side img { position: relative; width: 50%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; }
@@ -489,14 +485,32 @@ dialog menu button.primary { background: var(--primary); color: #fff; }
    Cada elemento posicionado por left/top (inline), como no canvas. */
 .wm { position: absolute; z-index: 5; pointer-events: none; }
 .wm-logo img { width: 100%; height: auto; display: block; }
-.wm-name span {
-  color: #fff; font-weight: 700; white-space: nowrap;
+.wm-name .wm-name-txt {
+  color: #fff; font-weight: 700; white-space: nowrap; display: inline-block;
   /* Contorno escuro + sombra: legível também sobre fotos claras (pele). */
   text-shadow:
     -1.5px -1.5px 0 rgba(0,0,0,0.9), 1.5px -1.5px 0 rgba(0,0,0,0.9),
     -1.5px 1.5px 0 rgba(0,0,0,0.9), 1.5px 1.5px 0 rgba(0,0,0,0.9),
     0 2px 4px rgba(0,0,0,0.6);
 }
+
+/* Edição da marca d'água direto sobre as fotos (mover / redimensionar / girar). */
+.wm-edit { pointer-events: auto; cursor: move; touch-action: none; }
+.wm-edit.wm-logo { outline: 1px dashed rgba(255,255,255,0.6); outline-offset: 2px; }
+.wm-edit.wm-name { outline: 1px dashed rgba(255,255,255,0.6); outline-offset: 3px; }
+.wm-h {
+  position: absolute; width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(255,255,255,0.96); border: 1.5px solid var(--primary);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.45); pointer-events: auto; touch-action: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; line-height: 1; color: var(--primary);
+}
+/* Alças posicionadas SOBRE os cantos (metade dentro) para continuarem
+   alcançáveis mesmo quando o elemento encosta na borda do quadro. */
+.wm-res { right: -12px; bottom: -12px; cursor: nwse-resize; }
+.wm-res::after { content: "⤢"; }
+.wm-rot { left: -12px; top: -12px; cursor: grab; }
+.wm-rot::after { content: "↻"; }
 
 /* ---------- Salvar / Compartilhar (v3.0) ---------- */
 .share-hint { font-size: 0.82rem; color: var(--muted); margin: 0 0 10px; }

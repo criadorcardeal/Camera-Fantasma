@@ -46,8 +46,10 @@ const Profile = {
       logoX: p.logoX != null ? p.logoX : 0.60,
       logoY: p.logoY != null ? p.logoY : 0.06,
       logoW: p.logoW != null ? p.logoW : 0.30,
+      logoRot: p.logoRot != null ? p.logoRot : 0,
       nameX: p.nameX != null ? p.nameX : 0.04,
       nameY: p.nameY != null ? p.nameY : 0.84,
+      nameRot: p.nameRot != null ? p.nameRot : 0,
       opacity: p.opacity != null ? p.opacity : 0.7,
       nameFontKey: nf, nameFamily: FONT_FAMILIES[nf] || FONT_FAMILIES.system,
       nameScale: p.nameScale != null ? p.nameScale : 1,
@@ -74,8 +76,8 @@ const Profile = {
     $("#prof-transp-val").textContent = transp + "%";
 
     this._logo = c.logo;
-    this._lx = c.logoX; this._ly = c.logoY; this._lw = c.logoW;
-    this._nx = c.nameX; this._ny = c.nameY;
+    this._lx = c.logoX; this._ly = c.logoY; this._lw = c.logoW; this._lrot = c.logoRot;
+    this._nx = c.nameX; this._ny = c.nameY; this._nrot = c.nameRot;
     this._scale = c.nameScale;
     this._nameFamily = c.nameFamily;
     this._refreshLogoPrev();
@@ -104,7 +106,6 @@ const Profile = {
     const dragImg = $("#prof-logo-drag");
     const box = $("#prof-logo-box");
     if (this._logo) {
-      box.style.display = "block";
       dragImg.onload = () => {
         this._aspect = (dragImg.naturalHeight / dragImg.naturalWidth) || 0.6;
         this._layoutLogo();
@@ -112,9 +113,10 @@ const Profile = {
       dragImg.src = this._logo;
     } else {
       dragImg.removeAttribute("src");
-      box.style.display = "none";
       this._aspect = 0.6;
     }
+    // Só aparece na prévia se houver logo E o checkbox "Mostrar logo" estiver ligado.
+    box.style.display = (this._logo && $("#prof-logo-on").checked) ? "block" : "none";
     requestAnimationFrame(() => this._layoutLogo());
   },
 
@@ -125,7 +127,8 @@ const Profile = {
     const name = $("#prof-name").value.trim();
     this._scale = (parseInt($("#prof-name-size").value, 10) || 100) / 100;
     this._nameFamily = FONT_FAMILIES[$("#prof-name-font").value] || FONT_FAMILIES.system;
-    if (!name) { box.style.display = "none"; return; }
+    // Só aparece na prévia se houver nome E o checkbox "Mostrar nome" estiver ligado.
+    if (!name || !$("#prof-name-on").checked) { box.style.display = "none"; return; }
     box.style.display = "block";
     span.textContent = name;
     span.style.fontFamily = this._nameFamily;
@@ -158,6 +161,7 @@ const Profile = {
     box.style.height = bh + "px";
     box.style.left = (this._lx * sw) + "px";
     box.style.top = (this._ly * this._stageDims().sh) + "px";
+    box.style.transform = "rotate(" + (this._lrot || 0) + "deg)";
   },
 
   _layoutName() {
@@ -168,19 +172,22 @@ const Profile = {
     [this._nx, this._ny] = this._clampBox(this._nx, this._ny, bw, bh);
     box.style.left = (this._nx * sw) + "px";
     box.style.top = (this._ny * sh) + "px";
+    box.style.transform = "rotate(" + (this._nrot || 0) + "deg)";
   },
 
   save() {
     const nameScale = (parseInt($("#prof-name-size").value, 10) || 100) / 100;
     const footerScale = (parseInt($("#prof-footer-size").value, 10) || 100) / 100;
     const transp = parseInt($("#prof-transp").value, 10) || 0;
+    const cur = this.get();
     this.set({
+      ...cur,
       name: $("#prof-name").value.trim(),
       logo: this._logo || "",
       logoOn: $("#prof-logo-on").checked,
       nameOn: $("#prof-name-on").checked,
-      logoX: this._lx, logoY: this._ly, logoW: this._lw,
-      nameX: this._nx, nameY: this._ny,
+      logoX: this._lx, logoY: this._ly, logoW: this._lw, logoRot: this._lrot || 0,
+      nameX: this._nx, nameY: this._ny, nameRot: this._nrot || 0,
       opacity: Math.max(0.05, 1 - transp / 100),
       nameFont: $("#prof-name-font").value,
       nameScale,
@@ -192,42 +199,65 @@ const Profile = {
     if (typeof refreshCompareCaptions === "function") refreshCompareCaptions();
   },
 
+  // Grava ajustes da marca d'água feitos direto sobre as fotos na Comparação
+  // (posição/tamanho/rotação da logo e do nome). Mescla no perfil já salvo.
+  setWm(patch) {
+    const p = this.get();
+    Object.assign(p, patch);
+    this.set(p);
+  },
+
   // Overlay da marca d'agua no palco de comparacao (tela). c = config().
-  wmHtml(c) {
+  // Quando `edit` e verdadeiro, inclui as alcas para mover/redimensionar/girar.
+  wmHtml(c, edit) {
+    const handles = edit
+      ? `<span class="wm-h wm-rot" data-h="rot" title="Girar"></span><span class="wm-h wm-res" data-h="res" title="Redimensionar"></span>`
+      : "";
     let html = "";
     if (c.logoOn && c.logo) {
-      html += `<div class="wm wm-logo" style="left:${c.logoX * 100}%;top:${c.logoY * 100}%;width:${c.logoW * 100}%;opacity:${c.opacity}"><img src="${c.logo}" alt="" /></div>`;
+      html += `<div class="wm wm-logo${edit ? " wm-edit" : ""}" data-wm="logo" style="left:${c.logoX * 100}%;top:${c.logoY * 100}%;width:${c.logoW * 100}%;opacity:${c.opacity};transform:rotate(${c.logoRot || 0}deg)"><img src="${c.logo}" alt="" />${handles}</div>`;
     }
     if (c.nameOn && c.name) {
-      html += `<div class="wm wm-name" style="left:${c.nameX * 100}%;top:${c.nameY * 100}%;opacity:${c.opacity}"><span style="font-family:${c.nameFamily};font-size:calc(0.95rem * ${c.nameScale})">${escHtml(c.name)}</span></div>`;
+      html += `<div class="wm wm-name${edit ? " wm-edit" : ""}" data-wm="name" style="left:${c.nameX * 100}%;top:${c.nameY * 100}%;opacity:${c.opacity};transform:rotate(${c.nameRot || 0}deg)"><span class="wm-name-txt" style="font-family:${c.nameFamily};font-size:calc(0.95rem * ${c.nameScale})">${escHtml(c.name)}</span>${handles}</div>`;
     }
     return html;
   },
 
   // Desenha a marca d'agua num canvas, dentro da regiao [x,y,w,h] (uma foto).
   drawWatermark(ctx, x, y, w, h, c, logoImg) {
-    ctx.save();
-    ctx.globalAlpha = c.opacity != null ? c.opacity : 1;
+    const rad = (deg) => (deg || 0) * Math.PI / 180;
     if (c.logoOn && logoImg) {
       const lw = c.logoW * w;
       const lh = lw * (logoImg.naturalHeight / (logoImg.naturalWidth || 1));
-      ctx.drawImage(logoImg, x + c.logoX * w, y + c.logoY * h, lw, lh);
+      const cx = x + c.logoX * w + lw / 2, cy = y + c.logoY * h + lh / 2;
+      ctx.save();
+      ctx.globalAlpha = c.opacity != null ? c.opacity : 1;
+      ctx.translate(cx, cy);
+      ctx.rotate(rad(c.logoRot));
+      ctx.drawImage(logoImg, -lw / 2, -lh / 2, lw, lh);
+      ctx.restore();
     }
     if (c.nameOn && c.name) {
       const fontPx = Math.max(12, Math.round(h * 0.05 * c.nameScale));
+      ctx.save();
+      ctx.globalAlpha = c.opacity != null ? c.opacity : 1;
       ctx.font = `700 ${fontPx}px ${c.nameFamily}`;
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
-      const nx = x + c.nameX * w, ny = y + c.nameY * h;
+      const tw = ctx.measureText(c.name).width;
+      // Gira em torno do centro do texto (mesmo referencial da tela).
+      const cx = x + c.nameX * w + tw / 2, cy = y + c.nameY * h + fontPx / 2;
+      ctx.translate(cx, cy);
+      ctx.rotate(rad(c.nameRot));
       // Contorno escuro para o nome ser legivel tambem sobre fotos claras (pele).
       ctx.lineJoin = "round";
       ctx.lineWidth = Math.max(2, Math.round(fontPx * 0.14));
       ctx.strokeStyle = "rgba(0,0,0,0.85)";
-      ctx.strokeText(c.name, nx, ny);
+      ctx.strokeText(c.name, -tw / 2, -fontPx / 2);
       ctx.fillStyle = "#ffffff";
-      ctx.fillText(c.name, nx, ny);
+      ctx.fillText(c.name, -tw / 2, -fontPx / 2);
+      ctx.restore();
     }
-    ctx.restore();
   },
 };
 
@@ -281,6 +311,9 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   $("#prof-name").addEventListener("input", () => Profile._syncNameBox());
   $("#prof-name-font").addEventListener("change", () => Profile._syncNameBox());
+  // Ligar/desligar mostra/oculta a logo e o nome na prévia "Posição na foto".
+  $("#prof-logo-on").addEventListener("change", () => Profile._loadDragLogo());
+  $("#prof-name-on").addEventListener("change", () => Profile._syncNameBox());
   $("#prof-logo-remove").addEventListener("click", () => {
     Profile._logo = ""; Profile._refreshLogoPrev(); Profile._loadDragLogo();
   });

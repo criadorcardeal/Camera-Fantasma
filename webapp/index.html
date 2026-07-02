@@ -229,7 +229,7 @@
   <dialog id="profile-dialog">
     <h3>Perfil</h3>
     <label>Nome
-      <input type="text" id="prof-name" placeholder="Ex.: Dr. Ricardo Lacerda" autocomplete="off" />
+      <input type="text" id="prof-name" placeholder="Seu nome" autocomplete="off" />
     </label>
     <div class="prof-font-row">
       <label>Fonte do nome
@@ -297,6 +297,20 @@
     <menu>
       <button id="prof-close">Cancelar</button>
       <button id="prof-save" class="primary">Salvar</button>
+    </menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: AVISO AO SALVAR (v3.5.6) ============ -->
+  <dialog id="save-warn-dialog">
+    <h3>Concluir comparação</h3>
+    <p>Ao salvar, <b>as fotos não poderão mais ser alteradas para esta comparação.</b></p>
+    <label class="prof-toggle save-warn-toggle">
+      <input type="checkbox" id="save-warn-check" />
+      <span>Não avisar mais isso</span>
+    </label>
+    <menu>
+      <button id="save-warn-cancel">Cancelar</button>
+      <button id="save-warn-ok" class="primary">Salvar</button>
     </menu>
   </dialog>
 
