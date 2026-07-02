@@ -1,10 +1,9 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* re-deploy v3.6.2 (publicacao do Pages falhou por erro transitorio). */
-/* v3.6.2: avatar da logo tambem na Montagem; editor com "Acompanhamento";
-   export de fotos separadas com rotulo em chip; removidos os campos de
-   registro de distancia (dialogo virou so rotulo). */
-const CACHE = "fotos-fantasma-v30";
+/* v3.6.3: nome (marca d'agua) na montagem com o mesmo tamanho das midias;
+   aviso ao fechar o perfil no X com alteracoes nao salvas; tela inicial com
+   avatar e badge trocados de lugar e sem o tipo de dispositivo. */
+const CACHE = "fotos-fantasma-v31";
 const ASSETS = [
   "./",
   "./index.html",

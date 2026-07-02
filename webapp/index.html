@@ -18,17 +18,14 @@
     <header class="topbar">
       <button id="cred-admin" class="icon-btn dark" title="Administração">⚙</button>
       <h1>ComparaCam</h1>
-      <span class="version-badge">v3.6.2</span>
+      <button id="cred-profile" class="cred-profile" title="Perfil">👤</button>
     </header>
     <div class="credits-bar">
       <span class="cred-left">
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Comprar</button>
       </span>
-      <span class="cred-device" id="cred-device"></span>
-      <span class="cred-actions">
-        <button id="cred-profile" class="cred-profile" title="Perfil">👤</button>
-      </span>
+      <span class="version-badge">v3.6.3</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -292,6 +289,16 @@
     <menu>
       <button id="prof-close" disabled>Cancelar</button>
       <button id="prof-save" class="primary" disabled>Salvar</button>
+    </menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: DESCARTAR ALTERAÇÕES (v3.6.3) ============ -->
+  <dialog id="prof-discard-dialog">
+    <h3>Descartar alterações?</h3>
+    <p>Há alterações não salvas no perfil.</p>
+    <menu>
+      <button id="prof-discard-cancel">Continuar editando</button>
+      <button id="prof-discard-ok" class="primary">Descartar</button>
     </menu>
   </dialog>
 

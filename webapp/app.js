@@ -90,23 +90,6 @@ function defaultLabel(kind) {
   return d ? (prefix + " • " + d) : prefix;
 }
 
-// Melhor esforço para identificar o dispositivo. O iOS não expõe o modelo do
-// iPhone (só "iPhone"); o Android costuma trazer o modelo no user-agent.
-function detectDevice() {
-  const ua = navigator.userAgent || "";
-  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "iPad";
-  if (/iPhone/.test(ua)) return "iPhone";
-  if (/Android/.test(ua)) {
-    const m = ua.match(/Android[^;]*;\s*([^;)]+?)\s*(?:Build\/|\))/i);
-    const model = m && m[1] ? m[1].replace(/\s+/g, " ").trim() : "";
-    return model ? ("Android " + model) : "Android";
-  }
-  if (/Windows/.test(ua)) return "Windows";
-  if (/Mac/.test(ua)) return "Mac";
-  if (/Linux/.test(ua)) return "Linux";
-  return "Dispositivo";
-}
-
 // Usa a versao com ajustes aplicados (se existir) ou a original.
 const baseSrc = (s) => s.baseImageView || s.baseImage;
 const followSrc = (s) => s.followImageView || s.followImage;
@@ -708,6 +691,7 @@ async function openDetail(id) {
     });
   }
   enableWmEdit();
+  requestAnimationFrame(sizeWmNames);
 
   if ($("#btn-adjust")) $("#btn-adjust").addEventListener("click", () => Editor.open(s));
   if ($("#btn-reposition")) $("#btn-reposition").addEventListener("click", () => Aligner.open(s, s.followImage));
@@ -784,8 +768,11 @@ function enableWmEdit() {
       if (p.rot != null) el.style.transform = "rotate(" + p.rot + "deg)";
       if (type === "logo" && p.w != null) el.style.width = (p.w * 100) + "%";
       if (type === "name" && p.scale != null) {
+        // Fonte proporcional à altura do palco (5%), igual ao perfil e à
+        // exportação — assim o tamanho na montagem corresponde às mídias.
+        const h = el.parentElement.clientHeight || el.parentElement.getBoundingClientRect().height;
         const t = el.querySelector(".wm-name-txt");
-        if (t) t.style.fontSize = "calc(0.95rem * " + p.scale + ")";
+        if (t && h) t.style.fontSize = Math.max(9, h * 0.05 * p.scale) + "px";
       }
     });
   };
@@ -861,6 +848,20 @@ function capHtml(text, cls, show) {
   return `<div class="cap ${cls}" style="font-family:${c.footerFamily};font-size:calc(0.72rem * ${c.footerScale})">${escHtml(text)}</div>`;
 }
 
+// Dimensiona o nome (marca d'água) na tela proporcional à altura do palco (5%),
+// igual ao perfil e à exportação — corrige o tamanho do nome na montagem.
+function sizeWmNames() {
+  const host = $("#cmp-host");
+  if (!host) return;
+  const scale = Profile.config().nameScale || 1;
+  host.querySelectorAll(".wm-name").forEach((el) => {
+    const stage = el.parentElement;
+    const h = stage.clientHeight || stage.getBoundingClientRect().height;
+    const t = el.querySelector(".wm-name-txt");
+    if (t && h) t.style.fontSize = Math.max(9, h * 0.05 * scale) + "px";
+  });
+}
+
 // Recolhe o modo de comparação ativo e re-renderiza (para atualizar legendas).
 function refreshCompareCaptions() {
   const s = _detailSession;
@@ -868,6 +869,7 @@ function refreshCompareCaptions() {
   if (!s.followImage) {
     const host = $("#cmp-host");
     if (host) host.innerHTML = `<img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}`;
+    requestAnimationFrame(sizeWmNames);
     return;
   }
   const active = $("#cmp-seg") && $("#cmp-seg").querySelector("button.active");
@@ -886,6 +888,7 @@ function renderCompare(mode) {
         <div class="side-cell"><img src="${baseSrc(s)}" />${capHtml(s.baseLabel, "cap-center", show)}${wm}</div>
         <div class="side-cell"><img src="${followSrc(s)}" />${capHtml(s.followLabel, "cap-center", show)}${wm}</div>
       </div>`;
+    requestAnimationFrame(sizeWmNames);
     return;
   }
   if (mode === "overlay") {
@@ -901,6 +904,7 @@ function renderCompare(mode) {
     $("#ov-range").addEventListener("input", (e) => {
       $("#ov-after").style.opacity = e.target.value;
     });
+    requestAnimationFrame(sizeWmNames);
     return;
   }
   // cortina (curtain): o corte é controlado por um slider ABAIXO das fotos
@@ -929,6 +933,7 @@ function renderCompare(mode) {
   };
   setSplit(0.5);
   $("#cur-range").addEventListener("input", (e) => setSplit(parseFloat(e.target.value)));
+  requestAnimationFrame(sizeWmNames);
 }
 
 /* ---------------- Eventos globais ---------------- */
@@ -975,8 +980,6 @@ function wireEvents() {
 /* ---------------- Início ---------------- */
 window.addEventListener("DOMContentLoaded", async () => {
   wireEvents();
-  const devEl = $("#cred-device");
-  if (devEl) devEl.textContent = detectDevice();
   if (typeof Profile !== "undefined" && Profile.updateAvatar) Profile.updateAvatar();
   await renderHome();
   if ("serviceWorker" in navigator) {

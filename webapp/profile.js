@@ -328,8 +328,21 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#cred-profile").addEventListener("click", () => Profile.open());
   const profBtn = $("#detail-profile");
   if (profBtn) profBtn.addEventListener("click", () => Profile.open());
-  // X (topo direito) e Cancelar fecham SEM salvar.
-  $("#prof-x").addEventListener("click", () => $("#profile-dialog").close());
+  // X (topo direito): se há alterações não salvas, confirma antes de descartar.
+  $("#prof-x").addEventListener("click", () => {
+    if (!Profile._dirty) { $("#profile-dialog").close(); return; }
+    const d = $("#prof-discard-dialog");
+    const ok = () => { cleanup(); d.close(); $("#profile-dialog").close(); };
+    const keep = () => { cleanup(); d.close(); };
+    function cleanup() {
+      $("#prof-discard-ok").removeEventListener("click", ok);
+      $("#prof-discard-cancel").removeEventListener("click", keep);
+    }
+    $("#prof-discard-ok").addEventListener("click", ok);
+    $("#prof-discard-cancel").addEventListener("click", keep);
+    d.showModal();
+  });
+  // Cancelar fecha SEM salvar (só habilita quando há alteração).
   $("#prof-close").addEventListener("click", () => $("#profile-dialog").close());
   $("#prof-save").addEventListener("click", () => Profile.save());
   // Qualquer mudança nos campos do diálogo habilita Cancelar/Salvar.
