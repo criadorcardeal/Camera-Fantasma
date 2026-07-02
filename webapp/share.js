@@ -74,6 +74,100 @@ async function generateComparisonImage(s) {
   return c.toDataURL("image/jpeg", 0.92);
 }
 
+// Escolhe o melhor formato de video suportado. No iOS Safari sai .mp4
+// (aceito pela galeria Fotos); no Android/desktop normalmente .webm.
+function pickVideoMime() {
+  if (!window.MediaRecorder) return "";
+  const opts = [
+    "video/mp4;codecs=avc1",
+    "video/mp4",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+  ];
+  for (const m of opts) {
+    try { if (MediaRecorder.isTypeSupported(m)) return m; } catch (e) {}
+  }
+  return "";
+}
+
+// Gera um video (2s) da cortina varrendo da foto base para a de acompanhamento.
+// Usa as mesmas fontes exibidas na tela (baseSrc/followSrc, ja com ajustes).
+async function generateCurtainVideo(s) {
+  const mime = pickVideoMime();
+  if (!mime) throw new Error("Gravação de vídeo não suportada neste navegador.");
+
+  const baseImg = await loadImageEl(baseSrc(s));
+  const followImg = await loadImageEl(followSrc(s));
+
+  // Resolucao com base no aspecto da foto base (dimensoes pares p/ o codec).
+  const aspect = (baseImg.naturalWidth / baseImg.naturalHeight) || 0.75;
+  let W = 720, H = Math.round(W / aspect);
+  W -= W % 2; H -= H % 2;
+
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d");
+
+  const drawFrame = (ratio) => {
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, W, H);
+    drawCover(ctx, baseImg, 0, 0, W, H);
+    if (ratio > 0) {
+      const clipW = Math.round(ratio * W);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, clipW, H);
+      ctx.clip();
+      drawCover(ctx, followImg, 0, 0, W, H);
+      ctx.restore();
+      if (ratio < 1) {
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.fillRect(clipW - 1, 0, 3, H);
+      }
+    }
+  };
+
+  drawFrame(0);
+  const stream = c.captureStream(30);
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
+  const chunks = [];
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+
+  const HOLD = 300, SWEEP = 1400, TOTAL = 2000; // 0,3s base + 1,4s varredura + 0,3s acompanhamento
+  const ext = mime.indexOf("mp4") !== -1 ? "mp4" : "webm";
+
+  return new Promise((resolve, reject) => {
+    rec.onstop = () => {
+      try {
+        const blob = new Blob(chunks, { type: rec.mimeType || mime });
+        resolve(new File([blob], "video-cortina." + ext, { type: blob.type }));
+      } catch (e) { reject(e); }
+    };
+    rec.onerror = (e) => reject(e.error || new Error("Falha na gravação."));
+    rec.start();
+    const t0 = performance.now();
+    const tick = () => {
+      const t = performance.now() - t0;
+      let r;
+      if (t < HOLD) r = 0;
+      else if (t > HOLD + SWEEP) r = 1;
+      else {
+        const u = (t - HOLD) / SWEEP;
+        r = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2; // easeInOutQuad
+      }
+      drawFrame(r);
+      if (t >= TOTAL) {
+        drawFrame(1);
+        if (rec.state !== "inactive") rec.stop();
+      } else {
+        requestAnimationFrame(tick);
+      }
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
 const Share = {
   files: {},
 
@@ -82,7 +176,8 @@ const Share = {
     this.files = {};
     const dlg = $("#share-dialog");
     const status = $("#share-status");
-    ["#share-opt-base", "#share-opt-follow", "#share-opt-compare"].forEach((s) => {
+    const vbtn = $("#share-opt-video");
+    ["#share-opt-base", "#share-opt-follow", "#share-opt-compare", "#share-opt-video"].forEach((s) => {
       $(s).hidden = true;
     });
     status.textContent = "Preparando…";
@@ -104,6 +199,26 @@ const Share = {
     $("#share-opt-follow").hidden = !session.followImage;
     $("#share-opt-compare").hidden = !session.followImage;
     status.textContent = "";
+
+    // O video da cortina leva ~2s reais para gravar. Gera em segundo plano e so
+    // libera o botao quando o arquivo ja estiver pronto (mantem o clique sincrono
+    // exigido pelo iOS). Nao bloqueia o compartilhamento das fotos.
+    if (session.followImage && pickVideoMime()) {
+      vbtn.hidden = false;
+      vbtn.disabled = true;
+      vbtn.textContent = "🎬 Gerando vídeo…";
+      generateCurtainVideo(session)
+        .then((file) => {
+          if (this.session !== session) return; // dialogo ja foi reaberto/fechado
+          this.files.video = file;
+          vbtn.disabled = false;
+          vbtn.textContent = "🎬 Vídeo Cortina (2s)";
+        })
+        .catch(() => {
+          if (this.session !== session) return;
+          vbtn.hidden = true;
+        });
+    }
   },
 
   handle(what) {
