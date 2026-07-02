@@ -2,8 +2,9 @@
    usa o cache apenas como reserva offline). */
 /* v3.6.3: nome (marca d'agua) na montagem com o mesmo tamanho das midias;
    aviso ao fechar o perfil no X com alteracoes nao salvas; tela inicial com
-   avatar e badge trocados de lugar e sem o tipo de dispositivo. */
-const CACHE = "fotos-fantasma-v31";
+   avatar e badge trocados de lugar e sem o tipo de dispositivo.
+   v31->v32: avatar do perfil com o mesmo tamanho (40px) na ComparaCam e Montagem. */
+const CACHE = "fotos-fantasma-v32";
 const ASSETS = [
   "./",
   "./index.html",

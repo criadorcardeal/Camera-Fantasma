@@ -465,11 +465,13 @@ dialog menu button:disabled { opacity: 0.4; cursor: not-allowed; }
 .saved-dialog menu { justify-content: center; }
 
 /* ---------- Perfil do usuário (v3.5.1) ---------- */
-/* Ícone de perfil: círculo com a logo como avatar (ou 👤 quando não há logo). */
+/* Ícone de perfil: círculo com a logo como avatar (ou 👤 quando não há logo).
+   Mesmo tamanho/estilo do avatar da Montagem (icon-btn) — ambos na topbar. */
 .cred-profile {
-  width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%;
-  border: 1.5px solid var(--primary); background: #eef3f6 center/cover no-repeat;
-  color: var(--primary); font-size: 1.15rem; cursor: pointer; padding: 0; overflow: hidden;
+  width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.2) center/cover no-repeat;
+  color: #fff; font-size: 1.2rem; cursor: pointer; padding: 0; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
 }
 .cred-profile.has-logo { background-color: #fff; }
