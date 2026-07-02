@@ -1,6 +1,6 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* re-deploy v3.6.6 (Pages: "try again later" transitorio; nova tentativa). */
+/* re-deploy v3.6.6 (2a espera; nova tentativa de publicacao). */
 /* v3.6.6: alinhamento automatico mais exato — refino fino por otimizacao
    (hill-climb) das 4 variaveis (zoom/rotacao/2 translacoes) maximizando a
    sobreposicao das silhuetas; rotacao limitada a +-90 (nunca inverte a perna);
