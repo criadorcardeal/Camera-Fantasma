@@ -18,7 +18,7 @@
     <header class="topbar">
       <span class="topbar-spacer"></span>
       <h1>Fotos Fantasma</h1>
-      <span class="version-badge">v3.5.2</span>
+      <span class="version-badge">v3.5.3</span>
     </header>
     <div class="credits-bar">
       <span id="cred-balance">🪙 0 créditos</span>
@@ -245,7 +245,7 @@
       </div>
     </div>
 
-    <label>Posição e tamanho da logo <small>(arraste; alça no canto p/ redimensionar)</small></label>
+    <label>Posição na foto <small>(arraste a logo e o nome; alça da logo p/ redimensionar)</small></label>
     <div class="prof-stage-wrap">
       <div class="prof-stage" id="prof-stage">
         <span class="prof-stage-tag">foto</span>
@@ -253,12 +253,17 @@
           <img id="prof-logo-drag" alt="" />
           <div class="prof-resize" id="prof-resize"></div>
         </div>
+        <div class="prof-name-box" id="prof-name-box"><span id="prof-name-drag"></span></div>
       </div>
     </div>
 
     <label class="prof-toggle">
-      <input type="checkbox" id="prof-enabled" />
-      <span>Aplicar nome/logo nas fotos</span>
+      <input type="checkbox" id="prof-logo-on" />
+      <span>Mostrar logo nas fotos</span>
+    </label>
+    <label class="prof-toggle">
+      <input type="checkbox" id="prof-name-on" />
+      <span>Mostrar nome nas fotos</span>
     </label>
 
     <label>Transparência</label>
@@ -277,6 +282,13 @@
         <input type="range" id="prof-footer-size" min="60" max="180" step="10" value="100" />
       </label>
     </div>
+    <label>Data no rodapé
+      <select id="prof-footer-date">
+        <option value="none">Não incluir</option>
+        <option value="date">Somente data</option>
+        <option value="datetime">Data e hora</option>
+      </select>
+    </label>
 
     <menu>
       <button id="prof-close">Cancelar</button>

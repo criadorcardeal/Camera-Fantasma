@@ -75,7 +75,7 @@ async function generateComparisonImage(s) {
   const baseImg = await loadImageEl(baseSrc(s));
   const followImg = await loadImageEl(followSrc(s));
   const prof = Profile.config();
-  const logoImg = (prof.enabled && prof.logo) ? await loadImageEl(prof.logo).catch(() => null) : null;
+  const logoImg = (prof.logoOn && prof.logo) ? await loadImageEl(prof.logo).catch(() => null) : null;
   const aspect = (baseImg.naturalWidth / baseImg.naturalHeight) || 0.75;
   const cellW = 760;
   const cellH = Math.round(cellW / aspect);
@@ -106,11 +106,12 @@ async function generateComparisonImage(s) {
   drawCover(ctx, baseImg, pad, y, cellW, cellH);
   drawCover(ctx, followImg, pad + cellW + gap, y, cellW, cellH);
 
-  // Rotulo (rodape) de cada foto, se ligado.
+  // Rotulo (rodape) de cada foto, se ligado (rotulo + data de aquisicao).
   if (s.showLabels) {
     const fh = Math.max(30, Math.round(cellH * 0.07 * prof.footerScale));
-    if (s.baseLabel) drawFooterBar(ctx, s.baseLabel, pad, y + cellH, cellW, fh, prof.footerFamily);
-    if (s.followLabel) drawFooterBar(ctx, s.followLabel, pad + cellW + gap, y + cellH, cellW, fh, prof.footerFamily);
+    const bft = footerText(s.baseLabel, s.createdAt), fft = footerText(s.followLabel, s.followAt);
+    if (bft) drawFooterBar(ctx, bft, pad, y + cellH, cellW, fh, prof.footerFamily);
+    if (fft) drawFooterBar(ctx, fft, pad + cellW + gap, y + cellH, cellW, fh, prof.footerFamily);
   }
   // Marca d'agua (nome/logo) em cada foto, se ligada.
   Profile.drawWatermark(ctx, pad, y, cellW, cellH, prof, logoImg);
@@ -148,7 +149,7 @@ async function generateVideo(s, kind) {
   const baseImg = await loadImageEl(baseSrc(s));
   const followImg = await loadImageEl(followSrc(s));
   const prof = Profile.config();
-  const logoImg = (prof.enabled && prof.logo) ? await loadImageEl(prof.logo).catch(() => null) : null;
+  const logoImg = (prof.logoOn && prof.logo) ? await loadImageEl(prof.logo).catch(() => null) : null;
 
   // Resolucao com base no aspecto da foto base (dimensoes pares p/ o codec).
   const aspect = (baseImg.naturalWidth / baseImg.naturalHeight) || 0.75;
@@ -188,8 +189,9 @@ async function generateVideo(s, kind) {
     // Rotulo (rodape) de cada foto, se ligado: base a esquerda, acomp. a direita.
     if (s.showLabels) {
       const fs = Math.max(14, Math.round(H * 0.028 * prof.footerScale));
-      if (s.baseLabel) drawChip(ctx, s.baseLabel, 12, H - 12, "left", prof.footerFamily, fs);
-      if (s.followLabel) drawChip(ctx, s.followLabel, W - 12, H - 12, "right", prof.footerFamily, fs);
+      const bft = footerText(s.baseLabel, s.createdAt), fft = footerText(s.followLabel, s.followAt);
+      if (bft) drawChip(ctx, bft, 12, H - 12, "left", prof.footerFamily, fs);
+      if (fft) drawChip(ctx, fft, W - 12, H - 12, "right", prof.footerFamily, fs);
     }
     // Marca d'agua (nome/logo), se ligada.
     Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
@@ -270,10 +272,10 @@ const Share = {
     // Prepara os arquivos ANTES de liberar as opcoes, para o compartilhamento
     // acontecer imediatamente no clique (exigencia do iOS).
     const prof = Profile.config();
-    const logoImg = (prof.enabled && prof.logo) ? await loadImageEl(prof.logo).catch(() => null) : null;
-    const wmOn = prof.enabled && (prof.name || logoImg);
-    const prep = async (src, label) => {
-      const wantFooter = session.showLabels && label;
+    const logoImg = (prof.logoOn && prof.logo) ? await loadImageEl(prof.logo).catch(() => null) : null;
+    const wmOn = (prof.logoOn && logoImg) || (prof.nameOn && prof.name);
+    const prep = async (src, footer) => {
+      const wantFooter = session.showLabels && footer;
       if (!wantFooter && !wmOn) return src;
       const img = await loadImageEl(src);
       const W = img.naturalWidth, H = img.naturalHeight;
@@ -281,14 +283,14 @@ const Share = {
       c.width = W; c.height = H;
       const ctx = c.getContext("2d");
       ctx.drawImage(img, 0, 0);
-      if (wantFooter) drawFooterBar(ctx, label, 0, H, W, Math.max(28, Math.round(H * 0.07 * prof.footerScale)), prof.footerFamily);
+      if (wantFooter) drawFooterBar(ctx, footer, 0, H, W, Math.max(28, Math.round(H * 0.07 * prof.footerScale)), prof.footerFamily);
       Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
       return c.toDataURL("image/jpeg", 0.92);
     };
     try {
-      this.files.base = await dataUrlToFile(await prep(baseSrc(session), session.baseLabel), "foto-base.jpg");
+      this.files.base = await dataUrlToFile(await prep(baseSrc(session), footerText(session.baseLabel, session.createdAt)), "foto-base.jpg");
       if (hasFollow) {
-        this.files.follow = await dataUrlToFile(await prep(followSrc(session), session.followLabel), "acompanhamento.jpg");
+        this.files.follow = await dataUrlToFile(await prep(followSrc(session), footerText(session.followLabel, session.followAt)), "acompanhamento.jpg");
         const cmp = await generateComparisonImage(session);
         this.files.compare = await dataUrlToFile(cmp, "comparacao.jpg");
       }

@@ -68,6 +68,20 @@ const fmtDate = (iso) => {
   const p = (n) => String(n).padStart(2, "0");
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
+const fmtDateOnly = (iso) => {
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+};
+
+// Texto do rodapé de uma foto: rótulo + data de aquisição (conforme o perfil).
+function footerText(label, iso) {
+  const mode = Profile.config().footerDate;   // none | date | datetime
+  let dateStr = "";
+  if (iso && mode !== "none") dateStr = mode === "datetime" ? fmtDate(iso) : fmtDateOnly(iso);
+  if (label && dateStr) return label + "  •  " + dateStr;
+  return label || dateStr;
+}
 
 // Usa a versao com ajustes aplicados (se existir) ou a original.
 const baseSrc = (s) => s.baseImageView || s.baseImage;
@@ -550,7 +564,7 @@ async function openDetail(id) {
          <button data-mode="overlay">Sobrepor</button>
        </div>
        <div id="cmp-host"></div>`
-    : `<div class="compare-stage" id="cmp-host"><img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config())}</div>`;
+    : `<div class="compare-stage" id="cmp-host"><img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(footerText(s.baseLabel, s.createdAt), "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config())}</div>`;
 
   const statusTxt = s.creditState === "confirmed"
     ? "Concluída ✓ (crédito usado)"
@@ -652,7 +666,7 @@ function refreshCompareCaptions() {
   if (!s) return;
   if (!s.followImage) {
     const host = $("#cmp-host");
-    if (host) host.innerHTML = `<img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config())}`;
+    if (host) host.innerHTML = `<img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(footerText(s.baseLabel, s.createdAt), "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config())}`;
     return;
   }
   const active = $("#cmp-seg") && $("#cmp-seg").querySelector("button.active");
@@ -663,13 +677,15 @@ function renderCompare(mode) {
   const s = _detailSession;
   const host = $("#cmp-host");
   const show = s.showLabels;
-  const capB = capHtml(s.baseLabel, "cap-left", show);
-  const capF = capHtml(s.followLabel, "cap-right", show);
+  const baseFt = footerText(s.baseLabel, s.createdAt);
+  const followFt = footerText(s.followLabel, s.followAt);
+  const capB = capHtml(baseFt, "cap-left", show);
+  const capF = capHtml(followFt, "cap-right", show);
   const wm = Profile.wmHtml(Profile.config());
   if (mode === "side") {
     host.innerHTML = `<div class="side-by-side">
-        <div class="side-cell"><img src="${baseSrc(s)}" />${capHtml(s.baseLabel, "cap-center", show)}${wm}</div>
-        <div class="side-cell"><img src="${followSrc(s)}" />${capHtml(s.followLabel, "cap-center", show)}${wm}</div>
+        <div class="side-cell"><img src="${baseSrc(s)}" />${capHtml(baseFt, "cap-center", show)}${wm}</div>
+        <div class="side-cell"><img src="${followSrc(s)}" />${capHtml(followFt, "cap-center", show)}${wm}</div>
       </div>`;
     return;
   }
