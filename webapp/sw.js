@@ -1,5 +1,6 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
+/* re-deploy v3.5.3 (deploy do Pages falhou por timeout transitorio) */
 const CACHE = "fotos-fantasma-v20";
 const ASSETS = [
   "./",
