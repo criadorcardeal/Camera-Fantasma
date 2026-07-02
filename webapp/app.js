@@ -90,6 +90,23 @@ function defaultLabel(kind) {
   return d ? (prefix + " • " + d) : prefix;
 }
 
+// Melhor esforço para identificar o dispositivo. O iOS não expõe o modelo do
+// iPhone (só "iPhone"); o Android costuma trazer o modelo no user-agent.
+function detectDevice() {
+  const ua = navigator.userAgent || "";
+  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "iPad";
+  if (/iPhone/.test(ua)) return "iPhone";
+  if (/Android/.test(ua)) {
+    const m = ua.match(/Android[^;]*;\s*([^;)]+?)\s*(?:Build\/|\))/i);
+    const model = m && m[1] ? m[1].replace(/\s+/g, " ").trim() : "";
+    return model ? ("Android " + model) : "Android";
+  }
+  if (/Windows/.test(ua)) return "Windows";
+  if (/Mac/.test(ua)) return "Mac";
+  if (/Linux/.test(ua)) return "Linux";
+  return "Dispositivo";
+}
+
 // Usa a versao com ajustes aplicados (se existir) ou a original.
 const baseSrc = (s) => s.baseImageView || s.baseImage;
 const followSrc = (s) => s.followImageView || s.followImage;
@@ -985,6 +1002,9 @@ function wireEvents() {
 /* ---------------- Início ---------------- */
 window.addEventListener("DOMContentLoaded", async () => {
   wireEvents();
+  const devEl = $("#cred-device");
+  if (devEl) devEl.textContent = detectDevice();
+  if (typeof Profile !== "undefined" && Profile.updateAvatar) Profile.updateAvatar();
   await renderHome();
   if ("serviceWorker" in navigator) {
     // Recarrega SOMENTE quando o novo Service Worker efetivamente ASSUME a pagina

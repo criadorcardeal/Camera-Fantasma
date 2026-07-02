@@ -91,6 +91,22 @@ const Profile = {
     $("#profile-dialog").showModal();
   },
 
+  // Atualiza o avatar do ícone de perfil (círculo) com a logo, se houver.
+  updateAvatar() {
+    const btn = document.getElementById("cred-profile");
+    if (!btn) return;
+    const logo = this.config().logo;
+    if (logo) {
+      btn.style.backgroundImage = `url("${logo}")`;
+      btn.textContent = "";
+      btn.classList.add("has-logo");
+    } else {
+      btn.style.backgroundImage = "";
+      btn.textContent = "👤";
+      btn.classList.remove("has-logo");
+    }
+  },
+
   // Marca que houve alteração e habilita os botões Cancelar/Salvar.
   _markDirty() {
     if (this._dirty) return;
@@ -208,6 +224,7 @@ const Profile = {
       footerDate: $("#prof-footer-date").value,
     });
     $("#profile-dialog").close();
+    this.updateAvatar();
     if (typeof refreshCompareCaptions === "function") refreshCompareCaptions();
   },
 

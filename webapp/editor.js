@@ -515,6 +515,9 @@ const Editor = {
       this.renderImage(k);
     });
     this.refreshSliderValues();
+    // Zerar deixa os botões de ajuste brancos (sem seleção).
+    $("#ed-auto-rel").classList.remove("active");
+    $("#ed-auto-abs").classList.remove("active");
   },
 
   async save() {

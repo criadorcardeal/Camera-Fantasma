@@ -99,7 +99,8 @@ function drawChip(ctx, text, x, y, align, family, fontPx) {
   ctx.restore();
 }
 
-// Monta a imagem da comparacao (Base | Acompanhamento) com rotulos e datas.
+// Monta a imagem da comparacao (Base | Acompanhamento). Sem títulos/informações:
+// só as 2 fotos e os rótulos de rodapé como chips (largura do texto, como no vídeo).
 async function generateComparisonImage(s) {
   const baseImg = await loadImageEl(baseSrc(s));
   const followImg = await loadImageEl(followSrc(s));
@@ -108,9 +109,9 @@ async function generateComparisonImage(s) {
   const aspect = (baseImg.naturalWidth / baseImg.naturalHeight) || 0.75;
   const cellW = 760;
   const cellH = Math.round(cellW / aspect);
-  const gap = 14, headerH = 70, pad = 16;
+  const gap = 14, pad = 16;
   const W = pad * 2 + cellW * 2 + gap;
-  const H = pad + headerH + cellH + pad;
+  const H = pad * 2 + cellH;   // sem cabeçalho de títulos
 
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
@@ -118,20 +119,7 @@ async function generateComparisonImage(s) {
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, W, H);
 
-  const cx1 = pad + cellW / 2;
-  const cx2 = pad + cellW + gap + cellW / 2;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = "#1b5e8c";
-  ctx.font = "bold 30px -apple-system, Arial, sans-serif";
-  ctx.fillText("Base", cx1, pad + 24);
-  ctx.fillText("Acompanhamento", cx2, pad + 24);
-  ctx.fillStyle = "#5d6b73";
-  ctx.font = "18px -apple-system, Arial, sans-serif";
-  ctx.fillText(`${fmtDate(s.createdAt)}  •  ${Math.round(s.baseDistance)} cm`, cx1, pad + 50);
-  ctx.fillText(`${fmtDate(s.followAt)}  •  ${Math.round(s.followDistance)} cm`, cx2, pad + 50);
-
-  const y = pad + headerH;
+  const y = pad;
   drawCover(ctx, baseImg, pad, y, cellW, cellH);
   drawCover(ctx, followImg, pad + cellW + gap, y, cellW, cellH);
 
@@ -139,11 +127,11 @@ async function generateComparisonImage(s) {
   // para a logo ficar atras do rotulo (rodape sempre legivel por cima).
   Profile.drawWatermark(ctx, pad, y, cellW, cellH, prof, logoImg);
   Profile.drawWatermark(ctx, pad + cellW + gap, y, cellW, cellH, prof, logoImg);
-  // Rotulo (rodape) de cada foto, se ligado.
+  // Rótulo (rodapé) como chip (largura do texto), centrado na base de cada foto.
   if (s.showLabels) {
-    const fh = Math.max(30, Math.round(cellH * 0.07 * prof.footerScale));
-    if (s.baseLabel) drawFooterBar(ctx, s.baseLabel, pad, y + cellH, cellW, fh, prof.footerFamily);
-    if (s.followLabel) drawFooterBar(ctx, s.followLabel, pad + cellW + gap, y + cellH, cellW, fh, prof.footerFamily);
+    const fs = Math.max(16, Math.round(cellH * 0.045 * prof.footerScale));
+    if (s.baseLabel) drawChip(ctx, s.baseLabel, pad + cellW / 2, y + cellH - 12, "center", prof.footerFamily, fs);
+    if (s.followLabel) drawChip(ctx, s.followLabel, pad + cellW + gap + cellW / 2, y + cellH - 12, "center", prof.footerFamily, fs);
   }
 
   return c.toDataURL("image/jpeg", 0.92);

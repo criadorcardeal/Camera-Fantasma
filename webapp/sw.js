@@ -1,10 +1,9 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* v3.6: botao "Reposicionar imagens"; dialogo "Gerar comparação" com seta Voltar
-   e "Salvar fotos separadas"; rodape do video base 1o/4o e acomp 2o/3o; rotulo
-   padrao "Antes"/"Depois"+data; travar so a troca de fotos; botoes do editor
-   brancos que ficam azuis ao clicar. */
-const CACHE = "fotos-fantasma-v28";
+/* v3.6.1: tela inicial com tipo de dispositivo, avatar da logo no perfil e caixa
+   dos creditos; "Zerar ajustes" deixa os botoes do editor brancos; export lado a
+   lado sem titulos/infos, so com rotulos em chip (largura do texto). */
+const CACHE = "fotos-fantasma-v29";
 const ASSETS = [
   "./",
   "./index.html",
