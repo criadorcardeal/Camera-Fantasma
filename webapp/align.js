@@ -79,7 +79,7 @@ const Aligner = {
     ctx.restore();
     const aligned = c.toDataURL("image/jpeg", 0.9);
 
-    const res = await openDistanceDialog(this.session.baseDistance, this.session.followLabel || autoDateLabel());
+    const res = await openDistanceDialog(this.session.baseDistance, this.session.followLabel || defaultLabel("follow"));
     if (res == null) { await openDetail(this.session.id); return; }
 
     const s = this.session;

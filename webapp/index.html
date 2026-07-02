@@ -18,7 +18,7 @@
     <header class="topbar">
       <button id="cred-admin" class="icon-btn dark" title="Administração">⚙</button>
       <h1>ComparaCam</h1>
-      <span class="version-badge">v3.5.8</span>
+      <span class="version-badge">v3.6</span>
     </header>
     <div class="credits-bar">
       <span class="cred-left">
@@ -126,7 +126,7 @@
       </div>
       <div class="ed-auto-row">
         <button id="ed-auto-rel" class="btn outline">Ajuste Relativo</button>
-        <button id="ed-auto-abs" class="btn primary">Ajuste Absoluto</button>
+        <button id="ed-auto-abs" class="btn outline">Ajuste Absoluto</button>
       </div>
       <div class="ed-reset-row">
         <button id="ed-reset" class="btn outline">Zerar ajustes</button>
@@ -178,6 +178,8 @@
 
   <!-- ============ DIÁLOGO: SALVAR / COMPARTILHAR (v3.0) ============ -->
   <dialog id="share-dialog">
+    <button id="share-back-arrow" class="dialog-back" type="button" aria-label="Voltar" hidden>‹</button>
+    <button id="share-x" class="dialog-x" type="button" aria-label="Fechar">✕</button>
     <h3>Gerar comparação</h3>
     <p class="share-hint">No iPhone: escolha <b>Salvar em Fotos</b> (galeria) ou
       <b>Salvar em Arquivos</b> (iCloud, Google Drive, OneDrive, Dropbox).</p>
@@ -191,20 +193,15 @@
 
     <!-- Nível 2a: fotos -->
     <menu class="share-menu" id="share-sub-foto" hidden>
-      <button data-what="base">🦵 Foto base</button>
-      <button id="share-opt-follow" data-what="follow" hidden>📷 Foto de acompanhamento</button>
-      <button id="share-opt-compare" data-what="compare" hidden>🔀 Comparação (lado a lado)</button>
-      <button class="share-back" data-back>← Voltar</button>
+      <button id="share-opt-separate" data-what="separate">🖼 Salvar fotos separadas</button>
+      <button id="share-opt-compare" data-what="compare">🔀 Comparação (lado a lado)</button>
     </menu>
 
     <!-- Nível 2b: vídeos -->
     <menu class="share-menu" id="share-sub-video" hidden>
       <button id="share-opt-curtain" data-what="video-curtain">🎬 Cortina</button>
       <button id="share-opt-overlay" data-what="video-overlay">🎬 Sobrepostos</button>
-      <button class="share-back" data-back>← Voltar</button>
     </menu>
-
-    <menu><button id="share-close">Fechar</button></menu>
   </dialog>
 
   <!-- ============ DIÁLOGO: DISTÂNCIA ============ -->

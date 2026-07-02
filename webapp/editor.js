@@ -335,6 +335,9 @@ const Editor = {
     $("#ed-which-row").style.display = "";
     $("#ed-which").querySelectorAll("button").forEach((b) =>
       b.classList.toggle("active", b.dataset.img === "base"));
+    // Botões de ajuste começam brancos; ficam azuis só ao serem clicados.
+    $("#ed-auto-rel").classList.remove("active");
+    $("#ed-auto-abs").classList.remove("active");
 
     showScreen("screen-editor");
     try {
@@ -465,6 +468,9 @@ const Editor = {
   async runAuto(mode) {
     const relBtn = $("#ed-auto-rel"), absBtn = $("#ed-auto-abs");
     const clicked = mode === "relative" ? relBtn : absBtn;
+    // Azul só no botão de ajuste clicado.
+    relBtn.classList.toggle("active", mode === "relative");
+    absBtn.classList.toggle("active", mode === "absolute");
     const label = clicked.textContent;
     relBtn.disabled = absBtn.disabled = true;
     clicked.textContent = "Processando…";

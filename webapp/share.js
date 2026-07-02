@@ -14,12 +14,8 @@ async function dataUrlToFile(dataUrl, name) {
   return new File([blob], name, { type: "image/jpeg" });
 }
 
-// Compartilha imediatamente (sem await antes) para preservar o gesto do iOS.
-// Resolve true quando salvou/compartilhou; false se o usuário cancelou.
-function shareFile(file) {
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    return navigator.share({ files: [file], title: file.name }).then(() => true).catch(() => false);
-  }
+// Baixa um arquivo (fallback para navegadores sem Web Share).
+function downloadFile(file) {
   const url = URL.createObjectURL(file);
   const a = document.createElement("a");
   a.href = url;
@@ -28,14 +24,34 @@ function shareFile(file) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Compartilha imediatamente (sem await antes) para preservar o gesto do iOS.
+// Resolve true quando salvou/compartilhou; false se o usuário cancelou.
+function shareFile(file) {
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    return navigator.share({ files: [file], title: file.name }).then(() => true).catch(() => false);
+  }
+  downloadFile(file);
+  return Promise.resolve(true);
+}
+
+// Compartilha/salva VÁRIOS arquivos (ex.: as 2 fotos separadas).
+function shareFiles(files) {
+  if (navigator.canShare && navigator.canShare({ files })) {
+    return navigator.share({ files }).then(() => true).catch(() => false);
+  }
+  files.forEach((f, i) => setTimeout(() => downloadFile(f), i * 400));
   return Promise.resolve(true);
 }
 
 // Pop-up de confirmação após salvar/baixar a mídia.
 function showSavedPopup(what) {
-  const isVideo = /^video/.test(what);
   const t = $("#saved-title");
-  if (t) t.textContent = isVideo ? "Vídeo salvo!" : "Foto salva!";
+  if (t) {
+    t.textContent = /^video/.test(what) ? "Vídeo salvo!"
+      : (what === "separate" ? "Fotos salvas!" : "Foto salva!");
+  }
   const dlg = $("#saved-dialog");
   if (!dlg) return;
   dlg.showModal();
@@ -203,11 +219,11 @@ async function generateVideo(s, kind) {
     // Marca d'agua (nome/logo) desenhada em TODO frame (inclusive ratio 0), para
     // a logo/nome aparecerem desde o inicio. Antes do rotulo p/ a logo ficar atras.
     Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
-    // Rodape: alterna a cada segundo — base no 1o e 3o s; acompanhamento no 2o e 4o.
+    // Rodape: base no 1o e 4o segundos; acompanhamento no 2o e 3o (vai e volta).
     if (s.showLabels) {
       const fs = Math.max(14, Math.round(H * 0.028 * prof.footerScale));
       const sec = Math.min(3, Math.floor((t || 0) / 1000));
-      const showBase = (sec % 2 === 0);
+      const showBase = (sec === 0 || sec === 3);
       const label = showBase ? s.baseLabel : s.followLabel;
       if (label) drawChip(ctx, label, W / 2, H - 12, "center", prof.footerFamily, fs);
     }
@@ -261,10 +277,12 @@ const Share = {
   files: {},
 
   // Alterna entre os niveis do menu: "root" (Foto/Video), "foto" e "video".
+  // A seta Voltar (topo) aparece só nos submenus; o X fecha em qualquer nível.
   nav(view) {
     $("#share-cats").hidden = view !== "root";
     $("#share-sub-foto").hidden = view !== "foto";
     $("#share-sub-video").hidden = view !== "video";
+    $("#share-back-arrow").hidden = view === "root";
   },
 
   async open(session) {
@@ -278,8 +296,6 @@ const Share = {
     // Estado inicial: mostra as categorias; esconde as opcoes condicionais.
     this.nav("root");
     $("#share-cat-video").hidden = !canVideo;
-    $("#share-opt-follow").hidden = !hasFollow;
-    $("#share-opt-compare").hidden = !hasFollow;
     const curtain = $("#share-opt-curtain");
     const overlay = $("#share-opt-overlay");
     [curtain, overlay].forEach((b) => { b.disabled = true; });
@@ -345,10 +361,16 @@ const Share = {
   },
 
   handle(what) {
-    const file = this.files[what];
     $("#share-dialog").close();
-    if (file) shareFile(file).then((ok) => { if (ok) showSavedPopup(what); });
-    // Salvar/compartilhar COMPLETA a comparacao -> confirma o credito reservado.
+    if (what === "separate") {
+      // Salva as 2 fotos (base e acompanhamento) isoladamente.
+      const files = [this.files.base, this.files.follow].filter(Boolean);
+      if (files.length) shareFiles(files).then((ok) => { if (ok) showSavedPopup("separate"); });
+    } else {
+      const file = this.files[what];
+      if (file) shareFile(file).then((ok) => { if (ok) showSavedPopup(what); });
+    }
+    // Gerar a comparacao ja confirmou o credito; aqui e so garantia.
     if (this.session && this.session.creditState === "reserved") {
       this.session.creditState = "confirmed";
       DB.put(this.session);
@@ -359,10 +381,9 @@ const Share = {
 window.addEventListener("DOMContentLoaded", () => {
   $("#share-dialog").querySelectorAll("[data-what]").forEach((b) =>
     b.addEventListener("click", () => Share.handle(b.dataset.what)));
-  $("#share-dialog").querySelectorAll("[data-back]").forEach((b) =>
-    b.addEventListener("click", () => Share.nav("root")));
   $("#share-cat-foto").addEventListener("click", () => Share.nav("foto"));
   $("#share-cat-video").addEventListener("click", () => Share.nav("video"));
-  $("#share-close").addEventListener("click", () => $("#share-dialog").close());
+  $("#share-back-arrow").addEventListener("click", () => Share.nav("root"));
+  $("#share-x").addEventListener("click", () => $("#share-dialog").close());
   $("#saved-ok").addEventListener("click", () => $("#saved-dialog").close());
 });

@@ -363,6 +363,12 @@ html, body {
 
 /* ---------- Editor de imagens (v2.0) ---------- */
 .ed-content { padding-bottom: 32px; }
+/* Botões do editor: brancos por padrão; azul só quando clicados/selecionados. */
+.ed-content .btn.outline.active,
+.ed-content .btn.outline:active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.ed-seg { background: #fff; border: 1.5px solid var(--primary); }
+.ed-seg button { color: var(--primary); }
+.ed-seg button.active { background: var(--primary); color: #fff; }
 .ed-auto-row { display: flex; gap: 8px; margin-bottom: 4px; }
 .ed-auto-row .btn { margin-top: 0; flex: 1; }
 .ed-auto-hint { font-size: 0.74rem; color: var(--muted); margin: 0 0 8px; text-align: center; }
@@ -430,6 +436,16 @@ dialog menu button:disabled { opacity: 0.4; cursor: not-allowed; }
   font-size: 1rem; line-height: 1; cursor: pointer; padding: 0;
 }
 .dialog-x:hover { background: #e0e8ec; color: #333; }
+
+/* Botão Voltar (seta) no topo esquerdo do diálogo. */
+.dialog-back {
+  position: absolute; top: 10px; left: 10px; width: 32px; height: 32px;
+  border: none; border-radius: 50%; background: #eef3f6; color: var(--primary);
+  font-size: 1.4rem; line-height: 1; cursor: pointer; padding: 0;
+}
+.dialog-back:hover { background: #e0e8ec; }
+/* Título do diálogo de gerar comparação centrado entre a seta e o X. */
+#share-dialog h3 { text-align: center; padding: 2px 36px 0; }
 
 /* Pop-up "mídia salva". */
 .saved-dialog { width: min(80vw, 280px); text-align: center; }

@@ -1,9 +1,10 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* v3.5.8: "Comparar" trava as fotos; titulo do diálogo "Gerar comparação"; rodape
-   do video alterna base/acomp. por segundo; Montagem sem card de status; tela
-   inicial "ComparaCam" com engrenagem no topo e barra de creditos reorganizada. */
-const CACHE = "fotos-fantasma-v27";
+/* v3.6: botao "Reposicionar imagens"; dialogo "Gerar comparação" com seta Voltar
+   e "Salvar fotos separadas"; rodape do video base 1o/4o e acomp 2o/3o; rotulo
+   padrao "Antes"/"Depois"+data; travar so a troca de fotos; botoes do editor
+   brancos que ficam azuis ao clicar. */
+const CACHE = "fotos-fantasma-v28";
 const ASSETS = [
   "./",
   "./index.html",

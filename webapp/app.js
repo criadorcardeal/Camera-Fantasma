@@ -83,6 +83,13 @@ function autoDateLabel() {
   return mode === "datetime" ? fmtDate(iso) : fmtDateOnly(iso);
 }
 
+// Rótulo padrão do rodapé: "Antes"/"Depois" + a data (conforme a configuração).
+function defaultLabel(kind) {
+  const prefix = kind === "base" ? "Antes" : "Depois";
+  const d = autoDateLabel();
+  return d ? (prefix + " • " + d) : prefix;
+}
+
 // Usa a versao com ajustes aplicados (se existir) ou a original.
 const baseSrc = (s) => s.baseImageView || s.baseImage;
 const followSrc = (s) => s.followImageView || s.followImage;
@@ -438,10 +445,10 @@ const Cam = {
     bakeCameraFilter(ctx, canvas.width, canvas.height, f);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
 
-    // Prefill do rótulo com a data de aquisição (editável/removível).
+    // Prefill do rótulo com o texto padrão ("Antes"/"Depois" + data) editável.
     const seed = this.mode === "base"
-      ? autoDateLabel()
-      : ((this.session && this.session.followLabel) || autoDateLabel());
+      ? ((this.session && this.session.baseLabel) || defaultLabel("base"))
+      : ((this.session && this.session.followLabel) || defaultLabel("follow"));
     const res = await openDistanceDialog(this.target, seed);
     if (res == null) return; // usuario escolheu refazer
     const { distance, label } = res;
@@ -555,7 +562,7 @@ async function importBasePhoto(file, session) {
   }
   // Substituir a base de uma comparação já existente.
   if (session) {
-    const res = await openDistanceDialog(session.baseDistance, session.baseLabel || autoDateLabel());
+    const res = await openDistanceDialog(session.baseDistance, session.baseLabel || defaultLabel("base"));
     if (res == null) return;
     session.baseImage = dataUrl;
     session.baseDistance = res.distance;
@@ -565,7 +572,7 @@ async function importBasePhoto(file, session) {
     await openDetail(session.id);
     return;
   }
-  const res = await openDistanceDialog(null, autoDateLabel());
+  const res = await openDistanceDialog(null, defaultLabel("base"));
   if (res == null) return;
   const newSession = {
     id: String(Date.now()),
@@ -684,12 +691,15 @@ async function openDetail(id) {
     ? `<p class="lock-note">🔒 Comparação concluída — as fotos não podem mais ser alteradas.</p>`
     : "";
 
-  // O botão de comparar só aparece quando existem as 2 fotos (base + acompanhamento).
+  // Ajustar e Reposicionar continuam disponíveis mesmo depois de "Comparar"
+  // (o travamento só esconde os cards de TROCA de foto — base/acompanhamento).
+  // O botão Comparar fica embaixo, com largura total.
   const secondRow = hasFollow ? `
     <div class="btn-row" style="margin-top:12px">
-      ${!locked ? `<button class="btn primary" id="btn-adjust">🎚 Ajustar imagens</button>` : ""}
-      <button class="btn primary" id="btn-share">🔀 Comparar</button>
-    </div>` : "";
+      <button class="btn outline" id="btn-adjust">🎚 Ajustar imagens</button>
+      <button class="btn outline" id="btn-reposition">↔️ Reposicionar imagens</button>
+    </div>
+    <button class="btn primary" id="btn-share">🔀 Comparar</button>` : "";
 
   c.innerHTML = compareHtml + labelHtml + lockNote + baseCard + acCard + secondRow;
 
@@ -710,6 +720,7 @@ async function openDetail(id) {
   enableWmEdit();
 
   if ($("#btn-adjust")) $("#btn-adjust").addEventListener("click", () => Editor.open(s));
+  if ($("#btn-reposition")) $("#btn-reposition").addEventListener("click", () => Aligner.open(s, s.followImage));
   if ($("#btn-redo")) $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
   if ($("#btn-follow-import")) $("#btn-follow-import").addEventListener("click", () =>
     pickImage().then((file) => importFollowPhoto(s, file)));
