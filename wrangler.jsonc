@@ -1,0 +1,9 @@
+{
+  // Cloudflare (Workers Static Assets) — publica o app estático da pasta webapp/.
+  // Sem script de Worker: serve apenas os arquivos estaticos na raiz do dominio.
+  "name": "camera-fantasma",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    "directory": "./webapp"
+  }
+}
