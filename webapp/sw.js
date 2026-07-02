@@ -1,8 +1,8 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* v3.5.4 ajustes: transparencia da logo perceptivel no perfil, logo atras do
-   rodape, botao de perfil na Comparacao e logo reposicionavel na Comparacao. */
-const CACHE = "fotos-fantasma-v22";
+/* v3.5.5 ajustes: video 4s (vai e volta) com marca d'agua desde o inicio, nome
+   com contorno (legivel em fotos claras), sem reposicionamento da logo na tela. */
+const CACHE = "fotos-fantasma-v23";
 const ASSETS = [
   "./",
   "./index.html",

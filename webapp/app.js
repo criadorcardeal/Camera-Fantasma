@@ -684,8 +684,6 @@ async function openDetail(id) {
       });
     });
   }
-  enableLogoDrag();
-
   if ($("#btn-adjust")) $("#btn-adjust").addEventListener("click", () => Editor.open(s));
   if ($("#btn-redo")) $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
   if ($("#btn-follow-import")) $("#btn-follow-import").addEventListener("click", () =>
@@ -707,55 +705,6 @@ async function openDetail(id) {
   const onLabelInput = async (key, val) => { s[key] = val.trim(); await DB.put(s); refreshCompareCaptions(); };
   $("#lbl-base").addEventListener("input", (e) => onLabelInput("baseLabel", e.target.value));
   if (hasFollow) $("#lbl-follow").addEventListener("input", (e) => onLabelInput("followLabel", e.target.value));
-}
-
-// Permite arrastar a logo (marca d'água) diretamente no palco de comparação para
-// reposicioná-la. A nova posição é gravada no perfil e vale para todas as fotos.
-// Delegação no #cmp-host (que persiste entre os modos cortina/lado a lado/sobrepor).
-function enableLogoDrag() {
-  const host = $("#cmp-host");
-  if (!host || host._logoDragOn) return;
-  host._logoDragOn = true;
-  let d = null;
-
-  const reposition = (x, y) => {
-    host.querySelectorAll(".wm-logo").forEach((el) => {
-      el.style.left = (x * 100) + "%";
-      el.style.top = (y * 100) + "%";
-    });
-  };
-
-  host.addEventListener("pointerdown", (e) => {
-    const logo = e.target.closest(".wm-logo");
-    if (!logo) return;
-    e.preventDefault(); e.stopPropagation();
-    const rect = logo.parentElement.getBoundingClientRect();
-    const c = Profile.config();
-    const img = logo.querySelector("img");
-    const aspect = (img && img.naturalWidth) ? img.naturalHeight / img.naturalWidth : 0.6;
-    d = { rect, sx: e.clientX, sy: e.clientY, x0: c.logoX, y0: c.logoY,
-      w: c.logoW, h: c.logoW * aspect, nx: null, ny: null };
-    try { logo.setPointerCapture(e.pointerId); } catch (_) {}
-  });
-
-  host.addEventListener("pointermove", (e) => {
-    if (!d) return;
-    let x = d.x0 + (e.clientX - d.sx) / d.rect.width;
-    let y = d.y0 + (e.clientY - d.sy) / d.rect.height;
-    // mantém ao menos 25% da logo dentro do quadro
-    x = Math.max(-0.75 * d.w, Math.min(1 - 0.25 * d.w, x));
-    y = Math.max(-0.75 * d.h, Math.min(1 - 0.25 * d.h, y));
-    d.nx = x; d.ny = y;
-    reposition(x, y);
-  });
-
-  const end = () => {
-    if (!d) return;
-    if (d.nx != null) Profile.setLogoPos(d.nx, d.ny);
-    d = null;
-  };
-  host.addEventListener("pointerup", end);
-  host.addEventListener("pointercancel", end);
 }
 
 // Legenda (rodapé) opcional dentro do palco de comparação (com fonte do perfil).

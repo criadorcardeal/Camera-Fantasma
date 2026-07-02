@@ -166,27 +166,29 @@ async function generateVideo(s, kind) {
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, W, H);
     drawCover(ctx, baseImg, 0, 0, W, H);
-    if (ratio <= 0) return;
-    if (kind === "overlay") {
-      // Acompanhamento surge sobre a base (transparencia 100% -> 0%).
-      ctx.globalAlpha = ratio;
-      drawCover(ctx, followImg, 0, 0, W, H);
-      ctx.globalAlpha = 1;
-    } else {
-      // Cortina: recorta a faixa esquerda e desenha o acompanhamento.
-      const clipW = Math.round(ratio * W);
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, 0, clipW, H);
-      ctx.clip();
-      drawCover(ctx, followImg, 0, 0, W, H);
-      ctx.restore();
-      if (ratio < 1) {
-        ctx.fillStyle = "rgba(255,255,255,0.9)";
-        ctx.fillRect(clipW - 1, 0, 3, H);
+    if (ratio > 0) {
+      if (kind === "overlay") {
+        // Acompanhamento surge sobre a base (transparencia 100% -> 0%).
+        ctx.globalAlpha = ratio;
+        drawCover(ctx, followImg, 0, 0, W, H);
+        ctx.globalAlpha = 1;
+      } else {
+        // Cortina: recorta a faixa esquerda e desenha o acompanhamento.
+        const clipW = Math.round(ratio * W);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, clipW, H);
+        ctx.clip();
+        drawCover(ctx, followImg, 0, 0, W, H);
+        ctx.restore();
+        if (ratio < 1) {
+          ctx.fillStyle = "rgba(255,255,255,0.9)";
+          ctx.fillRect(clipW - 1, 0, 3, H);
+        }
       }
     }
-    // Marca d'agua (nome/logo), se ligada. Antes do rotulo p/ a logo ficar atras.
+    // Marca d'agua (nome/logo) desenhada em TODO frame (inclusive ratio 0), para
+    // a logo/nome aparecerem desde o inicio. Antes do rotulo p/ a logo ficar atras.
     Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
     // Rotulo (rodape) de cada foto, se ligado: base a esquerda, acomp. a direita.
     if (s.showLabels) {
@@ -202,7 +204,18 @@ async function generateVideo(s, kind) {
   const chunks = [];
   rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
 
-  const HOLD = 300, SWEEP = 1400, TOTAL = 2000; // 0,3s base + 1,4s transicao + 0,3s acompanhamento
+  // 4s no total: 2s de ida (base -> acompanhamento) e 2s de volta (os mesmos 2s
+  // iniciais em sentido reverso, voltando ao acompanhamento -> base).
+  const HOLD = 300, SWEEP = 1400, HALF = 2000, TOTAL = 4000;
+  // Fator de transicao no instante t: primeira metade normal; segunda metade
+  // espelha a primeira (reverso perfeito, formando um "vai e volta").
+  const ratioAt = (t) => {
+    const tf = t <= HALF ? t : (TOTAL - t);
+    if (tf < HOLD) return 0;
+    if (tf > HOLD + SWEEP) return 1;
+    const u = (tf - HOLD) / SWEEP;
+    return u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2; // easeInOutQuad
+  };
   const ext = mime.indexOf("mp4") !== -1 ? "mp4" : "webm";
   const fname = (kind === "overlay" ? "video-sobrepostos." : "video-cortina.") + ext;
 
@@ -218,16 +231,8 @@ async function generateVideo(s, kind) {
     const t0 = performance.now();
     const tick = () => {
       const t = performance.now() - t0;
-      let r;
-      if (t < HOLD) r = 0;
-      else if (t > HOLD + SWEEP) r = 1;
-      else {
-        const u = (t - HOLD) / SWEEP;
-        r = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2; // easeInOutQuad
-      }
-      drawFrame(r);
+      drawFrame(ratioAt(Math.min(t, TOTAL)));
       if (t >= TOTAL) {
-        drawFrame(1);
         if (rec.state !== "inactive") rec.stop();
       } else {
         requestAnimationFrame(tick);
@@ -314,7 +319,7 @@ const Share = {
             if (this.session !== session) return; // dialogo reaberto/fechado
             this.files[j.key] = file;
             j.btn.disabled = false;
-            j.btn.textContent = j.label + " (2s)";
+            j.btn.textContent = j.label + " (4s)";
           })
           .catch(() => {
             if (this.session !== session) return;

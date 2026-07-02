@@ -94,13 +94,6 @@ const Profile = {
     const ns = $("#prof-name-drag"); if (ns) ns.style.opacity = op;
   },
 
-  // Grava a posicao da logo (usada ao arrastar direto na tela de Comparacao).
-  setLogoPos(x, y) {
-    const p = this.get();
-    p.logoX = x; p.logoY = y;
-    this.set(p);
-  },
-
   _refreshLogoPrev() {
     const img = $("#prof-logo-prev");
     if (this._logo) { img.src = this._logo; img.style.visibility = "visible"; }
@@ -225,10 +218,14 @@ const Profile = {
       ctx.font = `700 ${fontPx}px ${c.nameFamily}`;
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
-      ctx.shadowColor = "rgba(0,0,0,0.7)";
-      ctx.shadowBlur = Math.round(fontPx * 0.3);
+      const nx = x + c.nameX * w, ny = y + c.nameY * h;
+      // Contorno escuro para o nome ser legivel tambem sobre fotos claras (pele).
+      ctx.lineJoin = "round";
+      ctx.lineWidth = Math.max(2, Math.round(fontPx * 0.14));
+      ctx.strokeStyle = "rgba(0,0,0,0.85)";
+      ctx.strokeText(c.name, nx, ny);
       ctx.fillStyle = "#ffffff";
-      ctx.fillText(c.name, x + c.nameX * w, y + c.nameY * h);
+      ctx.fillText(c.name, nx, ny);
     }
     ctx.restore();
   },
