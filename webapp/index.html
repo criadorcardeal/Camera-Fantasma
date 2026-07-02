@@ -18,7 +18,7 @@
     <header class="topbar">
       <span class="topbar-spacer"></span>
       <h1>Fotos Fantasma</h1>
-      <span class="version-badge">v3.5.1</span>
+      <span class="version-badge">v3.5.2</span>
     </header>
     <div class="credits-bar">
       <span id="cred-balance">🪙 0 créditos</span>
@@ -227,6 +227,15 @@
     <label>Nome
       <input type="text" id="prof-name" placeholder="Ex.: Dr. Ricardo Lacerda" autocomplete="off" />
     </label>
+    <div class="prof-font-row">
+      <label>Fonte do nome
+        <select id="prof-name-font"></select>
+      </label>
+      <label>Tamanho <span class="prof-range-val" id="prof-name-size-val">100%</span>
+        <input type="range" id="prof-name-size" min="60" max="180" step="10" value="100" />
+      </label>
+    </div>
+
     <label>Logo</label>
     <div class="prof-logo-row">
       <img id="prof-logo-prev" class="prof-logo-prev" alt="" />
@@ -235,21 +244,40 @@
         <button id="prof-logo-remove" type="button">Remover</button>
       </div>
     </div>
+
+    <label>Posição e tamanho da logo <small>(arraste; alça no canto p/ redimensionar)</small></label>
+    <div class="prof-stage-wrap">
+      <div class="prof-stage" id="prof-stage">
+        <span class="prof-stage-tag">foto</span>
+        <div class="prof-logo-box" id="prof-logo-box">
+          <img id="prof-logo-drag" alt="" />
+          <div class="prof-resize" id="prof-resize"></div>
+        </div>
+      </div>
+    </div>
+
     <label class="prof-toggle">
       <input type="checkbox" id="prof-enabled" />
       <span>Aplicar nome/logo nas fotos</span>
     </label>
-    <label>Posição na foto</label>
-    <div class="prof-pos-grid" id="prof-pos-grid">
-      <button data-pos="tl">↖</button><button data-pos="tc">↑</button><button data-pos="tr">↗</button>
-      <button data-pos="ml">←</button><button data-pos="mm">•</button><button data-pos="mr">→</button>
-      <button data-pos="bl">↙</button><button data-pos="bc">↓</button><button data-pos="br">↘</button>
-    </div>
+
     <label>Transparência</label>
     <div class="prof-range-row">
       <input type="range" id="prof-transp" min="0" max="90" step="5" value="30" />
       <span class="prof-range-val" id="prof-transp-val">30%</span>
     </div>
+
+    <hr class="prof-sep" />
+    <label>Fonte do rodapé</label>
+    <div class="prof-font-row">
+      <label>Tipo
+        <select id="prof-footer-font"></select>
+      </label>
+      <label>Tamanho <span class="prof-range-val" id="prof-footer-size-val">100%</span>
+        <input type="range" id="prof-footer-size" min="60" max="180" step="10" value="100" />
+      </label>
+    </div>
+
     <menu>
       <button id="prof-close">Cancelar</button>
       <button id="prof-save" class="primary">Salvar</button>

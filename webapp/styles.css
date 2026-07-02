@@ -399,42 +399,55 @@ dialog menu button.primary { background: var(--primary); color: #fff; }
   padding: 6px 12px; border-radius: 8px; border: 1.5px solid var(--primary);
   background: #fff; color: var(--primary); font-size: 0.85rem; font-weight: 600; cursor: pointer;
 }
-.prof-pos-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
-  width: 120px; margin: 4px 0 8px;
-}
-.prof-pos-grid button {
-  aspect-ratio: 4/3; border: 1.5px solid #ccd4d9; border-radius: 6px;
-  background: #fff; cursor: pointer; padding: 0; font-size: 0.9rem; color: var(--muted);
-  display: flex; align-items: center; justify-content: center;
-}
-.prof-pos-grid button.sel { border-color: var(--primary); background: var(--primary); color: #fff; }
 .prof-range-row { display: flex; align-items: center; gap: 10px; }
 .prof-range-row input[type=range] { flex: 1; accent-color: var(--primary); }
-.prof-range-row .prof-range-val { width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.prof-range-val { width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 400; }
 .prof-toggle { display: flex; align-items: center; gap: 10px; font-weight: 600; margin: 6px 0; }
 .prof-toggle input { width: 20px; height: 20px; accent-color: var(--primary); }
 
-/* Marca d'água (nome + logo) sobreposta no palco de comparação */
+/* Fontes (nome / rodapé) */
+.prof-font-row { display: flex; gap: 10px; margin: 4px 0 8px; }
+.prof-font-row > label { flex: 1; margin: 0; font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+.prof-font-row select { width: 100%; padding: 8px; border: 1px solid #ccd4d9; border-radius: 8px; font-size: 0.9rem; }
+.prof-font-row input[type=range] { width: 100%; accent-color: var(--primary); margin-top: 8px; }
+.prof-sep { border: none; border-top: 1px solid #e3e8eb; margin: 14px 0 8px; }
+
+/* Editor de posição/tamanho da logo (retângulo = foto) */
+.prof-stage-wrap {
+  position: relative; overflow: hidden; background: #eef3f6; border-radius: 10px;
+  padding: 46px 58px; display: flex; justify-content: center; margin: 4px 0 8px;
+  touch-action: none;
+}
+.prof-stage {
+  position: relative; width: 168px; height: 224px; flex-shrink: 0;
+  background: #fff; border: 2px solid #9fb2bd; border-radius: 4px;
+}
+.prof-stage-tag {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  color: #c2cdd4; font-size: 0.95rem; pointer-events: none;
+}
+.prof-logo-box {
+  position: absolute; box-sizing: border-box; border: 1.5px dashed var(--primary);
+  cursor: move; touch-action: none;
+}
+.prof-logo-box img { width: 100%; height: 100%; display: block; object-fit: contain; pointer-events: none; }
+.prof-resize {
+  position: absolute; right: -9px; bottom: -9px; width: 18px; height: 18px;
+  background: var(--primary); border: 2px solid #fff; border-radius: 50%;
+  cursor: nwse-resize; touch-action: none;
+}
+
+/* Marca d'água (logo + nome) sobreposta no palco de comparação.
+   Posicionada por left/top/width (inline), como no canvas das exportações. */
 .wm {
-  position: absolute; z-index: 5; display: flex; align-items: center; gap: 6px;
-  pointer-events: none; max-width: 60%;
+  position: absolute; z-index: 5; display: flex; flex-direction: column;
+  align-items: center; pointer-events: none;
 }
-.wm img { height: 44px; width: auto; }
+.wm img { width: 100%; height: auto; display: block; }
 .wm span {
-  color: #fff; font-size: 0.8rem; font-weight: 700;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: #fff; font-weight: 700; margin-top: 2px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.85); white-space: nowrap;
 }
-.wm-tl { top: 8px; left: 8px; }
-.wm-tc { top: 8px; left: 50%; transform: translateX(-50%); }
-.wm-tr { top: 8px; right: 8px; }
-.wm-ml { top: 50%; left: 8px; transform: translateY(-50%); }
-.wm-mm { top: 50%; left: 50%; transform: translate(-50%,-50%); }
-.wm-mr { top: 50%; right: 8px; transform: translateY(-50%); }
-.wm-bl { bottom: 8px; left: 8px; }
-.wm-bc { bottom: 8px; left: 50%; transform: translateX(-50%); }
-.wm-br { bottom: 8px; right: 8px; }
 
 /* ---------- Salvar / Compartilhar (v3.0) ---------- */
 .share-hint { font-size: 0.82rem; color: var(--muted); margin: 0 0 10px; }

@@ -390,7 +390,7 @@ const Cam = {
         baseDistance: distance,
         baseLabel: label,
         followLabel: "",
-        showLabels: false,
+        showLabels: true,
         filters: f,
         followImage: null,
         followDistance: null,
@@ -487,7 +487,7 @@ async function importBasePhoto(file) {
     baseDistance: res.distance,
     baseLabel: res.label,
     followLabel: "",
-    showLabels: false,
+    showLabels: true,
     filters: { brightness: 1, contrast: 1, saturate: 1 },
     followImage: null,
     followDistance: null,
@@ -639,9 +639,11 @@ async function openDetail(id) {
   if (hasFollow) $("#lbl-follow").addEventListener("input", (e) => onLabelInput("followLabel", e.target.value));
 }
 
-// Legenda (rodapé) opcional dentro do palco de comparação.
+// Legenda (rodapé) opcional dentro do palco de comparação (com fonte do perfil).
 function capHtml(text, cls, show) {
-  return show && text ? `<div class="cap ${cls}">${escHtml(text)}</div>` : "";
+  if (!(show && text)) return "";
+  const c = Profile.config();
+  return `<div class="cap ${cls}" style="font-family:${c.footerFamily};font-size:calc(0.72rem * ${c.footerScale})">${escHtml(text)}</div>`;
 }
 
 // Recolhe o modo de comparação ativo e re-renderiza (para atualizar legendas).

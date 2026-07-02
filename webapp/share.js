@@ -37,25 +37,28 @@ function drawCover(ctx, img, x, y, w, h) {
   ctx.drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, x, y, w, h);
 }
 
+const FONT_DEFAULT = '-apple-system, Arial, sans-serif';
+
 // Barra de rodape (rotulo) centrada na base de uma regiao [x, y-h .. y], largura w.
-function drawFooterBar(ctx, text, x, y, w, h) {
+function drawFooterBar(ctx, text, x, y, w, h, family) {
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,0.5)";
   ctx.fillRect(x, y - h, w, h);
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `600 ${Math.round(h * 0.44)}px -apple-system, Arial, sans-serif`;
+  ctx.font = `600 ${Math.round(h * 0.44)}px ${family || FONT_DEFAULT}`;
   ctx.fillText(text, x + w / 2, y - h / 2, w - 20);
   ctx.restore();
 }
 
 // Chip de rotulo (usado nos videos): ancorado a esquerda ou direita.
-function drawChip(ctx, text, x, y, align) {
+function drawChip(ctx, text, x, y, align, family, fontPx) {
   ctx.save();
-  ctx.font = "600 20px -apple-system, Arial, sans-serif";
-  const padX = 10, h = 30;
-  const tw = Math.min(ctx.measureText(text).width, 300);
+  const fs = fontPx || 20;
+  ctx.font = `600 ${fs}px ${family || FONT_DEFAULT}`;
+  const padX = Math.round(fs * 0.5), h = Math.round(fs * 1.5);
+  const tw = Math.min(ctx.measureText(text).width, 320);
   const w = tw + padX * 2;
   const bx = align === "right" ? x - w : x;
   ctx.fillStyle = "rgba(0,0,0,0.55)";
@@ -105,9 +108,9 @@ async function generateComparisonImage(s) {
 
   // Rotulo (rodape) de cada foto, se ligado.
   if (s.showLabels) {
-    const fh = Math.max(30, Math.round(cellH * 0.07));
-    if (s.baseLabel) drawFooterBar(ctx, s.baseLabel, pad, y + cellH, cellW, fh);
-    if (s.followLabel) drawFooterBar(ctx, s.followLabel, pad + cellW + gap, y + cellH, cellW, fh);
+    const fh = Math.max(30, Math.round(cellH * 0.07 * prof.footerScale));
+    if (s.baseLabel) drawFooterBar(ctx, s.baseLabel, pad, y + cellH, cellW, fh, prof.footerFamily);
+    if (s.followLabel) drawFooterBar(ctx, s.followLabel, pad + cellW + gap, y + cellH, cellW, fh, prof.footerFamily);
   }
   // Marca d'agua (nome/logo) em cada foto, se ligada.
   Profile.drawWatermark(ctx, pad, y, cellW, cellH, prof, logoImg);
@@ -184,8 +187,9 @@ async function generateVideo(s, kind) {
     }
     // Rotulo (rodape) de cada foto, se ligado: base a esquerda, acomp. a direita.
     if (s.showLabels) {
-      if (s.baseLabel) drawChip(ctx, s.baseLabel, 12, H - 12, "left");
-      if (s.followLabel) drawChip(ctx, s.followLabel, W - 12, H - 12, "right");
+      const fs = Math.max(14, Math.round(H * 0.028 * prof.footerScale));
+      if (s.baseLabel) drawChip(ctx, s.baseLabel, 12, H - 12, "left", prof.footerFamily, fs);
+      if (s.followLabel) drawChip(ctx, s.followLabel, W - 12, H - 12, "right", prof.footerFamily, fs);
     }
     // Marca d'agua (nome/logo), se ligada.
     Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
@@ -277,7 +281,7 @@ const Share = {
       c.width = W; c.height = H;
       const ctx = c.getContext("2d");
       ctx.drawImage(img, 0, 0);
-      if (wantFooter) drawFooterBar(ctx, label, 0, H, W, Math.max(28, Math.round(H * 0.07)));
+      if (wantFooter) drawFooterBar(ctx, label, 0, H, W, Math.max(28, Math.round(H * 0.07 * prof.footerScale)), prof.footerFamily);
       Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
       return c.toDataURL("image/jpeg", 0.92);
     };
