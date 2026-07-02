@@ -1,0 +1,4 @@
+# Netlify — publica o app estático da pasta webapp/ (sem build).
+# O _headers em webapp/ (mesmo formato) continua valendo para o cache.
+[build]
+  publish = "webapp"
