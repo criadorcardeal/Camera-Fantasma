@@ -308,7 +308,11 @@ const Share = {
       ctx.drawImage(img, 0, 0);
       // Marca d'agua antes do rodape: a logo fica atras do rotulo.
       Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
-      if (wantFooter) drawFooterBar(ctx, footer, 0, H, W, Math.max(28, Math.round(H * 0.07 * prof.footerScale)), prof.footerFamily);
+      // Rótulo como chip (largura do texto), centrado na base — igual aos vídeos.
+      if (wantFooter) {
+        const fs = Math.max(16, Math.round(H * 0.045 * prof.footerScale));
+        drawChip(ctx, footer, W / 2, H - 14, "center", prof.footerFamily, fs);
+      }
       return c.toDataURL("image/jpeg", 0.92);
     };
     try {

@@ -91,20 +91,23 @@ const Profile = {
     $("#profile-dialog").showModal();
   },
 
-  // Atualiza o avatar do ícone de perfil (círculo) com a logo, se houver.
+  // Atualiza o(s) ícone(s) de perfil (ComparaCam e Montagem) com a logo como
+  // avatar, se houver; senão mostra o emoji 👤.
   updateAvatar() {
-    const btn = document.getElementById("cred-profile");
-    if (!btn) return;
     const logo = this.config().logo;
-    if (logo) {
-      btn.style.backgroundImage = `url("${logo}")`;
-      btn.textContent = "";
-      btn.classList.add("has-logo");
-    } else {
-      btn.style.backgroundImage = "";
-      btn.textContent = "👤";
-      btn.classList.remove("has-logo");
-    }
+    ["cred-profile", "detail-profile"].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      if (logo) {
+        btn.style.backgroundImage = `url("${logo}")`;
+        btn.textContent = "";
+        btn.classList.add("has-logo");
+      } else {
+        btn.style.backgroundImage = "";
+        btn.textContent = "👤";
+        btn.classList.remove("has-logo");
+      }
+    });
   },
 
   // Marca que houve alteração e habilita os botões Cancelar/Salvar.

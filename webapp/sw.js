@@ -1,9 +1,9 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* v3.6.1: tela inicial com tipo de dispositivo, avatar da logo no perfil e caixa
-   dos creditos; "Zerar ajustes" deixa os botoes do editor brancos; export lado a
-   lado sem titulos/infos, so com rotulos em chip (largura do texto). */
-const CACHE = "fotos-fantasma-v29";
+/* v3.6.2: avatar da logo tambem na Montagem; editor com "Acompanhamento";
+   export de fotos separadas com rotulo em chip; removidos os campos de
+   registro de distancia (dialogo virou so rotulo). */
+const CACHE = "fotos-fantasma-v30";
 const ASSETS = [
   "./",
   "./index.html",

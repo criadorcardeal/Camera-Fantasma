@@ -6,7 +6,7 @@
    Mostra a foto importada com a foto BASE como fantasma por cima. O usuario
    arrasta para posicionar e usa o zoom para deixar as duas simetricas. Ao
    confirmar, gera a foto de acompanhamento ja enquadrada igual a base.
-   (loadImageEl, $, showScreen, DB, openDetail, openDistanceDialog sao globais.)
+   (loadImageEl, $, showScreen, DB, openDetail, openLabelDialog sao globais.)
    ========================================================================= */
 const Aligner = {
   session: null,
@@ -79,12 +79,11 @@ const Aligner = {
     ctx.restore();
     const aligned = c.toDataURL("image/jpeg", 0.9);
 
-    const res = await openDistanceDialog(this.session.baseDistance, this.session.followLabel || defaultLabel("follow"));
+    const res = await openLabelDialog(this.session.followLabel || defaultLabel("follow"));
     if (res == null) { await openDetail(this.session.id); return; }
 
     const s = this.session;
     s.followImage = aligned;
-    s.followDistance = res.distance;
     s.followLabel = res.label;
     s.followAt = new Date().toISOString();
     // Nova imagem: zera ajustes/versao anteriores do acompanhamento.

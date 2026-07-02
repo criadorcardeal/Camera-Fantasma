@@ -18,7 +18,7 @@
     <header class="topbar">
       <button id="cred-admin" class="icon-btn dark" title="Administração">⚙</button>
       <h1>ComparaCam</h1>
-      <span class="version-badge">v3.6.1</span>
+      <span class="version-badge">v3.6.2</span>
     </header>
     <div class="credits-bar">
       <span class="cred-left">
@@ -123,7 +123,7 @@
     <div class="content ed-content">
       <div class="ed-previews">
         <figure><canvas id="ed-canvas-base"></canvas><figcaption>Base</figcaption></figure>
-        <figure><canvas id="ed-canvas-follow"></canvas><figcaption>Depois</figcaption></figure>
+        <figure><canvas id="ed-canvas-follow"></canvas><figcaption>Acompanhamento</figcaption></figure>
       </div>
       <div class="ed-auto-row">
         <button id="ed-auto-rel" class="btn outline">Ajuste Relativo</button>
@@ -141,7 +141,7 @@
         <span>Editando:</span>
         <div class="seg ed-seg" id="ed-which">
           <button data-img="base" class="active">Base</button>
-          <button data-img="follow">Depois</button>
+          <button data-img="follow">Acompanhamento</button>
         </div>
       </div>
       <div id="ed-sliders"></div>
@@ -205,15 +205,10 @@
     </menu>
   </dialog>
 
-  <!-- ============ DIÁLOGO: DISTÂNCIA ============ -->
+  <!-- ============ DIÁLOGO: RÓTULO DA FOTO ============ -->
   <dialog id="dist-dialog">
     <form method="dialog">
-      <h3>Distância da foto</h3>
-      <p id="dist-target" hidden></p>
-      <label>Distância (cm)
-        <input type="number" id="dist-input" inputmode="numeric" value="50" min="1" />
-      </label>
-      <small>Recomendado: 40 a 60 cm</small>
+      <h3>Rótulo da foto</h3>
       <label>Rótulo (rodapé da foto)
         <input type="text" id="dist-label" placeholder="Ex.: Perna direita" autocomplete="off" />
       </label>

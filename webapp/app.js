@@ -174,7 +174,7 @@ async function renderHome() {
       <img src="${baseSrc(s)}" alt="" />
       <div class="info">
         <b>Comparação de ${fmtDate(s.createdAt)}</b>
-        <span>${s.followImage ? "Base + acompanhamento" : "Só foto base"} • ${Math.round(s.baseDistance)} cm</span>
+        <span>${s.followImage ? "Base + acompanhamento" : "Só foto base"}</span>
       </div>
       <div>${s.followImage ? "🔀" : "➕"}</div>`;
     wrap.appendChild(card);
@@ -314,21 +314,18 @@ const Cam = {
       ghost.src = session.baseImage;
       ghost.style.display = "block";
       $("#ghost-wrap").style.display = "flex";
-      this.target = session.baseDistance;
       $("#cam-title").textContent = "Foto de acompanhamento";
       const f = session.filters || { brightness: 1, contrast: 1, saturate: 1 };
       $("#f-brightness").value = f.brightness;
       $("#f-contrast").value = f.contrast;
       $("#f-saturate").value = f.saturate;
-      $("#distance-chip").textContent =
-        `Distância-alvo: ${Math.round(this.target)} cm (mantenha 40–60 cm)`;
+      $("#distance-chip").textContent = "Mantenha 40–60 cm do local";
     } else {
       // Modo "base": foto nova (session null) ou refazer a base de uma
       // comparação existente (session preenchida).
       ghost.removeAttribute("src");
       ghost.style.display = "none";
       $("#ghost-wrap").style.display = "none";
-      this.target = session ? session.baseDistance : null;
       $("#cam-title").textContent = session ? "Refazer foto base" : "Foto base";
       const f = (session && session.filters) || { brightness: 1, contrast: 1, saturate: 1 };
       $("#f-brightness").value = f.brightness;
@@ -466,15 +463,14 @@ const Cam = {
     const seed = this.mode === "base"
       ? ((this.session && this.session.baseLabel) || defaultLabel("base"))
       : ((this.session && this.session.followLabel) || defaultLabel("follow"));
-    const res = await openDistanceDialog(this.target, seed);
+    const res = await openLabelDialog(seed);
     if (res == null) return; // usuario escolheu refazer
-    const { distance, label } = res;
+    const { label } = res;
 
     if (this.mode === "base" && this.session) {
       // Refazer a foto base de uma comparação já existente (não cria sessão nova).
       const s = this.session;
       s.baseImage = dataUrl;
-      s.baseDistance = distance;
       s.baseLabel = label;
       s.filters = f;
       delete s.baseImageView;   // descarta ajuste anterior da base
@@ -486,13 +482,11 @@ const Cam = {
         id: String(Date.now()),
         createdAt: new Date().toISOString(),
         baseImage: dataUrl,
-        baseDistance: distance,
         baseLabel: label,
         followLabel: "",
         showLabels: true,
         filters: f,
         followImage: null,
-        followDistance: null,
         followAt: null,
         creditState: "reserved",
       };
@@ -503,7 +497,6 @@ const Cam = {
     } else {
       const s = this.session;
       s.followImage = dataUrl;
-      s.followDistance = distance;
       s.followLabel = label;
       s.followAt = new Date().toISOString();
       await DB.put(s);
@@ -579,29 +572,26 @@ async function importBasePhoto(file, session) {
   }
   // Substituir a base de uma comparação já existente.
   if (session) {
-    const res = await openDistanceDialog(session.baseDistance, session.baseLabel || defaultLabel("base"));
+    const res = await openLabelDialog(session.baseLabel || defaultLabel("base"));
     if (res == null) return;
     session.baseImage = dataUrl;
-    session.baseDistance = res.distance;
     session.baseLabel = res.label;
     delete session.baseImageView;
     await DB.put(session);
     await openDetail(session.id);
     return;
   }
-  const res = await openDistanceDialog(null, defaultLabel("base"));
+  const res = await openLabelDialog(defaultLabel("base"));
   if (res == null) return;
   const newSession = {
     id: String(Date.now()),
     createdAt: new Date().toISOString(),
     baseImage: dataUrl,
-    baseDistance: res.distance,
     baseLabel: res.label,
     followLabel: "",
     showLabels: true,
     filters: { brightness: 1, contrast: 1, saturate: 1 },
     followImage: null,
-    followDistance: null,
     followAt: null,
     creditState: "reserved",
   };
@@ -610,33 +600,16 @@ async function importBasePhoto(file, session) {
   await openDetail(newSession.id);
 }
 
-/* ---------------- Diálogo de distância + rótulo ----------------
-   Resolve { distance, label } ou null (usuário escolheu refazer). */
-function openDistanceDialog(target, labelValue) {
+/* ---------------- Diálogo de rótulo (rodapé da foto) ----------------
+   Resolve { label } ou null (usuário escolheu refazer). */
+function openLabelDialog(labelValue) {
   return new Promise((resolve) => {
     const dlg = $("#dist-dialog");
-    const input = $("#dist-input");
     const labelInp = $("#dist-label");
-    const tEl = $("#dist-target");
-    input.value = target != null ? Math.round(target) : 50;
     labelInp.value = labelValue || "";
-    if (target != null) {
-      tEl.hidden = false;
-      tEl.textContent = `Meta para igualar a foto base: ${Math.round(target)} cm`;
-    } else {
-      tEl.hidden = true;
-    }
     const onClose = () => {
       dlg.removeEventListener("close", onClose);
-      if (dlg.returnValue === "ok") {
-        const v = parseFloat(String(input.value).replace(",", "."));
-        resolve({
-          distance: isNaN(v) ? (target != null ? target : 50) : v,
-          label: labelInp.value.trim(),
-        });
-      } else {
-        resolve(null);
-      }
+      resolve(dlg.returnValue === "ok" ? { label: labelInp.value.trim() } : null);
     };
     dlg.addEventListener("close", onClose);
     dlg.showModal();

@@ -48,6 +48,11 @@ html, body {
   cursor: pointer;
 }
 .icon-btn.dark { background: rgba(255,255,255,0.2); }
+/* Ícone de perfil na topbar com a logo como avatar. */
+.icon-btn.has-logo {
+  background-size: cover; background-position: center; background-repeat: no-repeat;
+  background-color: #fff; border: 1.5px solid rgba(255,255,255,0.85); overflow: hidden;
+}
 
 .content { flex: 1; overflow-y: auto; padding: 12px; padding-bottom: 96px; }
 
@@ -378,7 +383,7 @@ html, body {
 .ed-content .btn.outline.active,
 .ed-content .btn.outline:active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .ed-seg { background: #fff; border: 1.5px solid var(--primary); }
-.ed-seg button { color: var(--primary); }
+.ed-seg button { color: var(--primary); font-size: 0.78rem; white-space: nowrap; padding: 8px 4px; }
 .ed-seg button.active { background: var(--primary); color: #fff; }
 .ed-auto-row { display: flex; gap: 8px; margin-bottom: 4px; }
 .ed-auto-row .btn { margin-top: 0; flex: 1; }
@@ -438,7 +443,6 @@ dialog menu { display: flex; gap: 8px; justify-content: flex-end; padding: 16px 
 dialog menu button { padding: 10px 16px; border-radius: 8px; border: none; background: #e3e8eb; cursor: pointer; }
 dialog menu button.primary { background: var(--primary); color: #fff; }
 dialog menu button:disabled { opacity: 0.4; cursor: not-allowed; }
-#dist-target { font-weight: 700; color: var(--primary); }
 
 /* Botão X (fechar sem salvar) no topo direito do diálogo. */
 .dialog-x {
