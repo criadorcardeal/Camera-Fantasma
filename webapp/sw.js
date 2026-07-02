@@ -1,10 +1,9 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* re-deploy v3.5.7 (publicacao do Pages falhou por erro transitorio). */
-/* v3.5.7: popup "midia salva", botao Comparar so com 2 fotos, janela "Montagem"
-   com card Base, camera negada volta a tela anterior, perfil com X e botoes que
-   so habilitam quando ha alteracao. */
-const CACHE = "fotos-fantasma-v26";
+/* v3.5.8: "Comparar" trava as fotos; titulo do diálogo "Gerar comparação"; rodape
+   do video alterna base/acomp. por segundo; Montagem sem card de status; tela
+   inicial "ComparaCam" com engrenagem no topo e barra de creditos reorganizada. */
+const CACHE = "fotos-fantasma-v27";
 const ASSETS = [
   "./",
   "./index.html",

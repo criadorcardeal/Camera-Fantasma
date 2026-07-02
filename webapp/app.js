@@ -639,26 +639,7 @@ async function openDetail(id) {
        <div id="cmp-host"></div>`
     : `<div class="compare-stage" id="cmp-host"><img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}</div>`;
 
-  const statusTxt = s.creditState === "confirmed"
-    ? "Concluída ✓ (crédito usado)"
-    : s.creditState === "reserved"
-      ? "Em aberto — salve para concluir"
-      : "—";
-
-  const infoHtml = `
-    <div class="info-block" id="info-block">
-      <div class="info-head" id="info-head">
-        <b>Status:</b><span class="status-txt">${statusTxt}</span>
-        <span class="chev">▾</span>
-      </div>
-      <div class="info-rows">
-        <div class="row"><b>Foto base</b><span>${fmtDate(s.createdAt)} • ${Math.round(s.baseDistance)} cm</span></div>
-        ${hasFollow ? `<div class="row"><b>Acompanhamento</b><span>${fmtDate(s.followAt)} • ${Math.round(s.followDistance)} cm</span></div>` : ""}
-        <div class="row"><b>Captura (câmera)</b><span>Brilho ${s.filters.brightness.toFixed(2)} • Contraste ${s.filters.contrast.toFixed(2)} • Saturação ${s.filters.saturate.toFixed(2)}</span></div>
-      </div>
-    </div>`;
-
-  // Depois de salvo/compartilhado (crédito confirmado), as fotos ficam travadas.
+  // Depois de gerar a comparação (crédito confirmado), as fotos ficam travadas.
   const locked = s.creditState === "confirmed";
 
   const labelHtml = `
@@ -710,7 +691,7 @@ async function openDetail(id) {
       <button class="btn primary" id="btn-share">🔀 Comparar</button>
     </div>` : "";
 
-  c.innerHTML = compareHtml + infoHtml + labelHtml + lockNote + baseCard + acCard + secondRow;
+  c.innerHTML = compareHtml + labelHtml + lockNote + baseCard + acCard + secondRow;
 
   // Ativa a tela ANTES de montar a comparação, para o palco já ter largura
   // (a cortina depende de clientWidth para dimensionar a foto de acompanhamento).
@@ -737,9 +718,6 @@ async function openDetail(id) {
     pickImage().then((file) => importBasePhoto(file, s)));
   if ($("#btn-share")) $("#btn-share").addEventListener("click", () => confirmThenSave(s));
 
-  // Card de dados recolhível (recolhido mostra só o Status).
-  $("#info-head").addEventListener("click", () => $("#info-block").classList.toggle("open"));
-
   // Card de rótulo: seta de expansão abre/fecha os campos de edição.
   $("#lbl-chev").addEventListener("click", () => $("#label-card").classList.toggle("open"));
 
@@ -754,17 +732,28 @@ async function openDetail(id) {
   if (hasFollow) $("#lbl-follow").addEventListener("input", (e) => onLabelInput("followLabel", e.target.value));
 }
 
-// Aviso antes de salvar: a comparação será concluída e as fotos travadas.
+// Clicar em "Comparar" TRAVA a comparação (as fotos não podem mais ser alteradas)
+// e abre o diálogo "Gerar comparação". Confirma o crédito reservado.
+async function lockAndGenerate(s) {
+  if (s.creditState === "reserved") {
+    s.creditState = "confirmed";
+    await DB.put(s);
+    await openDetail(s.id);          // re-renderiza já travado (sem cards de editar)
+  }
+  Share.open(_detailSession || s);
+}
+
+// Aviso antes de gerar: a comparação será concluída e as fotos travadas.
 // Mostra o popup só até o usuário marcar "Não avisar mais isso" (ff_no_save_warn)
 // e apenas quando a comparação ainda não foi concluída.
 function confirmThenSave(s) {
   const optedOut = localStorage.getItem("ff_no_save_warn") === "1";
-  if (optedOut || s.creditState === "confirmed") { Share.open(s); return; }
+  if (optedOut || s.creditState === "confirmed") { lockAndGenerate(s); return; }
   const dlg = $("#save-warn-dialog");
   $("#save-warn-check").checked = false;
   const proceed = () => {
     if ($("#save-warn-check").checked) localStorage.setItem("ff_no_save_warn", "1");
-    cleanup(); dlg.close(); Share.open(s);
+    cleanup(); dlg.close(); lockAndGenerate(s);
   };
   const cancel = () => { cleanup(); dlg.close(); };
   function cleanup() {

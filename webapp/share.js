@@ -73,7 +73,7 @@ function drawChip(ctx, text, x, y, align, family, fontPx) {
   const padX = Math.round(fs * 0.5), h = Math.round(fs * 1.5);
   const tw = Math.min(ctx.measureText(text).width, 320);
   const w = tw + padX * 2;
-  const bx = align === "right" ? x - w : x;
+  const bx = align === "right" ? x - w : (align === "center" ? x - w / 2 : x);
   ctx.fillStyle = "rgba(0,0,0,0.55)";
   ctx.fillRect(bx, y - h, w, h);
   ctx.fillStyle = "#ffffff";
@@ -173,8 +173,8 @@ async function generateVideo(s, kind) {
   c.width = W; c.height = H;
   const ctx = c.getContext("2d");
 
-  // ratio: 0 = so a base; 1 = so o acompanhamento.
-  const drawFrame = (ratio) => {
+  // ratio: 0 = so a base; 1 = so o acompanhamento. t = ms decorridos (p/ o rodape).
+  const drawFrame = (ratio, t) => {
     ctx.globalAlpha = 1;
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, W, H);
@@ -203,15 +203,17 @@ async function generateVideo(s, kind) {
     // Marca d'agua (nome/logo) desenhada em TODO frame (inclusive ratio 0), para
     // a logo/nome aparecerem desde o inicio. Antes do rotulo p/ a logo ficar atras.
     Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
-    // Rotulo (rodape) de cada foto, se ligado: base a esquerda, acomp. a direita.
+    // Rodape: alterna a cada segundo — base no 1o e 3o s; acompanhamento no 2o e 4o.
     if (s.showLabels) {
       const fs = Math.max(14, Math.round(H * 0.028 * prof.footerScale));
-      if (s.baseLabel) drawChip(ctx, s.baseLabel, 12, H - 12, "left", prof.footerFamily, fs);
-      if (s.followLabel) drawChip(ctx, s.followLabel, W - 12, H - 12, "right", prof.footerFamily, fs);
+      const sec = Math.min(3, Math.floor((t || 0) / 1000));
+      const showBase = (sec % 2 === 0);
+      const label = showBase ? s.baseLabel : s.followLabel;
+      if (label) drawChip(ctx, label, W / 2, H - 12, "center", prof.footerFamily, fs);
     }
   };
 
-  drawFrame(0);
+  drawFrame(0, 0);
   const stream = c.captureStream(30);
   const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
   const chunks = [];
@@ -244,7 +246,7 @@ async function generateVideo(s, kind) {
     const t0 = performance.now();
     const tick = () => {
       const t = performance.now() - t0;
-      drawFrame(ratioAt(Math.min(t, TOTAL)));
+      drawFrame(ratioAt(Math.min(t, TOTAL)), Math.min(t, TOTAL));
       if (t >= TOTAL) {
         if (rec.state !== "inactive") rec.stop();
       } else {

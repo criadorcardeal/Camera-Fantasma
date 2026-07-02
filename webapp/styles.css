@@ -59,6 +59,7 @@ html, body {
 }
 #cred-balance { font-weight: 700; color: var(--primary); }
 #cred-balance.cred-zero { color: #c0392b; }
+.cred-left { display: flex; align-items: center; gap: 10px; }
 .cred-actions { display: flex; align-items: center; gap: 8px; }
 .cred-buy {
   background: var(--primary); color: #fff; border: none;

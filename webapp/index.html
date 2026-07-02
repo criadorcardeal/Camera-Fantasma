@@ -16,16 +16,17 @@
   <!-- ============ TELA: INÍCIO ============ -->
   <section id="screen-home" class="screen active">
     <header class="topbar">
-      <span class="topbar-spacer"></span>
-      <h1>Fotos Fantasma</h1>
-      <span class="version-badge">v3.5.7</span>
+      <button id="cred-admin" class="icon-btn dark" title="Administração">⚙</button>
+      <h1>ComparaCam</h1>
+      <span class="version-badge">v3.5.8</span>
     </header>
     <div class="credits-bar">
-      <span id="cred-balance">🪙 0 créditos</span>
-      <span class="cred-actions">
+      <span class="cred-left">
+        <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Comprar</button>
+      </span>
+      <span class="cred-actions">
         <button id="cred-profile" class="cred-profile" title="Perfil">👤</button>
-        <button id="cred-admin" class="cred-admin" title="Administração">⚙</button>
       </span>
     </div>
     <div class="content" id="home-list"></div>
@@ -177,7 +178,7 @@
 
   <!-- ============ DIÁLOGO: SALVAR / COMPARTILHAR (v3.0) ============ -->
   <dialog id="share-dialog">
-    <h3>Salvar / Compartilhar</h3>
+    <h3>Gerar comparação</h3>
     <p class="share-hint">No iPhone: escolha <b>Salvar em Fotos</b> (galeria) ou
       <b>Salvar em Arquivos</b> (iCloud, Google Drive, OneDrive, Dropbox).</p>
     <div id="share-status" class="share-status"></div>
