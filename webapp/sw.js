@@ -1,11 +1,9 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* re-deploy v3.6.6 (2a espera; nova tentativa de publicacao). */
-/* v3.6.6: alinhamento automatico mais exato — refino fino por otimizacao
-   (hill-climb) das 4 variaveis (zoom/rotacao/2 translacoes) maximizando a
-   sobreposicao das silhuetas; rotacao limitada a +-90 (nunca inverte a perna);
-   resolucao de trabalho maior. */
-const CACHE = "fotos-fantasma-v35";
+/* v4.0 (marco estavel): ComparaCam completo — Montagem, gerar comparacao/videos,
+   perfil/marca d'agua, e alinhamento automatico do acompanhamento por visao
+   computacional (deteccao de pele + momentos + refino fino por sobreposicao). */
+const CACHE = "fotos-fantasma-v36";
 const ASSETS = [
   "./",
   "./index.html",
