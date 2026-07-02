@@ -287,9 +287,11 @@ html, body {
   border-radius: 8px; font-size: 0.9rem;
 }
 
-/* Rodapé de rótulo dentro do palco de comparação */
+/* Rodapé de rótulo dentro do palco de comparação.
+   z-index acima da marca d'água (.wm = 5) para o rótulo ficar SEMPRE por cima
+   da logo (a logo fica atrás do rodapé). */
 .cap {
-  position: absolute; bottom: 6px; z-index: 4; pointer-events: none;
+  position: absolute; bottom: 6px; z-index: 7; pointer-events: none;
   background: rgba(0,0,0,0.55); color: #fff; font-size: 0.72rem;
   padding: 3px 8px; border-radius: 10px; max-width: 46%;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -484,6 +486,9 @@ dialog menu button.primary { background: var(--primary); color: #fff; }
 /* Marca d'água (logo e/ou nome) sobreposta no palco de comparação.
    Cada elemento posicionado por left/top (inline), como no canvas. */
 .wm { position: absolute; z-index: 5; pointer-events: none; }
+/* A logo pode ser reposicionada arrastando direto no palco de comparação. */
+.wm-logo { pointer-events: auto; cursor: move; touch-action: none; }
+.wm-logo:hover { outline: 1.5px dashed rgba(255,255,255,0.7); outline-offset: 3px; }
 .wm-logo img { width: 100%; height: auto; display: block; }
 .wm-name span {
   color: #fff; font-weight: 700; white-space: nowrap;

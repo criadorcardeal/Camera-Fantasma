@@ -106,15 +106,16 @@ async function generateComparisonImage(s) {
   drawCover(ctx, baseImg, pad, y, cellW, cellH);
   drawCover(ctx, followImg, pad + cellW + gap, y, cellW, cellH);
 
+  // Marca d'agua (nome/logo) em cada foto, se ligada. Desenhada ANTES do rodape
+  // para a logo ficar atras do rotulo (rodape sempre legivel por cima).
+  Profile.drawWatermark(ctx, pad, y, cellW, cellH, prof, logoImg);
+  Profile.drawWatermark(ctx, pad + cellW + gap, y, cellW, cellH, prof, logoImg);
   // Rotulo (rodape) de cada foto, se ligado.
   if (s.showLabels) {
     const fh = Math.max(30, Math.round(cellH * 0.07 * prof.footerScale));
     if (s.baseLabel) drawFooterBar(ctx, s.baseLabel, pad, y + cellH, cellW, fh, prof.footerFamily);
     if (s.followLabel) drawFooterBar(ctx, s.followLabel, pad + cellW + gap, y + cellH, cellW, fh, prof.footerFamily);
   }
-  // Marca d'agua (nome/logo) em cada foto, se ligada.
-  Profile.drawWatermark(ctx, pad, y, cellW, cellH, prof, logoImg);
-  Profile.drawWatermark(ctx, pad + cellW + gap, y, cellW, cellH, prof, logoImg);
 
   return c.toDataURL("image/jpeg", 0.92);
 }
@@ -185,14 +186,14 @@ async function generateVideo(s, kind) {
         ctx.fillRect(clipW - 1, 0, 3, H);
       }
     }
+    // Marca d'agua (nome/logo), se ligada. Antes do rotulo p/ a logo ficar atras.
+    Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
     // Rotulo (rodape) de cada foto, se ligado: base a esquerda, acomp. a direita.
     if (s.showLabels) {
       const fs = Math.max(14, Math.round(H * 0.028 * prof.footerScale));
       if (s.baseLabel) drawChip(ctx, s.baseLabel, 12, H - 12, "left", prof.footerFamily, fs);
       if (s.followLabel) drawChip(ctx, s.followLabel, W - 12, H - 12, "right", prof.footerFamily, fs);
     }
-    // Marca d'agua (nome/logo), se ligada.
-    Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
   };
 
   drawFrame(0);
@@ -281,8 +282,9 @@ const Share = {
       c.width = W; c.height = H;
       const ctx = c.getContext("2d");
       ctx.drawImage(img, 0, 0);
-      if (wantFooter) drawFooterBar(ctx, footer, 0, H, W, Math.max(28, Math.round(H * 0.07 * prof.footerScale)), prof.footerFamily);
+      // Marca d'agua antes do rodape: a logo fica atras do rotulo.
       Profile.drawWatermark(ctx, 0, 0, W, H, prof, logoImg);
+      if (wantFooter) drawFooterBar(ctx, footer, 0, H, W, Math.max(28, Math.round(H * 0.07 * prof.footerScale)), prof.footerFamily);
       return c.toDataURL("image/jpeg", 0.92);
     };
     try {

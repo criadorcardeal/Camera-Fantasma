@@ -1,7 +1,8 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* re-deploy v3.5.4 (deploy do Pages falhou por timeout transitorio) */
-const CACHE = "fotos-fantasma-v21";
+/* v3.5.4 ajustes: transparencia da logo perceptivel no perfil, logo atras do
+   rodape, botao de perfil na Comparacao e logo reposicionavel na Comparacao. */
+const CACHE = "fotos-fantasma-v22";
 const ASSETS = [
   "./",
   "./index.html",

@@ -81,7 +81,24 @@ const Profile = {
     this._refreshLogoPrev();
     this._loadDragLogo();
     this._syncNameBox();
+    this._applyPreviewOpacity();
     $("#profile-dialog").showModal();
+  },
+
+  // Reflete a transparencia escolhida na previa da logo e do nome (so na imagem;
+  // as bordas/alcas do editor continuam nitidas). Atualiza ao vivo com o slider.
+  _applyPreviewOpacity() {
+    const transp = parseInt($("#prof-transp").value, 10) || 0;
+    const op = Math.max(0.05, 1 - transp / 100);
+    const li = $("#prof-logo-drag"); if (li) li.style.opacity = op;
+    const ns = $("#prof-name-drag"); if (ns) ns.style.opacity = op;
+  },
+
+  // Grava a posicao da logo (usada ao arrastar direto na tela de Comparacao).
+  setLogoPos(x, y) {
+    const p = this.get();
+    p.logoX = x; p.logoY = y;
+    this.set(p);
   },
 
   _refreshLogoPrev() {
@@ -250,10 +267,13 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   $("#cred-profile").addEventListener("click", () => Profile.open());
+  const profBtn = $("#detail-profile");
+  if (profBtn) profBtn.addEventListener("click", () => Profile.open());
   $("#prof-close").addEventListener("click", () => $("#profile-dialog").close());
   $("#prof-save").addEventListener("click", () => Profile.save());
   $("#prof-transp").addEventListener("input", (e) => {
     $("#prof-transp-val").textContent = e.target.value + "%";
+    Profile._applyPreviewOpacity();
   });
   $("#prof-name-size").addEventListener("input", (e) => {
     $("#prof-name-size-val").textContent = e.target.value + "%";
