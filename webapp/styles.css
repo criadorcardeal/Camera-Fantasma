@@ -49,6 +49,36 @@
   font-size: 1rem; cursor: pointer; padding: 4px 6px; flex-shrink: 0;
 }
 
+/* Tutorial ilustrado de instalação (iOS) */
+.ihelp-overlay {
+  position: fixed; inset: 0; z-index: 10000; padding: 20px;
+  background: rgba(6,20,32,0.55); display: flex; align-items: center; justify-content: center;
+}
+.ihelp-card {
+  position: relative; background: #fff; border-radius: 16px; padding: 20px 18px;
+  width: min(94vw, 360px); box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+.ihelp-card h3 { margin: 0 0 12px; color: var(--primary); font-size: 1.1rem; padding-right: 30px; }
+.ihelp-close {
+  position: absolute; top: 10px; right: 10px; width: 30px; height: 30px;
+  border: none; border-radius: 50%; background: #eef3f6; color: var(--muted);
+  font-size: 0.95rem; cursor: pointer;
+}
+.ihelp-step { display: flex; gap: 12px; align-items: flex-start; margin: 12px 0; }
+.ihelp-step .ihelp-num {
+  flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--primary); color: #fff; font-weight: 700; font-size: 0.85rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.ihelp-step p { margin: 2px 0; font-size: 0.92rem; color: #22333d; line-height: 1.45; }
+.ihelp-step svg { vertical-align: -4px; margin: 0 1px; }
+.ihelp-step:first-of-type svg { animation: ihpulse 1.3s ease-in-out infinite; }
+@keyframes ihpulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+.ihelp-ok {
+  width: 100%; margin-top: 14px; padding: 12px; border: none; border-radius: 12px;
+  background: var(--primary); color: #fff; font-weight: 600; font-size: 0.95rem; cursor: pointer;
+}
+
 html, body {
   margin: 0;
   height: 100%;

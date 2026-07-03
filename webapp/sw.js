@@ -1,8 +1,10 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
 /* v4.1: cara de app — novo icone ComparaCam, splash de abertura e convite para
-   instalar na tela de inicio (Android com prompt nativo; iOS com instrucao). */
-const CACHE = "fotos-fantasma-v37";
+   instalar na tela de inicio (Android com prompt nativo; iOS com instrucao).
+   v37->v38: no iOS o banner sempre aparece no Safari (X esconde so na sessao) e
+   abre um tutorial ilustrado passo a passo. */
+const CACHE = "fotos-fantasma-v38";
 const ASSETS = [
   "./",
   "./index.html",
