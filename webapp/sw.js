@@ -1,9 +1,8 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* v4.0 (marco estavel): ComparaCam completo — Montagem, gerar comparacao/videos,
-   perfil/marca d'agua, e alinhamento automatico do acompanhamento por visao
-   computacional (deteccao de pele + momentos + refino fino por sobreposicao). */
-const CACHE = "fotos-fantasma-v36";
+/* v4.1: cara de app — novo icone ComparaCam, splash de abertura e convite para
+   instalar na tela de inicio (Android com prompt nativo; iOS com instrucao). */
+const CACHE = "fotos-fantasma-v37";
 const ASSETS = [
   "./",
   "./index.html",
@@ -14,8 +13,12 @@ const ASSETS = [
   "./align.js",
   "./profile.js",
   "./share.js",
+  "./install.js",
   "./manifest.webmanifest",
   "./icon.svg",
+  "./icon-180.png",
+  "./icon-192.png",
+  "./icon-512.png",
 ];
 
 self.addEventListener("install", (e) => {

@@ -1,10 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#0e2a3b"/>
-  <!-- fantasma -->
-  <path d="M256 120c-66 0-120 54-120 120v150c0 10 12 16 20 9l28-22 30 24c6 5 14 5 20 0l30-24 30 24c6 5 14 5 20 0l30-24 28 22c8 7 20 1 20-9V240c0-66-54-120-120-120z" fill="#ffffff" opacity="0.92"/>
-  <circle cx="218" cy="236" r="16" fill="#0e2a3b"/>
-  <circle cx="294" cy="236" r="16" fill="#0e2a3b"/>
-  <!-- lente de camera -->
-  <circle cx="256" cy="300" r="40" fill="none" stroke="#1b5e8c" stroke-width="12"/>
-  <circle cx="256" cy="300" r="16" fill="#f2b705"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgC" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f7cb0"/>
+      <stop offset="1" stop-color="#0e3252"/>
+    </linearGradient>
+    <clipPath id="lensC"><circle cx="256" cy="256" r="150"/></clipPath>
+    <clipPath id="cBody">
+      <circle cx="256" cy="146" r="27"/>
+      <rect x="246" y="166" width="20" height="18"/>
+      <path d="M230 180 C196 184 160 208 152 250 C147 285 152 315 166 342 C176 360 186 376 200 388 C214 394 232 392 240 382 C246 362 250 344 255 330 C260 344 264 362 272 382 C280 392 300 394 312 386 C322 372 329 352 331 330 C332 305 322 275 300 252 C316 226 326 206 322 196 C316 187 300 181 286 179 C270 175 246 175 230 180 Z"/>
+    </clipPath>
+  </defs>
+  <rect x="0" y="0" width="512" height="512" fill="url(#bgC)"/>
+  <rect x="0" y="0" width="512" height="230" fill="#ffffff" opacity="0.06"/>
+  <circle cx="256" cy="256" r="171" fill="#0b2a45" opacity="0.45"/>
+  <circle cx="256" cy="256" r="168" fill="none" stroke="#eaf2f8" stroke-width="13"/>
+  <circle cx="256" cy="256" r="157" fill="none" stroke="#f2b705" stroke-width="3" opacity="0.85"/>
+  <g clip-path="url(#lensC)">
+    <rect x="106" y="106" width="300" height="300" fill="#a6b6c4"/>
+    <g clip-path="url(#cBody)">
+      <rect x="106" y="106" width="150" height="320" fill="#d0996f"/>
+      <rect x="256" y="106" width="156" height="320" fill="#f3d3b3"/>
+    </g>
+    <rect x="250" y="106" width="12" height="300" fill="#ffffff"/>
+  </g>
+  <circle cx="256" cy="256" r="33" fill="#ffffff"/>
+  <path d="M245 250 l-10 6 l10 6 z" fill="#1b5e8c"/>
+  <path d="M267 250 l10 6 l-10 6 z" fill="#1b5e8c"/>
+  <rect x="242" y="253" width="28" height="6" rx="3" fill="#1b5e8c"/>
 </svg>

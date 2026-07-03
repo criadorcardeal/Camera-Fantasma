@@ -13,6 +13,42 @@
 /* Garante que o atributo [hidden] sempre esconda (vence display:flex etc.) */
 [hidden] { display: none !important; }
 
+/* ---------- Splash de abertura (cara de app) ---------- */
+#app-splash {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  background: #0e2a3b; transition: opacity 0.4s ease;
+}
+#app-splash.hide { opacity: 0; pointer-events: none; }
+#app-splash .splash-ic {
+  width: 132px; height: 132px; border-radius: 30px;
+  box-shadow: 0 10px 34px rgba(0,0,0,0.4);
+}
+#app-splash .splash-name {
+  color: #eaf2f8; font-size: 1.45rem; font-weight: 700; letter-spacing: 0.5px;
+}
+
+/* ---------- Convite para instalar na tela de início ---------- */
+.install-banner {
+  position: fixed; left: 12px; right: 12px; z-index: 9998;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 12px;
+  background: #fff; border: 1px solid #dbe3e9; border-radius: 14px; padding: 10px 12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+}
+.install-banner .ib-ic { width: 46px; height: 46px; border-radius: 11px; flex-shrink: 0; }
+.install-banner .ib-txt { flex: 1; display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.install-banner .ib-txt b { font-size: 0.9rem; color: var(--primary); }
+.install-banner .ib-txt span { font-size: 0.78rem; color: var(--muted); }
+.install-banner .ib-btn {
+  background: var(--primary); color: #fff; border: none; border-radius: 10px;
+  padding: 9px 15px; font-weight: 600; font-size: 0.85rem; cursor: pointer; flex-shrink: 0;
+}
+.install-banner .ib-close {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 1rem; cursor: pointer; padding: 4px 6px; flex-shrink: 0;
+}
+
 html, body {
   margin: 0;
   height: 100%;

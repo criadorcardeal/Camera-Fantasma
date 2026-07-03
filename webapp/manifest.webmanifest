@@ -1,7 +1,7 @@
 {
-  "name": "Fotos Fantasma",
-  "short_name": "Fotos Fantasma",
-  "description": "Fotos comparativas para angiologia com Ghost Overlay.",
+  "name": "ComparaCam",
+  "short_name": "ComparaCam",
+  "description": "Câmera de acompanhamento com Ghost Overlay: compare fotos antes/depois com precisão.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -10,10 +10,22 @@
   "theme_color": "#0e2a3b",
   "icons": [
     {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
       "src": "./icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

@@ -4,15 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#0e2a3b" />
-  <title>Fotos Fantasma</title>
+  <title>ComparaCam</title>
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="./icon.svg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Fotos Fantasma" />
+  <meta name="apple-mobile-web-app-title" content="ComparaCam" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
+  <!-- ============ SPLASH (abertura com cara de app) ============ -->
+  <div id="app-splash" aria-hidden="true">
+    <img src="./icon.svg" alt="" class="splash-ic" />
+    <div class="splash-name">ComparaCam</div>
+  </div>
+
   <!-- ============ TELA: INÍCIO ============ -->
   <section id="screen-home" class="screen active">
     <header class="topbar">
@@ -25,7 +32,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Comprar</button>
       </span>
-      <span class="version-badge">v4.0</span>
+      <span class="version-badge">v4.1</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -341,5 +348,6 @@
   <script src="./align.js"></script>
   <script src="./profile.js"></script>
   <script src="./share.js"></script>
+  <script src="./install.js"></script>
 </body>
 </html>
