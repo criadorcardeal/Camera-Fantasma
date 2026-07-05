@@ -249,8 +249,22 @@ No app, logado como admin: **⚙ (topo esquerdo) → PIN** (padrão `1234`) →
 Os códigos aparecem numa caixa para copiar e enviar aos médicos. O vídeo colado fica
 associado a todos os vouchers daquele grupo.
 
-> O PIN local (`1234`) só abre a janela; a segurança real é o `is_admin()` no servidor.
-> Troque o PIN no próprio painel de Administração.
+### D) Upload de vídeo pelo app (bucket + policy) — v5.0
+Para o botão **"Escolher arquivo"** enviar o vídeo direto pelo painel:
+1. **Storage → New bucket:** nome exatamente **`videos`**, marque **Public bucket** → Create.
+2. **SQL Editor** → rode (permite leitura pública e upload só de admin):
+   ```sql
+   create policy "videos leitura publica" on storage.objects
+     for select using (bucket_id = 'videos');
+   create policy "videos upload admin" on storage.objects
+     for insert to authenticated
+     with check (bucket_id = 'videos' and public.is_admin());
+   ```
+No painel, o admin escolhe o arquivo → o app envia para `videos/` e associa a URL ao
+grupo automaticamente. (Colar uma URL manual continua funcionando como alternativa.)
+
+> A engrenagem ⚙ (v5.0) **só aparece para contas admin** (o app checa `is_admin()` no
+> login). Usuário comum não vê nem abre a Administração.
 
 ---
 

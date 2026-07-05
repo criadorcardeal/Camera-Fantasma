@@ -22,10 +22,9 @@ const Credits = {
     localStorage.setItem("ff_credits", String(Math.max(0, Math.round(n))));
     this.render();
   },
-  getPrice() { const v = parseFloat(localStorage.getItem("ff_price")); return isNaN(v) ? 50 : v; },
-  setPrice(v) { localStorage.setItem("ff_price", String(v)); },
-  getPin() { return localStorage.getItem("ff_adminpin") || "1234"; },
-  setPin(v) { localStorage.setItem("ff_adminpin", String(v)); },
+  // Preço UNITÁRIO (por crédito). Chave nova p/ não herdar o antigo preço de pacote.
+  getUnitPrice() { const v = parseFloat(localStorage.getItem("ff_unit_price")); return isNaN(v) ? 5 : v; },
+  setUnitPrice(v) { localStorage.setItem("ff_unit_price", String(v)); },
   fmtPrice(v) { return "R$ " + Number(v).toFixed(2).replace(".", ","); },
 
   canStart() { return this.getBalance() >= 1; },
@@ -45,8 +44,9 @@ const Credits = {
     const msg = document.getElementById("buy-msg");
     msg.textContent = message || "";
     msg.hidden = !message;
+    const unit = this.getUnitPrice();
     document.getElementById("buy-price").textContent =
-      "Pacote de " + this.PACK + " créditos — " + this.fmtPrice(this.getPrice());
+      "Crédito: " + this.fmtPrice(unit) + " · Pacote de " + this.PACK + ": " + this.fmtPrice(unit * this.PACK);
     document.getElementById("buy-dialog").showModal();
   },
 };
@@ -64,23 +64,16 @@ window.addEventListener("DOMContentLoaded", () => {
       "O pagamento via Mercado Pago entra na próxima fase.");
   });
 
-  // Administracao (mudar preco / PIN). Acesso pelo botao de engrenagem + PIN.
+  // Administracao. A engrenagem so aparece para admins (account.js checa is_admin()),
+  // e a criacao de vouchers e validada no servidor -> nao precisa mais de PIN local.
   const adminDlg = document.getElementById("admin-dialog");
   document.getElementById("cred-admin").addEventListener("click", () => {
-    const pin = prompt("PIN do administrador:");
-    if (pin === null) return;
-    if (pin !== Credits.getPin()) { alert("PIN incorreto."); return; }
-    document.getElementById("admin-price").value = Credits.getPrice().toFixed(2);
-    document.getElementById("admin-pin").value = "";
+    document.getElementById("admin-price").value = Credits.getUnitPrice().toFixed(2);
     adminDlg.showModal();
   });
   document.getElementById("admin-close").addEventListener("click", () => adminDlg.close());
   document.getElementById("admin-save").addEventListener("click", () => {
     const p = parseFloat(String(document.getElementById("admin-price").value).replace(",", "."));
-    if (!isNaN(p) && p >= 0) Credits.setPrice(p);
-    const newpin = document.getElementById("admin-pin").value.trim();
-    if (newpin) Credits.setPin(newpin);
-    adminDlg.close();
-    alert("Configurações salvas.");
+    if (!isNaN(p) && p >= 0) { Credits.setUnitPrice(p); alert("Preço salvo."); }
   });
 });

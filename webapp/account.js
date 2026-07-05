@@ -46,9 +46,24 @@ const Account = {
       const em = document.getElementById("prof-acc-email");
       if (em) em.textContent = session.user.email;
       this.loadBalance();
+      this.checkAdmin();
     } else {
       this.resetGate();                             // deslogado => volta ao passo do e-mail
+      const gear = document.getElementById("cred-admin");
+      if (gear) gear.hidden = true;
     }
+  },
+
+  /* A engrenagem de Administração só aparece para contas na tabela admins. */
+  async checkAdmin() {
+    const gear = document.getElementById("cred-admin");
+    if (!gear) return;
+    gear.hidden = true;
+    if (!this.sb || !this.session) return;
+    try {
+      const { data } = await this.sb.rpc("is_admin");
+      gear.hidden = !data;
+    } catch (_) { gear.hidden = true; }
   },
 
   /* Volta o gate ao passo 1 (pedir e-mail) — usado ao deslogar/trocar perfil. */
@@ -199,16 +214,39 @@ const Account = {
   /* ---- Admin: criar um grupo (lote) de vouchers + gerar os códigos ----
      Seguro: o RPC admin_create_batch só cria se auth.uid() estiver na tabela
      admins (a chave pública não permite ninguém "cunhar" vouchers). ---- */
+  // Envia o arquivo de vídeo para o bucket público "videos" e devolve a URL pública.
+  async uploadVideo(file, msg) {
+    const ext = (file.name.split(".").pop() || "mp4").toLowerCase();
+    const path = "ad-" + Date.now() + "." + ext;
+    if (msg) msg.textContent = "Enviando vídeo…";
+    const { error } = await this.sb.storage.from("videos")
+      .upload(path, file, { contentType: file.type || "video/mp4", upsert: false });
+    if (error) throw error;
+    const { data } = this.sb.storage.from("videos").getPublicUrl(path);
+    return data.publicUrl;
+  },
+
   async createBatch() {
     const msg = document.getElementById("vb-msg");
     const credits = parseInt(document.getElementById("vb-credits").value, 10);
     const qty = parseInt(document.getElementById("vb-qty").value, 10);
-    const video = document.getElementById("vb-video").value.trim();
+    let video = document.getElementById("vb-video").value.trim();
     const note = document.getElementById("vb-note").value.trim();
+    const fileInput = document.getElementById("vb-video-file");
+    const file = fileInput && fileInput.files && fileInput.files[0];
     if (!(credits >= 1)) { msg.textContent = "Créditos por voucher inválido."; return; }
     if (!(qty >= 1 && qty <= 500)) { msg.textContent = "Quantidade deve ser de 1 a 500."; return; }
     if (!this.sb) { msg.textContent = "Sem internet."; return; }
     if (!this.session) { msg.textContent = "Entre na sua conta de administrador primeiro."; return; }
+    // Se escolheu um arquivo, envia para o Storage e usa a URL resultante.
+    if (file) {
+      try { video = await this.uploadVideo(file, msg); }
+      catch (e) {
+        msg.textContent = "Falha ao enviar o vídeo: " + this._err(e) +
+          " (confira se o bucket 'videos' existe, é público e tem a policy de upload de admin).";
+        return;
+      }
+    }
     msg.textContent = "Gerando…";
     const { data, error } = await this.sb.rpc("admin_create_batch", {
       p_credits_each: credits, p_qty: qty, p_video_url: video, p_note: note || null,

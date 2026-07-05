@@ -24,7 +24,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v4.9</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v5.0</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -51,7 +51,7 @@
   <!-- ============ TELA: INÍCIO ============ -->
   <section id="screen-home" class="screen active">
     <header class="topbar">
-      <button id="cred-admin" class="icon-btn dark" title="Administração">⚙</button>
+      <button id="cred-admin" class="icon-btn dark" title="Administração" hidden>⚙</button>
       <h1>ComparaCam</h1>
       <button id="cred-profile" class="cred-profile" title="Perfil">👤</button>
     </header>
@@ -60,7 +60,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v4.9</span>
+      <span class="version-badge">v5.0</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -207,15 +207,12 @@
   <!-- ============ DIÁLOGO: ADMINISTRAÇÃO (v3.3) ============ -->
   <dialog id="admin-dialog">
     <h3>Administração</h3>
-    <label>Preço do pacote de 10 créditos (R$)
+    <label>Preço por crédito (R$)
       <input type="text" id="admin-price" inputmode="decimal" />
     </label>
-    <label>Novo PIN do admin (opcional)
-      <input type="text" id="admin-pin" inputmode="numeric" autocomplete="off" />
-    </label>
     <menu>
-      <button id="admin-close">Cancelar</button>
-      <button id="admin-save" class="primary">Salvar</button>
+      <button id="admin-close">Fechar</button>
+      <button id="admin-save" class="primary">Salvar preço</button>
     </menu>
 
     <hr class="admin-sep" />
@@ -228,7 +225,10 @@
         <input type="number" id="vb-qty" inputmode="numeric" min="1" max="500" value="10" />
       </label>
     </div>
-    <label>URL do vídeo (opcional)
+    <label>Vídeo do patrocinador (opcional)
+      <input type="file" id="vb-video-file" accept="video/*" />
+    </label>
+    <label>ou cole a URL de um vídeo já enviado
       <input type="text" id="vb-video" autocomplete="off" placeholder="https://…/video.mp4" />
     </label>
     <label>Observação (opcional)
