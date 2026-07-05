@@ -131,6 +131,66 @@ sem precisar de nada "cripto".
 
 ---
 
+## Parte 6 — Vídeo do patrocinador por grupo de vouchers (v4.8)
+
+Cada **grupo de vouchers** (`voucher_batches`) pode ter um vídeo do patrocinador que
+toca (obrigatório) logo após o resgate. Rode este SQL uma vez em **SQL Editor**:
+
+```sql
+-- 1) Campo do vídeo no grupo de vouchers
+alter table public.voucher_batches add column if not exists video_url text;
+
+-- 2) redeem_voucher passa a devolver {credits, video_url} (jsonb)
+drop function if exists public.redeem_voucher(text);
+create or replace function public.redeem_voucher(p_code text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_credits int; v_batch uuid; v_video text; v_uid uuid := auth.uid();
+begin
+  if v_uid is null then raise exception 'nao autenticado'; end if;
+  update public.vouchers set status='redeemed', redeemed_by=v_uid, redeemed_at=now()
+   where code=p_code and status='active' and (expires_at is null or expires_at>now())
+  returning credits, batch_id into v_credits, v_batch;
+  if v_credits is null then raise exception 'voucher invalido ou ja usado'; end if;
+  insert into public.wallets(user_id,balance) values (v_uid,v_credits)
+    on conflict (user_id) do update set balance=public.wallets.balance+excluded.balance, updated_at=now();
+  insert into public.credit_transactions(user_id,delta,reason,ref) values (v_uid,v_credits,'voucher',p_code);
+  select video_url into v_video from public.voucher_batches where id = v_batch;
+  return jsonb_build_object('credits', v_credits, 'video_url', v_video);
+end $$;
+```
+
+### Como subir o vídeo e ligá-lo a um grupo de vouchers (para testar)
+1. **Storage → Create bucket:** nome `videos`, marque **Public bucket**. Create.
+2. Abra o bucket `videos` → **Upload file** → escolha o `.mp4` (ideal: retrato,
+   5–30 s, H.264/AAC, alguns MB).
+3. No arquivo enviado → **Get URL** (URL pública). Fica algo como
+   `https://<ref>.supabase.co/storage/v1/object/public/videos/anuncio.mp4`.
+4. **Criar um grupo de vouchers com esse vídeo** (SQL Editor):
+   ```sql
+   -- (opcional) um parceiro
+   insert into public.partners(name) values ('Parceiro Teste')
+     returning id;   -- copie o id se quiser vincular
+
+   -- grupo (lote) de vouchers com o vídeo
+   insert into public.voucher_batches(credits_each, note, video_url)
+   values (10, 'Lote teste com video',
+           'https://<ref>.supabase.co/storage/v1/object/public/videos/anuncio.mp4')
+   returning id;     -- copie o id do lote
+
+   -- gerar alguns vouchers nesse lote (troque <BATCH_ID>)
+   insert into public.vouchers(code, batch_id, credits) values
+     ('TESTE-VIDEO-1', '<BATCH_ID>', 10),
+     ('TESTE-VIDEO-2', '<BATCH_ID>', 10);
+   ```
+5. No app: **Adquirir créditos → Resgatar** com `TESTE-VIDEO-1`. Após confirmar, o
+   **vídeo do lote** toca em tela cheia; "Rever"/"Sair" habilitam ao final.
+
+> Para trocar o vídeo de um grupo: `update public.voucher_batches set video_url='<nova URL>' where id='<BATCH_ID>';`
+> Se um lote não tiver `video_url`, o app usa o padrão global (`REWARD_VIDEO_URL`
+> em `account.js`) ou o marcador temporizado de 8 s.
+
+---
+
 ## Pendências fora do código (responsabilidade do dono do produto)
 - **CNPJ/MEI** e **conta Mercado Pago empresarial** (para receber e emitir nota).
 - **Termos de Uso + Política de Privacidade** e conformidade **LGPD**.

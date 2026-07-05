@@ -182,14 +182,18 @@ const Account = {
     msg.textContent = "Resgatando…";
     const { data, error } = await this.sb.rpc("redeem_voucher", { p_code: code });
     if (error) {
-      msg.textContent = /invalido|ja usado|invalid|used/i.test(error.message)
-        ? "Voucher inválido ou já usado." : "Erro: " + error.message;
+      msg.textContent = /invalido|ja usado|invalid|used/i.test(this._err(error))
+        ? "Voucher inválido ou já usado." : "Erro: " + this._err(error);
       return;
     }
-    msg.textContent = "✔ +" + data + " créditos adicionados!";
+    // redeem_voucher devolve {credits, video_url} (jsonb). Compat: aceita também um
+    // número puro, caso a função antiga (retornando int) ainda esteja instalada.
+    const credits = (data && typeof data === "object") ? data.credits : data;
+    const videoUrl = (data && typeof data === "object") ? data.video_url : null;
+    msg.textContent = "✔ +" + credits + " créditos adicionados!";
     document.getElementById("buy-voucher").value = "";
     this.loadBalance();
-    Reward.open();                                   // vídeo obrigatório após o resgate
+    Reward.open(videoUrl);                           // vídeo do grupo do voucher (obrigatório)
   },
 
   /* ---- "Sair": desabilita o app neste aparelho (exige novo login) ---- */
@@ -215,19 +219,22 @@ const Account = {
 /* ========================= Vídeo obrigatório ========================= */
 const Reward = {
   timer: null,
+  url: "",
 
-  open() {
+  // videoUrl vem do grupo (voucher_batch) resgatado; se vazio, usa o padrão global.
+  open(videoUrl) {
     const dlg = document.getElementById("reward-dialog");
     if (!dlg) return;
-    const replay = document.getElementById("reward-replay");
-    const exit = document.getElementById("reward-exit");
-    replay.disabled = true;
-    exit.disabled = true;
+    this.url = videoUrl || REWARD_VIDEO_URL || "";
+    document.getElementById("reward-replay").disabled = true;
+    document.getElementById("reward-exit").disabled = true;
     if (!dlg.open) dlg.showModal();
     this.play();
   },
 
   finish() {
+    const fill = document.getElementById("rp-fill");
+    if (fill) fill.style.width = "100%";
     document.getElementById("reward-replay").disabled = false;
     document.getElementById("reward-exit").disabled = false;
   },
@@ -235,15 +242,20 @@ const Reward = {
   play() {
     const video = document.getElementById("reward-video");
     const ph = document.getElementById("reward-placeholder");
+    const fill = document.getElementById("rp-fill");
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
     document.getElementById("reward-replay").disabled = true;
     document.getElementById("reward-exit").disabled = true;
+    if (fill) fill.style.width = "0%";
 
-    if (REWARD_VIDEO_URL) {
+    if (this.url) {
       ph.hidden = true;
       video.hidden = false;
-      video.src = REWARD_VIDEO_URL;
+      video.src = this.url;
       video.currentTime = 0;
+      video.ontimeupdate = () => {
+        if (fill && video.duration) fill.style.width = (video.currentTime / video.duration * 100).toFixed(1) + "%";
+      };
       video.onended = () => this.finish();
       video.play().catch(() => {
         // Autoplay bloqueado: mostra controle para o usuário iniciar.
@@ -253,13 +265,11 @@ const Reward = {
       // Marcador temporizado (sem vídeo do parceiro ainda).
       video.hidden = true;
       ph.hidden = false;
-      const fill = document.getElementById("rp-fill");
       const total = REWARD_PLACEHOLDER_SECS * 1000;
       const start = Date.now();
-      fill.style.width = "0%";
       this.timer = setInterval(() => {
         const p = Math.min(1, (Date.now() - start) / total);
-        fill.style.width = (p * 100).toFixed(1) + "%";
+        if (fill) fill.style.width = (p * 100).toFixed(1) + "%";
         if (p >= 1) { clearInterval(this.timer); this.timer = null; this.finish(); }
       }, 100);
     }
