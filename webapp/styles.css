@@ -138,6 +138,23 @@ html, body {
 }
 /* Badge da versão, agora na barra de créditos (fundo claro). */
 .credits-bar .version-badge { width: auto; white-space: nowrap; color: var(--muted); }
+/* Botão de conta (login / fase paga) */
+.cc-account {
+  background: #fff; border: 1.5px solid var(--primary); color: var(--primary);
+  border-radius: 16px; padding: 5px 12px; font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cc-account.logged { background: var(--primary); color: #fff; }
+
+/* Diálogo de Conta */
+.acc-hint { font-size: 0.85rem; color: var(--muted); margin: 0 0 10px; line-height: 1.5; }
+.acc-user-line { font-size: 0.9rem; margin: 0 0 6px; }
+.acc-balance {
+  background: #eef3f6; border-radius: 10px; padding: 10px 12px; margin: 6px 0 12px;
+  font-size: 0.95rem; color: var(--primary);
+}
+.acc-balance b { font-size: 1.2rem; }
+.acc-msg { font-size: 0.82rem; color: var(--primary); min-height: 16px; margin: 8px 0 0; }
 .cred-actions { display: flex; align-items: center; gap: 8px; }
 .cred-buy {
   background: var(--primary); color: #fff; border: none;

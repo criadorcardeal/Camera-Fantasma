@@ -1,10 +1,9 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* v4.1: cara de app — novo icone ComparaCam, splash de abertura e convite para
-   instalar na tela de inicio (Android com prompt nativo; iOS com instrucao).
-   v37->v38: no iOS o banner sempre aparece no Safari (X esconde so na sessao) e
-   abre um tutorial ilustrado passo a passo. */
-const CACHE = "fotos-fantasma-v38";
+/* v4.2 (inicio da fase paga): Conta com login por link magico (Supabase),
+   saldo de creditos no servidor e resgate de voucher (aditivo; o gating de
+   credito segue local por enquanto). Bibliotecas externas nao entram no cache. */
+const CACHE = "fotos-fantasma-v39";
 const ASSETS = [
   "./",
   "./index.html",
@@ -15,6 +14,7 @@ const ASSETS = [
   "./align.js",
   "./profile.js",
   "./share.js",
+  "./account.js",
   "./install.js",
   "./manifest.webmanifest",
   "./icon.svg",

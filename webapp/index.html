@@ -32,7 +32,8 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Comprar</button>
       </span>
-      <span class="version-badge">v4.1</span>
+      <button id="cc-account" class="cc-account" type="button">Entrar</button>
+      <span class="version-badge">v4.2</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -331,6 +332,33 @@
     </menu>
   </dialog>
 
+  <!-- ============ DIÁLOGO: CONTA (fase paga, v4.2) ============ -->
+  <dialog id="account-dialog">
+    <button id="acc-x" class="dialog-x" type="button" aria-label="Fechar">✕</button>
+    <h3>Conta</h3>
+
+    <div id="acc-out">
+      <p class="acc-hint">Entre para guardar seus créditos na sua conta e usá-los em
+        qualquer aparelho. Sem senha — você recebe um link de acesso por e-mail.</p>
+      <label>E-mail
+        <input type="email" id="acc-email" inputmode="email" autocomplete="email" placeholder="voce@exemplo.com" />
+      </label>
+      <button id="acc-send" class="btn primary" style="margin-top:10px">Enviar link de acesso</button>
+      <p id="acc-msg" class="acc-msg"></p>
+    </div>
+
+    <div id="acc-in" hidden>
+      <p class="acc-user-line">Conectado como <b id="acc-user"></b></p>
+      <div class="acc-balance">Saldo: <b id="acc-bal">…</b> créditos</div>
+      <label>Resgatar voucher
+        <input type="text" id="acc-voucher" autocomplete="off" placeholder="Código do voucher" />
+      </label>
+      <button id="acc-redeem" class="btn primary" style="margin-top:10px">Resgatar</button>
+      <p id="acc-redeem-msg" class="acc-msg"></p>
+      <button id="acc-logout" class="btn outline" style="margin-top:14px">Sair</button>
+    </div>
+  </dialog>
+
   <!-- ============ DIÁLOGO: NOVA COMPARAÇÃO ============ -->
   <dialog id="new-dialog">
     <h3>Nova comparação</h3>
@@ -348,6 +376,8 @@
   <script src="./align.js"></script>
   <script src="./profile.js"></script>
   <script src="./share.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./account.js"></script>
   <script src="./install.js"></script>
 </body>
 </html>
