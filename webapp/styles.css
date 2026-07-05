@@ -150,6 +150,7 @@ html, body {
 }
 #login-gate .lg-ic { width: 96px; height: 96px; border-radius: 22px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
 #login-gate .lg-name { font-size: 1.35rem; font-weight: 700; color: var(--primary); margin: 12px 0 4px; }
+#login-gate .lg-ver { font-size: 0.8rem; font-weight: 600; color: var(--muted); vertical-align: middle; }
 #login-gate .lg-sub { font-size: 0.88rem; color: var(--muted); line-height: 1.5; margin: 0 0 16px; }
 #login-gate .lg-label { display: block; text-align: left; font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
 #login-gate input {
