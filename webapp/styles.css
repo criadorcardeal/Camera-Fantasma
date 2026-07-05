@@ -252,6 +252,23 @@ html, body {
 .terms-body li { margin-bottom: 5px; }
 .terms-note { font-size: 0.8rem; color: var(--muted); font-style: italic; }
 
+/* ---------- Setas flutuantes de rolagem ---------- */
+.scroll-hint {
+  position: fixed; z-index: 99999; transform: translateX(-50%);
+  width: 36px; height: 26px; border-radius: 13px; border: none;
+  background: rgba(27,94,140,0.92); color: #fff; font-size: 12px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3); animation: schint 1.5s ease-in-out infinite;
+}
+.scroll-hint[hidden] { display: none; }
+@keyframes schint { 0%,100% { opacity: 0.45; } 50% { opacity: 1; } }
+
+/* ---------- Nome do arquivo do zip ---------- */
+.zipname-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.zipname-row input { flex: 1; min-width: 0; padding: 9px 10px; border: 1px solid #ccd4d9; border-radius: 8px; font-size: 0.95rem; }
+.zipname-ext { color: var(--muted); font-family: monospace; }
+.zipname-note { font-size: 0.82rem; color: var(--muted); line-height: 1.45; margin: 10px 0 0; }
+
 /* ---------- Admin: preço + moeda em linha ---------- */
 .admin-price-row { display: flex; gap: 8px; margin-top: 4px; align-items: stretch; }
 .admin-price-row select { flex: 0 0 auto; border: 1px solid #ccd4d9; border-radius: 8px; padding: 0 6px; font-size: 0.85rem; }

@@ -687,6 +687,7 @@ async function openDetail(id) {
       <button class="btn outline" id="btn-adjust">🎚 Ajustar imagens</button>
       <button class="btn outline" id="btn-reposition">↔️ Reposicionar imagens</button>
     </div>
+    ${locked ? "" : `<button class="btn outline" id="btn-swap" style="margin-top:8px">🔁 Trocar base ↔ acompanhamento</button>`}
     <button class="btn primary" id="btn-share">🔀 Comparar</button>` : "";
 
   c.innerHTML = compareHtml + labelHtml + lockNote + baseCard + acCard + secondRow;
@@ -717,6 +718,7 @@ async function openDetail(id) {
   if ($("#btn-base-import")) $("#btn-base-import").addEventListener("click", () =>
     pickImage().then((file) => importBasePhoto(file, s)));
   if ($("#btn-share")) $("#btn-share").addEventListener("click", () => confirmThenSave(s));
+  if ($("#btn-swap")) $("#btn-swap").addEventListener("click", () => swapPhotos(s));
 
   // Card de rótulo: seta de expansão abre/fecha os campos de edição.
   $("#lbl-chev").addEventListener("click", () => $("#label-card").classList.toggle("open"));
@@ -730,6 +732,18 @@ async function openDetail(id) {
   const onLabelInput = async (key, val) => { s[key] = val.trim(); await DB.put(s); refreshCompareCaptions(); };
   $("#lbl-base").addEventListener("input", (e) => onLabelInput("baseLabel", e.target.value));
   if (hasFollow) $("#lbl-follow").addEventListener("input", (e) => onLabelInput("followLabel", e.target.value));
+}
+
+// Troca base ↔ acompanhamento (só as fotos/ajustes; rótulos e datas do rodapé ficam).
+async function swapPhotos(s) {
+  if (!s || !s.followImage) return;
+  const swap = (a, b) => { const t = s[a]; s[a] = s[b]; s[b] = t; };
+  swap("baseImage", "followImage");
+  swap("baseImageView", "followImageView");
+  swap("baseAdj", "followAdj");
+  swap("baseTarget", "followTarget");
+  await DB.put(s);
+  await openDetail(s.id);
 }
 
 // Clicar em "Comparar" TRAVA a comparação (as fotos não podem mais ser alteradas)
@@ -1028,9 +1042,59 @@ function wireEvents() {
   });
 }
 
+/* ---------- Setas flutuantes indicando rolagem em janelas/diálogos ---------- */
+const ScrollHint = {
+  up: null, down: null, host: null,
+  init() {
+    this.up = this._make("▲"); this.down = this._make("▼");
+    document.body.append(this.up, this.down);
+    this.up.addEventListener("click", () => this._page(-1));
+    this.down.addEventListener("click", () => this._page(1));
+    document.addEventListener("scroll", () => this.update(), true); // captura rolagem interna
+    window.addEventListener("resize", () => this.update());
+    // Só observamos "open" (diálogos). NÃO observar "hidden": as próprias setas usam
+    // hidden e observá-lo criaria um laço infinito. A troca do gate é pega pelo intervalo.
+    new MutationObserver(() => this.update()).observe(document.body,
+      { attributes: true, attributeFilter: ["open"], subtree: true });
+    setInterval(() => this.update(), 900); // pega conteúdo carregado depois (listas etc.)
+  },
+  _make(sym) {
+    const b = document.createElement("button");
+    b.className = "scroll-hint"; b.type = "button"; b.textContent = sym;
+    b.hidden = true; b.setAttribute("aria-hidden", "true"); b.tabIndex = -1;
+    return b;
+  },
+  _scroller() {
+    const dlgs = document.querySelectorAll("dialog[open]");
+    if (dlgs.length) return dlgs[dlgs.length - 1];
+    const gate = document.getElementById("login-gate");
+    if (gate && !gate.hidden) return gate;
+    return null;
+  },
+  update() {
+    const s = this._scroller();
+    if (!s) { this.up.hidden = true; this.down.hidden = true; return; }
+    // Diálogos modais ficam na "top layer": as setas precisam ser filhas do diálogo
+    // para aparecerem por cima; para o gate (não-modal) ficam no body.
+    const host = (s.tagName === "DIALOG") ? s : document.body;
+    if (this.host !== host) { host.append(this.up, this.down); this.host = host; }
+    const canScroll = s.scrollHeight - s.clientHeight > 8;
+    if (!canScroll) { this.up.hidden = true; this.down.hidden = true; return; }
+    const r = s.getBoundingClientRect();
+    const x = Math.round(r.left + r.width / 2);
+    const atTop = s.scrollTop <= 4;
+    const atBottom = s.scrollTop + s.clientHeight >= s.scrollHeight - 4;
+    this._place(this.up, x, Math.round(r.top + 8), !atTop);
+    this._place(this.down, x, Math.round(r.bottom - 36), !atBottom);
+  },
+  _place(el, x, y, show) { el.style.left = x + "px"; el.style.top = y + "px"; el.hidden = !show; },
+  _page(dir) { const s = this._scroller(); if (s) s.scrollBy({ top: dir * s.clientHeight * 0.8, behavior: "smooth" }); },
+};
+
 /* ---------------- Início ---------------- */
 window.addEventListener("DOMContentLoaded", async () => {
   wireEvents();
+  ScrollHint.init();
   if (typeof Profile !== "undefined" && Profile.updateAvatar) Profile.updateAvatar();
   await renderHome();
   if ("serviceWorker" in navigator) {

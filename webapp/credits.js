@@ -18,7 +18,13 @@ const Credits = {
   PACK: 10,
 
   // Preço UNITÁRIO (por crédito) + moeda.
-  CURRENCIES: { BRL: { sym: "R$", loc: "pt-BR" }, USD: { sym: "US$", loc: "en-US" }, EUR: { sym: "€", loc: "de-DE" }, GBP: { sym: "£", loc: "en-GB" } },
+  CURRENCIES: {
+    BRL: { sym: "R$", loc: "pt-BR" }, USD: { sym: "US$", loc: "en-US" },
+    EUR: { sym: "€", loc: "de-DE" }, GBP: { sym: "£", loc: "en-GB" },
+    SGD: { sym: "S$", loc: "en-SG" }, JPY: { sym: "¥", loc: "ja-JP" },
+    CAD: { sym: "C$", loc: "en-CA" }, AUD: { sym: "A$", loc: "en-AU" },
+    CHF: { sym: "CHF", loc: "de-CH" },
+  },
   getUnitPrice() { const v = parseFloat(localStorage.getItem("ff_unit_price")); return isNaN(v) ? 5 : v; },
   setUnitPrice(v) { localStorage.setItem("ff_unit_price", String(v)); },
   getCurrency() { return localStorage.getItem("ff_currency") || "BRL"; },
@@ -73,17 +79,34 @@ window.addEventListener("DOMContentLoaded", () => {
   // Administracao. A engrenagem so aparece para admins (account.js checa is_admin()),
   // e a criacao de vouchers e validada no servidor -> nao precisa de PIN local.
   const adminDlg = document.getElementById("admin-dialog");
+  const saveBtn = document.getElementById("admin-save");
+  const genBtn = document.getElementById("vb-create");
+  const refreshSaveBtn = () => { saveBtn.disabled = !adminDirty().priceDirty; };
   document.getElementById("cred-admin").addEventListener("click", () => {
     document.getElementById("admin-price").value = Credits.getUnitPrice().toFixed(2);
     document.getElementById("admin-currency").value = Credits.getCurrency();
+    saveBtn.disabled = true;                 // habilita só ao mudar preço/moeda
+    genBtn.disabled = true;                   // habilita só ao mexer nos campos do grupo
     adminDlg.showModal();
     if (typeof Account !== "undefined" && Account.listBatches) Account.listBatches();
+  });
+  // Salvar habilita ao mudar preço/moeda.
+  ["admin-price", "admin-currency"].forEach((id) => {
+    const el = document.getElementById(id);
+    el.addEventListener("input", refreshSaveBtn);
+    el.addEventListener("change", refreshSaveBtn);
+  });
+  // Gerar habilita ao mexer em qualquer campo do grupo.
+  ["vb-name", "vb-credits", "vb-qty", "vb-video", "vb-video-file", "vb-note", "vb-expires"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) { el.addEventListener("input", () => { genBtn.disabled = false; }); el.addEventListener("change", () => { genBtn.disabled = false; }); }
   });
   document.getElementById("admin-save").addEventListener("click", () => {
     const p = parseFloat(String(document.getElementById("admin-price").value).replace(",", "."));
     if (!isNaN(p) && p >= 0) Credits.setUnitPrice(p);
     Credits.setCurrency(document.getElementById("admin-currency").value);
     document.getElementById("admin-price").value = Credits.getUnitPrice().toFixed(2);
+    saveBtn.disabled = true;
     alert("Preço salvo.");
   });
 

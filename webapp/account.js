@@ -308,6 +308,7 @@ const Account = {
     // Limpa os campos do grupo (deixa de contar como "grupo iniciado não gerado").
     ["vb-name", "vb-video", "vb-note", "vb-expires"].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ""; });
     const fileEl = document.getElementById("vb-video-file"); if (fileEl) fileEl.value = "";
+    const genBtn = document.getElementById("vb-create"); if (genBtn) genBtn.disabled = true;
     this.listBatches();                              // atualiza a lista de grupos
   },
 
@@ -441,12 +442,24 @@ const Account = {
     return new Promise((res) => canvas.toBlob(res, "image/png"));
   },
 
-  // Baixa um .zip com um PNG por voucher AINDA NÃO resgatado do grupo.
-  async downloadQRZip() {
+  // Baixa um .zip (nome escolhido) com 1 PNG por voucher AINDA NÃO resgatado.
+  async downloadQRZip(filename) {
     const batch = this._qrBatch;
-    const msg = document.getElementById("qr-dlmsg");
+    const msg = document.getElementById("zipname-msg") || document.getElementById("qr-dlmsg");
     if (!batch) return;
     if (typeof JSZip === "undefined") { msg.textContent = "Compactador não carregou (precisa de internet)."; return; }
+    const name = ((filename || "vouchers-qr").trim().replace(/[^\w.-]+/g, "_") || "vouchers-qr") + ".zip";
+    // No computador (File System Access API) o usuário escolhe a PASTA já no início
+    // do gesto (antes das operações assíncronas, para manter a ativação do clique).
+    let handle = null;
+    if (window.showSaveFilePicker) {
+      try {
+        handle = await window.showSaveFilePicker({
+          suggestedName: name,
+          types: [{ description: "Arquivo ZIP", accept: { "application/zip": [".zip"] } }],
+        });
+      } catch (e) { if (e && e.name === "AbortError") return; }
+    }
     msg.textContent = "Gerando PNGs…";
     const { data, error } = await this.sb.rpc("admin_batch_codes", { p_batch: batch });
     if (error) { msg.textContent = "Erro: " + this._err(error); return; }
@@ -458,9 +471,13 @@ const Account = {
       zip.file(v.code + ".png", blob);
     }
     const zipBlob = await zip.generateAsync({ type: "blob" });
-    const file = new File([zipBlob], "vouchers-qr.zip", { type: "application/zip" });
-    this._shareOrDownload(file);
-    msg.textContent = codes.length + " PNG(s) gerado(s).";
+    if (handle) {
+      const w = await handle.createWritable(); await w.write(zipBlob); await w.close();
+    } else {
+      this._shareOrDownload(new File([zipBlob], name, { type: "application/zip" }));
+    }
+    msg.textContent = codes.length + " PNG(s) salvos.";
+    const zd = document.getElementById("zipname-dialog"); if (zd && zd.open) zd.close();
   },
 
   // iOS: Web Share (Salvar em Arquivos); desktop: download.
@@ -714,7 +731,13 @@ window.addEventListener("DOMContentLoaded", () => {
   on("installqr-x", () => { const d = document.getElementById("install-qr-dialog"); if (d && d.open) d.close(); });
   on("qr-close", () => { const d = document.getElementById("qr-dialog"); if (d && d.open) d.close(); });
   on("qr-x", () => { const d = document.getElementById("qr-dialog"); if (d && d.open) d.close(); });
-  on("qr-download", () => Account.downloadQRZip());
+  on("qr-download", () => {
+    const zd = document.getElementById("zipname-dialog");
+    document.getElementById("zipname-msg").textContent = "";
+    if (zd && !zd.open) zd.showModal();
+  });
+  on("zipname-cancel", () => { const d = document.getElementById("zipname-dialog"); if (d && d.open) d.close(); });
+  on("zipname-save", () => Account.downloadQRZip(document.getElementById("zipname-input").value));
   on("report-csv", () => Account.reportCsv());
   on("report-close", () => { const d = document.getElementById("report-dialog"); if (d && d.open) d.close(); });
   on("report-x", () => { const d = document.getElementById("report-dialog"); if (d && d.open) d.close(); });

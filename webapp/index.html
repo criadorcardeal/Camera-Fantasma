@@ -24,7 +24,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v6.5</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v6.6</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -63,7 +63,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v6.5</span>
+      <span class="version-badge">v6.6</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -215,6 +215,11 @@
           <option value="USD">US$ (Dólar)</option>
           <option value="EUR">€ (Euro)</option>
           <option value="GBP">£ (Libra)</option>
+          <option value="SGD">S$ (Dólar de Singapura)</option>
+          <option value="JPY">¥ (Iene)</option>
+          <option value="CAD">C$ (Dólar canadense)</option>
+          <option value="AUD">A$ (Dólar australiano)</option>
+          <option value="CHF">CHF (Franco suíço)</option>
         </select>
         <input type="text" id="admin-price" inputmode="decimal" />
         <button id="admin-save" class="primary">Salvar</button>
@@ -580,6 +585,24 @@
     <menu>
       <button id="qr-download" class="primary">⬇️ Baixar PNGs</button>
       <button id="qr-close">Fechar</button>
+    </menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: NOME/LOCAL DO ZIP DE QR ============ -->
+  <dialog id="zipname-dialog">
+    <h3>Salvar PNGs dos vouchers</h3>
+    <label>Nome do arquivo
+      <span class="zipname-row">
+        <input type="text" id="zipname-input" autocomplete="off" value="vouchers-qr" />
+        <span class="zipname-ext">.zip</span>
+      </span>
+    </label>
+    <p class="zipname-note">No computador você poderá escolher a <b>pasta</b> ao salvar.
+      No celular, o arquivo vai para <b>Salvar em Arquivos</b> (você escolhe o local lá).</p>
+    <p id="zipname-msg" class="acc-msg"></p>
+    <menu>
+      <button id="zipname-cancel">Cancelar</button>
+      <button id="zipname-save" class="primary">Salvar</button>
     </menu>
   </dialog>
 
