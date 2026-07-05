@@ -46,7 +46,24 @@ const Account = {
       const em = document.getElementById("prof-acc-email");
       if (em) em.textContent = session.user.email;
       this.loadBalance();
+    } else {
+      this.resetGate();                             // deslogado => volta ao passo do e-mail
     }
+  },
+
+  /* Volta o gate ao passo 1 (pedir e-mail) — usado ao deslogar/trocar perfil. */
+  resetGate() {
+    const s1 = document.getElementById("lg-step1");
+    const s2 = document.getElementById("lg-step2");
+    if (s1) s1.hidden = false;
+    if (s2) s2.hidden = true;
+    const code = document.getElementById("lg-code");
+    if (code) code.value = "";
+    const msg = document.getElementById("lg-msg");
+    if (msg) msg.textContent = "";
+    const send = document.getElementById("lg-send");
+    if (send) send.disabled = false;
+    this.pendingEmail = "";
   },
 
   /* Extrai uma mensagem legível de qualquer forma de erro (objeto de erro do
@@ -268,6 +285,19 @@ window.addEventListener("DOMContentLoaded", () => {
   // Perfil
   on("prof-exit", () => Account.exit());
   on("prof-logout", () => Account.logout());
+
+  // Termos de uso
+  const openTerms = (e) => {
+    if (e) e.preventDefault();
+    const t = document.getElementById("terms-dialog");
+    if (t && !t.open) t.showModal();
+  };
+  const lgTerms = document.getElementById("lg-terms-link");
+  if (lgTerms) lgTerms.addEventListener("click", openTerms);
+  const profTerms = document.getElementById("prof-terms-link");
+  if (profTerms) profTerms.addEventListener("click", openTerms);
+  on("terms-close", () => { const t = document.getElementById("terms-dialog"); if (t && t.open) t.close(); });
+  on("terms-x", () => { const t = document.getElementById("terms-dialog"); if (t && t.open) t.close(); });
 
   // Vídeo obrigatório
   on("reward-replay", () => Reward.play());

@@ -943,6 +943,16 @@ function wireEvents() {
       Credits.promptBuy("Você está sem créditos. Compre para fazer uma nova comparação.");
       return;
     }
+    // Aviso (uma vez, até marcar "não mostrar") de que as comparações ficam só no aparelho.
+    if (localStorage.getItem("cc_ondevice_ack") !== "1") {
+      $("#ondevice-dialog").showModal();
+      return;
+    }
+    $("#new-dialog").showModal();
+  });
+  $("#ondevice-ok").addEventListener("click", () => {
+    if ($("#ondevice-dontshow").checked) localStorage.setItem("cc_ondevice_ack", "1");
+    $("#ondevice-dialog").close();
     $("#new-dialog").showModal();
   });
   $("#new-camera").addEventListener("click", () => { $("#new-dialog").close(); Cam.open("base"); });

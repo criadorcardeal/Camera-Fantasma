@@ -24,7 +24,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v4.6</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v4.7</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -44,6 +44,7 @@
       </div>
 
       <p id="lg-msg" class="lg-msg"></p>
+      <p class="lg-terms">Ao entrar, você concorda com os <a href="#" id="lg-terms-link">Termos de uso</a>.</p>
     </div>
   </div>
 
@@ -59,7 +60,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v4.6</span>
+      <span class="version-badge">v4.7</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -272,6 +273,7 @@
         <button id="prof-exit" type="button" class="prof-exit">Sair</button>
         <button id="prof-logout" type="button" class="prof-logout">Trocar perfil</button>
       </div>
+      <p class="prof-terms"><a href="#" id="prof-terms-link">Termos de uso</a></p>
     </div>
     <hr class="prof-sep" />
 
@@ -380,19 +382,76 @@
 
   <!-- ============ VÍDEO OBRIGATÓRIO (após resgate de voucher) ============ -->
   <dialog id="reward-dialog" class="reward-dialog">
-    <div class="reward-head">Vídeo do patrocinador</div>
-    <div class="reward-stage">
-      <video id="reward-video" playsinline webkit-playsinline hidden></video>
-      <div id="reward-placeholder" class="reward-ph">
-        <div class="rp-logo">ComparaCam</div>
-        <div class="rp-sub">Espaço do patrocinador</div>
-        <div class="rp-bar"><div id="rp-fill"></div></div>
+    <div class="reward-inner">
+      <div class="reward-head">Vídeo do patrocinador</div>
+      <div class="reward-stage">
+        <video id="reward-video" playsinline webkit-playsinline hidden></video>
+        <div id="reward-placeholder" class="reward-ph">
+          <div class="rp-logo">ComparaCam</div>
+          <div class="rp-sub">Espaço do patrocinador</div>
+        </div>
+      </div>
+      <div class="reward-progress"><div id="rp-fill"></div></div>
+      <div class="reward-btns">
+        <button id="reward-replay" type="button" disabled>Rever</button>
+        <button id="reward-exit" type="button" class="primary" disabled>Sair</button>
       </div>
     </div>
-    <div class="reward-btns">
-      <button id="reward-replay" type="button" disabled>Rever</button>
-      <button id="reward-exit" type="button" class="primary" disabled>Sair</button>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: AVISO "SÓ NESTE APARELHO" ============ -->
+  <dialog id="ondevice-dialog">
+    <h3>Suas comparações ficam só neste aparelho</h3>
+    <p class="od-text">As fotos e comparações são salvas <b>apenas neste dispositivo</b>. Elas
+      não vão para a nuvem e <b>não podem ser abertas em outro aparelho</b>. Se você
+      desconectar a conta ou limpar o aplicativo, elas <b>não poderão ser recuperadas</b>.</p>
+    <label class="od-check"><input type="checkbox" id="ondevice-dontshow" /> Não mostrar novamente</label>
+    <menu><button id="ondevice-ok" class="primary">Entendi</button></menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: TERMOS DE USO / CONTRATO ============ -->
+  <dialog id="terms-dialog" class="terms-dialog">
+    <button id="terms-x" class="dialog-x" type="button" aria-label="Fechar">✕</button>
+    <h3>Termos de Uso e Licença — ComparaCam</h3>
+    <div class="terms-body">
+      <p><b>1. Objeto.</b> O ComparaCam é um aplicativo para captura e comparação padronizada
+        de fotografias (antes/depois), destinado ao uso por profissionais de saúde no
+        acompanhamento clínico. O uso do aplicativo implica a aceitação integral destes termos.</p>
+
+      <p><b>2. Armazenamento apenas no dispositivo.</b> Todas as fotos e comparações são
+        gravadas <b>exclusivamente no aparelho</b> em que foram criadas. O aplicativo
+        <b>não envia essas imagens para nenhum servidor ou nuvem</b>. Em consequência:</p>
+      <ul>
+        <li>as comparações <b>não podem ser acessadas de outro aparelho</b>;</li>
+        <li>se você <b>desconectar a conta</b>, trocar de perfil, limpar os dados do
+          aplicativo, remover o app ou perder o aparelho, as comparações
+          <b>serão perdidas e não poderão ser recuperadas</b>;</li>
+        <li>a responsabilidade por manter cópias/backup das imagens, quando necessário, é
+          exclusivamente do usuário, por meio das funções de exportar/salvar.</li>
+      </ul>
+
+      <p><b>3. Conta e créditos.</b> O acesso é feito por e-mail (código de uso único). Os
+        créditos e vouchers vinculados à conta são pessoais e intransferíveis. A conta serve
+        para liberar o uso e gerir créditos — <b>ela não guarda suas fotos</b>.</p>
+
+      <p><b>4. Responsabilidade do profissional.</b> O usuário é o único responsável pelo uso
+        clínico das imagens, pela obtenção do <b>consentimento do paciente</b>, pela guarda
+        e sigilo dos dados e pelo cumprimento das normas aplicáveis (incluindo a LGPD e as
+        regras do conselho profissional). O aplicativo é uma ferramenta de apoio e não
+        substitui o julgamento clínico.</p>
+
+      <p><b>5. Garantias.</b> O software é fornecido "no estado em que se encontra", sem
+        garantia de disponibilidade contínua ou ausência de falhas. Na máxima extensão
+        permitida em lei, os fornecedores não respondem por perda de imagens decorrente das
+        características descritas no item 2.</p>
+
+      <p><b>6. Alterações.</b> Estes termos podem ser atualizados. O uso continuado após a
+        atualização representa concordância com a nova versão.</p>
+
+      <p class="terms-note">Este texto é um modelo inicial e deve ser revisado por um
+        profissional jurídico antes do uso comercial.</p>
     </div>
+    <menu><button id="terms-close" class="primary">Entendi</button></menu>
   </dialog>
 
   <!-- ============ DIÁLOGO: NOVA COMPARAÇÃO ============ -->
