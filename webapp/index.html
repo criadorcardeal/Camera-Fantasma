@@ -24,7 +24,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v6.0</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v6.1</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -62,7 +62,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v6.0</span>
+      <span class="version-badge">v6.1</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -309,7 +309,6 @@
 
     <div class="prof-acc">
       <div class="prof-acc-row">Conta: <b id="prof-acc-email">—</b></div>
-      <div class="prof-acc-bal-row">Saldo: <b id="prof-acc-bal">…</b> créditos</div>
       <div class="prof-acc-btns">
         <button id="prof-exit" type="button" class="prof-exit">Sair</button>
         <button id="prof-logout" type="button" class="prof-logout">Trocar perfil</button>
@@ -322,6 +321,7 @@
     </div>
     <hr class="prof-sep" />
 
+    <h4 class="prof-wm-title">Características da marca d'água</h4>
     <label>Nome
       <input type="text" id="prof-name" placeholder="Seu nome" autocomplete="off" />
     </label>
@@ -499,12 +499,23 @@
     <menu><button id="terms-close" class="primary">Entendi</button></menu>
   </dialog>
 
+  <!-- ============ DIÁLOGO: QR CODES DOS VOUCHERS (admin) ============ -->
+  <dialog id="qr-dialog" class="qr-dialog">
+    <button id="qr-x" class="dialog-x" type="button" aria-label="Fechar">✕</button>
+    <h3 id="qr-title">QR codes dos vouchers</h3>
+    <p class="qr-note">Cada QR abre o app e já preenche o voucher para o médico resgatar.
+      Imprima, compartilhe ou tire uma captura de tela.</p>
+    <div id="qr-grid" class="qr-grid"></div>
+    <menu><button id="qr-close">Fechar</button></menu>
+  </dialog>
+
   <!-- ============ DIÁLOGO: BACKUP DAS COMPARAÇÕES ============ -->
   <dialog id="backup-dialog" class="backup-dialog">
     <h3>Backup das comparações</h3>
-    <p class="backup-note">Suas comparações ficam <b>só neste aparelho</b>. Faça um backup
-      para não perdê-las ao trocar de aparelho, limpar o app ou desconectar. Guarde o
-      arquivo em Arquivos/nuvem — depois é só restaurar aqui.</p>
+    <p class="backup-note">Suas comparações ficam na <b>memória temporária do aplicativo</b>
+      neste aparelho. Faça um backup para não perdê-las ao trocar de aparelho, limpar o app
+      ou desconectar. Guarde o backup em um diretório do seu dispositivo ou na sua nuvem —
+      depois é só restaurar aqui.</p>
     <div class="backup-row">Backup: <b id="backup-info">…</b></div>
     <button id="backup-save" class="primary backup-save" type="button" disabled>Salvar backup</button>
     <hr class="prof-sep" />
@@ -577,6 +588,7 @@
   <script src="./profile.js"></script>
   <script src="./share.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
   <script src="./account.js"></script>
   <script src="./backup.js"></script>
   <script src="./install.js"></script>

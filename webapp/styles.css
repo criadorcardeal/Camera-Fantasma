@@ -281,6 +281,18 @@ html, body {
   border-radius: 8px; padding: 7px; font-weight: 600; font-size: 0.8rem; cursor: pointer;
 }
 .vb-card-btns button[data-act="disable"] { border-color: #c0392b; color: #c0392b; }
+
+/* ---------- QR codes dos vouchers ---------- */
+.qr-dialog { width: min(94vw, 560px); max-height: 88dvh; }
+.qr-note { font-size: 0.85rem; color: var(--muted); margin: 0 0 12px; }
+.qr-loading { color: var(--muted); font-size: 0.9rem; }
+.qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+.qr-cell { text-align: center; border: 1px solid #e2e8ec; border-radius: 8px; padding: 8px; background: #fff; }
+.qr-cell img { width: 100%; height: auto; display: block; image-rendering: pixelated; }
+.qr-code { font-family: monospace; font-size: 0.72rem; margin-top: 6px; word-break: break-all; color: #333; }
+
+/* ---------- Título das características da marca d'água (Perfil) ---------- */
+.prof-wm-title { margin: 0 0 8px; font-size: 1rem; color: var(--primary); }
 .vb-copy {
   width: 100%; margin-top: 8px; border: 1.5px solid var(--primary); background: #fff;
   color: var(--primary); border-radius: 8px; padding: 9px; font-weight: 600; cursor: pointer;

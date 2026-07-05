@@ -26,6 +26,8 @@ const Account = {
   balance: null,          // saldo autoritativo do servidor (wallets)
 
   init() {
+    // Deep link de voucher: QR/URL "?voucher=CODE" -> preenche após o login.
+    try { this.pendingVoucher = new URLSearchParams(location.search).get("voucher") || ""; } catch (_) {}
     // Sem a biblioteca (1º acesso offline): mantém o gate; login exige internet.
     if (!(window.supabase && window.supabase.createClient)) return;
     this.sb = window.supabase.createClient(CC_SB_URL, CC_SB_KEY);
@@ -48,6 +50,7 @@ const Account = {
       if (em) em.textContent = session.user.email;
       this.loadBalance();
       this.checkAdmin();
+      this.applyPendingVoucher();
     } else {
       this.resetGate();                             // deslogado => volta ao passo do e-mail
       const gear = document.getElementById("cred-admin");
@@ -65,6 +68,19 @@ const Account = {
       const { data } = await this.sb.rpc("is_admin");
       gear.hidden = !data;
     } catch (_) { gear.hidden = true; }
+  },
+
+  /* Veio de um QR/link "?voucher=CODE": abre "Adquirir" com o código preenchido. */
+  applyPendingVoucher() {
+    if (!this.pendingVoucher) return;
+    const code = this.pendingVoucher; this.pendingVoucher = "";
+    const inp = document.getElementById("buy-voucher");
+    if (inp) inp.value = code;
+    if (typeof Credits !== "undefined") Credits.promptBuy();
+    else { const d = document.getElementById("buy-dialog"); if (d && !d.open) d.showModal(); }
+    const msg = document.getElementById("buy-redeem-msg");
+    if (msg) msg.textContent = "Voucher recebido — toque em Resgatar.";
+    try { history.replaceState(null, "", location.origin + location.pathname); } catch (_) {}
   },
 
   /* Volta o gate ao passo 1 (pedir e-mail) — usado ao deslogar/trocar perfil. */
@@ -317,7 +333,8 @@ const Account = {
         "<div class='vb-card-row vb-muted'>" + exp + " · " + vid + "</div>" +
         "<div class='vb-card-btns'>" +
         "<button type='button' data-act='codes' data-batch='" + b.id + "'>Ver códigos</button>" +
-        "<button type='button' data-act='disable' data-batch='" + b.id + "'>Desativar restantes</button>" +
+        "<button type='button' data-act='qr' data-batch='" + b.id + "'>QR codes</button>" +
+        "<button type='button' data-act='disable' data-batch='" + b.id + "'>Desativar</button>" +
         "</div></div>";
     }).join("");
   },
@@ -333,6 +350,29 @@ const Account = {
     document.getElementById("vb-result-wrap").hidden = false;
     document.getElementById("vb-copy").hidden = false;
     msg.textContent = lines.length + " código(s).";
+  },
+
+  // Gera QR codes (deep link ?voucher=CODE) dos vouchers ativos de um grupo.
+  async showQR(batch) {
+    const dlg = document.getElementById("qr-dialog");
+    const grid = document.getElementById("qr-grid");
+    if (!dlg || !grid) return;
+    grid.innerHTML = "<p class='qr-loading'>Carregando…</p>";
+    if (!dlg.open) dlg.showModal();
+    const { data, error } = await this.sb.rpc("admin_batch_codes", { p_batch: batch });
+    if (error) { grid.innerHTML = "<p class='qr-loading'>" + this._esc(this._err(error)) + "</p>"; return; }
+    if (typeof qrcode === "undefined") {
+      grid.innerHTML = "<p class='qr-loading'>A biblioteca de QR não carregou (precisa de internet).</p>"; return;
+    }
+    const codes = (data || []).filter((v) => v.status === "active");
+    if (!codes.length) { grid.innerHTML = "<p class='qr-loading'>Nenhum voucher ativo neste grupo.</p>"; return; }
+    const base = location.origin + location.pathname;
+    grid.innerHTML = codes.map((v) => {
+      const url = base + "?voucher=" + encodeURIComponent(v.code);
+      const qr = qrcode(0, "M"); qr.addData(url); qr.make();
+      return "<div class='qr-cell'>" + qr.createImgTag(4, 8) +
+        "<div class='qr-code'>" + this._esc(v.code) + "</div></div>";
+    }).join("");
   },
 
   async disableBatch(batch) {
@@ -459,9 +499,13 @@ window.addEventListener("DOMContentLoaded", () => {
     const btn = e.target.closest("button[data-act]");
     if (!btn) return;
     const batch = btn.getAttribute("data-batch");
-    if (btn.getAttribute("data-act") === "codes") Account.viewCodes(batch);
-    else if (btn.getAttribute("data-act") === "disable") Account.disableBatch(batch);
+    const act = btn.getAttribute("data-act");
+    if (act === "codes") Account.viewCodes(batch);
+    else if (act === "qr") Account.showQR(batch);
+    else if (act === "disable") Account.disableBatch(batch);
   });
+  on("qr-close", () => { const d = document.getElementById("qr-dialog"); if (d && d.open) d.close(); });
+  on("qr-x", () => { const d = document.getElementById("qr-dialog"); if (d && d.open) d.close(); });
 
   // Termos de uso
   const openTerms = (e) => {
