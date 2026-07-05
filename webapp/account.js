@@ -101,21 +101,29 @@ const Account = {
     if (code) { code.value = ""; code.focus(); }
   },
 
+  _verify(type, token) {
+    return this.sb.auth.verifyOtp({ email: this.pendingEmail, token, type })
+      .then(({ error }) => error || null)
+      .catch((e) => e);
+  },
+
   /* ---- Passo 2: verificar o código e criar a sessão NESTE aparelho ---- */
   async verifyCode() {
     const token = (document.getElementById("lg-code").value || "").trim();
     const msg = document.getElementById("lg-msg");
     const btn = document.getElementById("lg-verify");
-    if (!/^\d{6}$/.test(token)) { msg.textContent = "Digite o código de 6 dígitos."; return; }
+    // Aceita códigos de 4 a 8 dígitos (o tamanho do OTP é configurável no Supabase).
+    if (!/^\d{4,8}$/.test(token)) { msg.textContent = "Digite o código recebido por e-mail."; return; }
     if (!this.sb) { msg.textContent = "Sem internet. Conecte-se e tente de novo."; return; }
     btn.disabled = true;
     msg.textContent = "Verificando…";
-    let error;
-    try {
-      ({ error } = await this.sb.auth.verifyOtp({
-        email: this.pendingEmail, token, type: "email",
-      }));
-    } catch (e) { error = e; }
+    // Tenta como login de e-mail; se falhar, tenta como confirmação de cadastro
+    // (usuário novo com "Confirmar e-mail" ligado recebe token do tipo 'signup').
+    let error = await this._verify("email", token);
+    if (error) {
+      const err2 = await this._verify("signup", token);
+      if (!err2) error = null;
+    }
     if (error) {
       console.error("verifyOtp:", error);
       btn.disabled = false;
