@@ -446,7 +446,7 @@ const Cam = {
     const seed = this.mode === "base"
       ? ((this.session && this.session.baseLabel) || defaultLabel("base"))
       : ((this.session && this.session.followLabel) || defaultLabel("follow"));
-    const res = await openLabelDialog(seed);
+    const res = await openLabelDialog(seed, this.mode === "base" && !this.session);
     if (res == null) return; // usuario escolheu refazer
     const { label } = res;
 
@@ -564,7 +564,7 @@ async function importBasePhoto(file, session) {
     await openDetail(session.id);
     return;
   }
-  const res = await openLabelDialog(defaultLabel("base"));
+  const res = await openLabelDialog(defaultLabel("base"), true);
   if (res == null) return;
   const newSession = {
     id: String(Date.now()),
@@ -585,11 +585,24 @@ async function importBasePhoto(file, session) {
 
 /* ---------------- Diálogo de rótulo (rodapé da foto) ----------------
    Resolve { label } ou null (usuário escolheu refazer). */
-function openLabelDialog(labelValue) {
+function openLabelDialog(labelValue, requireConsent) {
   return new Promise((resolve) => {
     const dlg = $("#dist-dialog");
     const labelInp = $("#dist-label");
+    const wrap = $("#dist-consent-wrap");
+    const consent = $("#dist-consent");
+    const ok = $("#dist-ok");
     labelInp.value = labelValue || "";
+    if (requireConsent) {
+      wrap.hidden = false;
+      consent.checked = false;
+      ok.disabled = true;
+      consent.onchange = () => { ok.disabled = !consent.checked; };
+    } else {
+      wrap.hidden = true;
+      ok.disabled = false;
+      consent.onchange = null;
+    }
     const onClose = () => {
       dlg.removeEventListener("close", onClose);
       resolve(dlg.returnValue === "ok" ? { label: labelInp.value.trim() } : null);

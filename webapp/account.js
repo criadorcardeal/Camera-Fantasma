@@ -476,6 +476,19 @@ window.addEventListener("DOMContentLoaded", () => {
   on("terms-close", () => { const t = document.getElementById("terms-dialog"); if (t && t.open) t.close(); });
   on("terms-x", () => { const t = document.getElementById("terms-dialog"); if (t && t.open) t.close(); });
 
+  // Política de Privacidade (LGPD)
+  const openPrivacy = (e) => {
+    if (e) e.preventDefault();
+    const p = document.getElementById("privacy-dialog");
+    if (p && !p.open) p.showModal();
+  };
+  ["lg-privacy-link", "prof-privacy-link"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("click", openPrivacy);
+  });
+  on("privacy-close", () => { const p = document.getElementById("privacy-dialog"); if (p && p.open) p.close(); });
+  on("privacy-x", () => { const p = document.getElementById("privacy-dialog"); if (p && p.open) p.close(); });
+
   // Vídeo obrigatório
   on("reward-replay", () => Reward.play());
   on("reward-exit", () => {

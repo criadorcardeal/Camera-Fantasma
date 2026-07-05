@@ -24,7 +24,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v5.2</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v6.0</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -44,7 +44,9 @@
       </div>
 
       <p id="lg-msg" class="lg-msg"></p>
-      <p class="lg-terms">Ao entrar, você concorda com os <a href="#" id="lg-terms-link">Termos de uso</a>.</p>
+      <p class="lg-terms">Ao entrar, você concorda com os
+        <a href="#" id="lg-terms-link">Termos de uso</a> e a
+        <a href="#" id="lg-privacy-link">Política de Privacidade</a>.</p>
     </div>
   </div>
 
@@ -60,7 +62,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v5.2</span>
+      <span class="version-badge">v6.0</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -289,6 +291,10 @@
       <label>Rótulo (rodapé da foto)
         <input type="text" id="dist-label" placeholder="Ex.: Perna direita" autocomplete="off" />
       </label>
+      <label id="dist-consent-wrap" class="dist-consent" hidden>
+        <input type="checkbox" id="dist-consent" />
+        <span>Confirmo que tenho o <b>consentimento do paciente</b> para registrar e usar estas imagens.</span>
+      </label>
       <menu>
         <button value="cancel" id="dist-cancel">Refazer</button>
         <button value="ok" id="dist-ok" class="primary">Salvar</button>
@@ -308,7 +314,11 @@
         <button id="prof-exit" type="button" class="prof-exit">Sair</button>
         <button id="prof-logout" type="button" class="prof-logout">Trocar perfil</button>
       </div>
-      <p class="prof-terms"><a href="#" id="prof-terms-link">Termos de uso</a></p>
+      <button id="prof-backup" type="button" class="prof-backup">💾 Backup das comparações</button>
+      <p class="prof-terms">
+        <a href="#" id="prof-terms-link">Termos de uso</a> ·
+        <a href="#" id="prof-privacy-link">Política de Privacidade</a>
+      </p>
     </div>
     <hr class="prof-sep" />
 
@@ -489,6 +499,66 @@
     <menu><button id="terms-close" class="primary">Entendi</button></menu>
   </dialog>
 
+  <!-- ============ DIÁLOGO: BACKUP DAS COMPARAÇÕES ============ -->
+  <dialog id="backup-dialog" class="backup-dialog">
+    <h3>Backup das comparações</h3>
+    <p class="backup-note">Suas comparações ficam <b>só neste aparelho</b>. Faça um backup
+      para não perdê-las ao trocar de aparelho, limpar o app ou desconectar. Guarde o
+      arquivo em Arquivos/nuvem — depois é só restaurar aqui.</p>
+    <div class="backup-row">Backup: <b id="backup-info">…</b></div>
+    <button id="backup-save" class="primary backup-save" type="button" disabled>Salvar backup</button>
+    <hr class="prof-sep" />
+    <label class="backup-restore">Restaurar de um arquivo de backup
+      <input type="file" id="backup-import" accept="application/json,.json" />
+    </label>
+    <p id="backup-import-msg" class="acc-msg"></p>
+    <menu><button id="backup-close">Fechar</button></menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: POLÍTICA DE PRIVACIDADE (LGPD) ============ -->
+  <dialog id="privacy-dialog" class="terms-dialog">
+    <button id="privacy-x" class="dialog-x" type="button" aria-label="Fechar">✕</button>
+    <h3>Política de Privacidade — ComparaCam</h3>
+    <div class="terms-body">
+      <p><b>Resumo:</b> as fotos e comparações dos pacientes ficam <b>apenas no seu
+        aparelho</b> e <b>não são enviadas</b> a nenhum servidor. No servidor guardamos
+        somente o necessário para a conta e os créditos.</p>
+
+      <p><b>1. Dados no aparelho.</b> Imagens, rótulos e comparações são gravados só no
+        dispositivo (armazenamento local do navegador). O desenvolvedor não tem acesso a
+        eles. Backups gerados por você ficam sob sua guarda.</p>
+
+      <p><b>2. Dados no servidor (Supabase).</b> Tratamos apenas: seu <b>e-mail</b> (login
+        por código, sem senha), o <b>saldo de créditos</b>, o histórico de créditos e os
+        <b>vouchers</b> resgatados. Nenhuma imagem de paciente é enviada.</p>
+
+      <p><b>3. Base legal e finalidade (LGPD).</b> Os dados de conta são tratados para
+        permitir o acesso e a gestão de créditos (execução do serviço). As imagens de
+        pacientes são tratadas <b>por você</b>, profissional de saúde, sob sua
+        responsabilidade e base legal próprias (consentimento do paciente e/ou tutela da
+        saúde), permanecendo no seu aparelho.</p>
+
+      <p><b>4. Consentimento do paciente.</b> Ao criar uma comparação, você confirma ter o
+        consentimento do paciente para registrar e usar as imagens. Guarde esse
+        consentimento conforme suas obrigações profissionais.</p>
+
+      <p><b>5. Compartilhamento.</b> Não vendemos nem compartilhamos seus dados. O envio de
+        e-mails de acesso usa um provedor de e-mail; o backend usa o Supabase. As imagens
+        que você exporta/compartilha vão para onde você escolher (Fotos, Arquivos, etc.).</p>
+
+      <p><b>6. Direitos do titular.</b> Você pode solicitar acesso, correção ou exclusão dos
+        dados de conta pelo e-mail de contato. A exclusão da conta remove saldo e histórico
+        do servidor; as imagens, por ficarem no aparelho, são apagadas por você.</p>
+
+      <p><b>7. Segurança.</b> Acesso por código de uso único; saldo protegido por regras no
+        servidor; as imagens nunca trafegam para a nuvem por padrão.</p>
+
+      <p class="terms-note">Modelo inicial — revise com um profissional jurídico e inclua o
+        e-mail de contato do responsável (encarregado/DPO) antes do uso comercial.</p>
+    </div>
+    <menu><button id="privacy-close" class="primary">Entendi</button></menu>
+  </dialog>
+
   <!-- ============ DIÁLOGO: NOVA COMPARAÇÃO ============ -->
   <dialog id="new-dialog">
     <h3>Nova comparação</h3>
@@ -508,6 +578,7 @@
   <script src="./share.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./account.js"></script>
+  <script src="./backup.js"></script>
   <script src="./install.js"></script>
 </body>
 </html>

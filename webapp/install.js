@@ -36,16 +36,23 @@ window.addEventListener("load", () => {
     o.innerHTML =
       '<div class="ihelp-card">' +
       '<button class="ihelp-close" type="button" aria-label="Fechar">✕</button>' +
-      "<h3>Instalar na tela de início</h3>" +
+      "<h3>Use como app — não perca suas comparações</h3>" +
+      '<p class="ihelp-warn">Você está no <b>Safari</b>. Aqui as comparações podem ' +
+      '<b>ser perdidas</b> se você abrir o app em outra aba/janela ou o navegador limpar os dados. ' +
+      'Adicione à <b>Tela de Início</b> para usar como aplicativo e manter tudo salvo:</p>' +
       '<div class="ihelp-step"><span class="ihelp-num">1</span><p>Toque em <b>Compartilhar</b> ' + shareIcon + " na barra do Safari.</p></div>" +
       '<div class="ihelp-step"><span class="ihelp-num">2</span><p>Role e toque em <b>Adicionar à Tela de Início</b> ' + plusIcon + ".</p></div>" +
       '<div class="ihelp-step"><span class="ihelp-num">3</span><p>Toque em <b>Adicionar</b>, no canto superior direito.</p></div>' +
+      '<button class="ihelp-backup" type="button">💾 Fazer backup agora</button>' +
       '<button class="ihelp-ok" type="button">Entendi</button>' +
       "</div>";
     document.body.appendChild(o);
     const close = () => o.remove();
     o.querySelector(".ihelp-close").addEventListener("click", close);
     o.querySelector(".ihelp-ok").addEventListener("click", close);
+    o.querySelector(".ihelp-backup").addEventListener("click", () => {
+      if (typeof Backup !== "undefined") Backup.openDialog();
+    });
     o.addEventListener("click", (e) => { if (e.target === o) close(); });
   }
 
@@ -78,7 +85,12 @@ window.addEventListener("load", () => {
   }
 
   if (isIOS) {
-    // Sempre aparece no Safari; X esconde só nesta sessão (volta na próxima visita).
+    // Popup de aviso (risco de perder comparações no Safari) — 1x por sessão.
+    if (sessionStorage.getItem("cc_safari_warned") !== "1") {
+      sessionStorage.setItem("cc_safari_warned", "1");
+      setTimeout(openHelp, 2200);
+    }
+    // Banner persistente; X esconde só nesta sessão (volta na próxima visita).
     if (sessionStorage.getItem("cc_install_hidden") === "1") return;
     setTimeout(() => showBanner({
       sub: "Toque em “Ver como” para usar como app.",
