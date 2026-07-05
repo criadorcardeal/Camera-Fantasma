@@ -444,6 +444,36 @@ grant execute on function public.admin_delete_batch(uuid) to anon, authenticated
 
 ---
 
+## Parte 13 — Relatório de resgates (e-mail + data) (v6.3)
+
+Botão "Relatório" em cada grupo → lista quem (e-mail) e quando resgatou cada voucher,
+para demonstrar ao contratante. Rode este SQL uma vez:
+
+```sql
+create or replace function public.admin_batch_report(p_batch uuid)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_res jsonb;
+begin
+  if not public.is_admin() then raise exception 'sem permissao (admin)'; end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'code', v.code, 'status', v.status,
+      'email', u.email, 'redeemed_at', v.redeemed_at)
+      order by v.redeemed_at nulls last, v.code), '[]'::jsonb)
+    into v_res
+    from public.vouchers v
+    left join auth.users u on u.id = v.redeemed_by
+    where v.batch_id = p_batch;
+  return v_res;
+end $$;
+grant execute on function public.admin_batch_report(uuid) to anon, authenticated;
+```
+
+> O e-mail de quem resgatou já era gravado (`vouchers.redeemed_by` → `auth.users`);
+> a função só junta os dados. No app, "Relatório" preenche a caixa de texto (com
+> "Copiar códigos") no formato `código | e-mail | data`.
+
+---
+
 ## Pendências fora do código (responsabilidade do dono do produto)
 - **CNPJ/MEI** e **conta Mercado Pago empresarial** (para receber e emitir nota).
 - **Termos de Uso + Política de Privacidade** e conformidade **LGPD**.

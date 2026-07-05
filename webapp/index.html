@@ -24,7 +24,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v6.2</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v6.3</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -63,7 +63,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v6.2</span>
+      <span class="version-badge">v6.3</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -218,6 +218,8 @@
       <button id="admin-close">Fechar</button>
       <button id="admin-save" class="primary">Salvar preço</button>
     </menu>
+
+    <button id="admin-install-qr" type="button" class="admin-install-qr">📇 QR de instalação (convite)</button>
 
     <hr class="admin-sep" />
     <h4 class="admin-subh">Criar grupo de vouchers</h4>
@@ -456,6 +458,28 @@
     <menu><button id="ondevice-ok" class="primary">Entendi</button></menu>
   </dialog>
 
+  <!-- ============ DIÁLOGO: EXPLICA AS 2 FOTOS ============ -->
+  <dialog id="twophotos-dialog">
+    <h3>Você vai precisar de 2 fotos</h3>
+    <p class="od-text">Uma comparação usa <b>duas fotos</b>: a <b>base</b> (o “antes”) e a de
+      <b>acompanhamento</b> (o “depois”). Comece pela <b>foto base</b> agora. Na próxima
+      consulta, use o <b>Ghost Overlay</b> para tirar a foto de acompanhamento no mesmo
+      enquadramento.</p>
+    <label class="od-check"><input type="checkbox" id="twophotos-dontshow" /> Não mostrar novamente</label>
+    <menu><button id="twophotos-ok" class="primary">Entendi</button></menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: AGORA A FOTO DE ACOMPANHAMENTO ============ -->
+  <dialog id="followhint-dialog">
+    <h3>Foto base salva ✓</h3>
+    <p class="od-text">Agora falta a <b>foto de acompanhamento</b> (o “depois”). Você pode
+      tirá-la mais tarde — na próxima consulta, abra esta comparação e use
+      <b>Refazer/Tirar</b> ou <b>Importar acompanhamento</b>, com o <b>Ghost Overlay</b>
+      ajudando a repetir o mesmo enquadramento.</p>
+    <label class="od-check"><input type="checkbox" id="followhint-dontshow" /> Não mostrar novamente</label>
+    <menu><button id="followhint-ok" class="primary">Entendi</button></menu>
+  </dialog>
+
   <!-- ============ DIÁLOGO: TERMOS DE USO / CONTRATO ============ -->
   <dialog id="terms-dialog" class="terms-dialog">
     <button id="terms-x" class="dialog-x" type="button" aria-label="Fechar">✕</button>
@@ -499,6 +523,36 @@
         profissional jurídico antes do uso comercial.</p>
     </div>
     <menu><button id="terms-close" class="primary">Entendi</button></menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: QR DE INSTALAÇÃO (cartões de convite) ============ -->
+  <dialog id="install-qr-dialog" class="qr-dialog">
+    <button id="installqr-x" class="dialog-x" type="button" aria-label="Fechar">✕</button>
+    <h3>QR de instalação (cartões de convite)</h3>
+    <p class="qr-note">Um QR para cada plataforma. Imprima ou tire um print para montar os
+      cartões. Ambos apontam para o mesmo endereço do app.</p>
+    <div class="installqr-cards">
+      <div class="installqr-card">
+        <div class="installqr-plat">📱 iPhone / iPad</div>
+        <div id="installqr-ios" class="installqr-img"></div>
+        <ol class="installqr-steps">
+          <li>Abra o QR no <b>Safari</b>.</li>
+          <li>Toque em <b>“…”</b> (reticências) no <b>canto inferior direito</b> e escolha <b>Compartilhar</b>.</li>
+          <li>Toque em <b>Adicionar à Tela de Início</b> e confirme em <b>Adicionar</b>.</li>
+        </ol>
+      </div>
+      <div class="installqr-card">
+        <div class="installqr-plat">🤖 Android</div>
+        <div id="installqr-android" class="installqr-img"></div>
+        <ol class="installqr-steps">
+          <li>Abra o QR no <b>Chrome</b>.</li>
+          <li>Toque em <b>Instalar</b> (ou menu <b>⋮ → Instalar app</b>).</li>
+          <li>Confirme para colocar na tela inicial.</li>
+        </ol>
+      </div>
+    </div>
+    <p class="installqr-url">Endereço: <b id="installqr-link"></b></p>
+    <menu><button id="installqr-close">Fechar</button></menu>
   </dialog>
 
   <!-- ============ DIÁLOGO: LER QR CODE (câmera, no app) ============ -->

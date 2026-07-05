@@ -477,6 +477,7 @@ const Cam = {
       await Credits.reserve();
       this.stop();
       await openDetail(session.id);
+      showFollowHint();
     } else {
       const s = this.session;
       s.followImage = dataUrl;
@@ -581,6 +582,7 @@ async function importBasePhoto(file, session) {
   await DB.put(newSession);
   await Credits.reserve();
   await openDetail(newSession.id);
+  showFollowHint();
 }
 
 /* ---------------- Diálogo de rótulo (rodapé da foto) ----------------
@@ -949,6 +951,27 @@ function renderCompare(mode) {
   requestAnimationFrame(sizeWmNames);
 }
 
+/* ---- Sequência de avisos antes de escolher a foto base ---- */
+let _ncQueue = [];
+function startNewComparison() {
+  _ncQueue = [];
+  if (localStorage.getItem("cc_ondevice_ack") !== "1") _ncQueue.push("ondevice-dialog");
+  if (localStorage.getItem("cc_twophotos_ack") !== "1") _ncQueue.push("twophotos-dialog");
+  ncNext();
+}
+function ncNext() {
+  const id = _ncQueue.shift();
+  if (!id) { $("#new-dialog").showModal(); return; }
+  $("#" + id).showModal();
+}
+
+/* Aviso (uma vez) de que agora falta a foto de acompanhamento. */
+function showFollowHint() {
+  if (localStorage.getItem("cc_followhint_ack") === "1") return;
+  const d = $("#followhint-dialog");
+  if (d) d.showModal();
+}
+
 /* ---------------- Eventos globais ---------------- */
 function wireEvents() {
   $("#btn-compare").addEventListener("click", () => {
@@ -956,17 +979,22 @@ function wireEvents() {
       Credits.promptBuy("Você está sem créditos. Compre para fazer uma nova comparação.");
       return;
     }
-    // Aviso (uma vez, até marcar "não mostrar") de que as comparações ficam só no aparelho.
-    if (localStorage.getItem("cc_ondevice_ack") !== "1") {
-      $("#ondevice-dialog").showModal();
-      return;
-    }
-    $("#new-dialog").showModal();
+    startNewComparison();
   });
+  // Avisos em sequência (cada um só reaparece se não marcou "não mostrar").
   $("#ondevice-ok").addEventListener("click", () => {
     if ($("#ondevice-dontshow").checked) localStorage.setItem("cc_ondevice_ack", "1");
     $("#ondevice-dialog").close();
-    $("#new-dialog").showModal();
+    ncNext();
+  });
+  $("#twophotos-ok").addEventListener("click", () => {
+    if ($("#twophotos-dontshow").checked) localStorage.setItem("cc_twophotos_ack", "1");
+    $("#twophotos-dialog").close();
+    ncNext();
+  });
+  $("#followhint-ok").addEventListener("click", () => {
+    if ($("#followhint-dontshow").checked) localStorage.setItem("cc_followhint_ack", "1");
+    $("#followhint-dialog").close();
   });
   $("#new-camera").addEventListener("click", () => { $("#new-dialog").close(); Cam.open("base"); });
   $("#new-import").addEventListener("click", () => { $("#new-dialog").close(); $("#import-input").click(); });

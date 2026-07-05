@@ -275,9 +275,9 @@ html, body {
 .vb-card-top span { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
 .vb-card-row { font-size: 0.88rem; margin-top: 3px; }
 .vb-card-row.vb-muted { color: var(--muted); font-size: 0.8rem; }
-.vb-card-btns { display: flex; gap: 8px; margin-top: 8px; }
+.vb-card-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .vb-card-btns button {
-  flex: 1; border: 1.5px solid var(--primary); background: #fff; color: var(--primary);
+  flex: 1 1 auto; min-width: 88px; border: 1.5px solid var(--primary); background: #fff; color: var(--primary);
   border-radius: 8px; padding: 7px; font-weight: 600; font-size: 0.8rem; cursor: pointer;
 }
 .vb-card-btns button[data-act="disable"] { border-color: #c0392b; color: #c0392b; }
@@ -304,6 +304,19 @@ html, body {
 
 /* ---------- Aviso de spam no login ---------- */
 .lg-spam { font-size: 0.78rem; color: var(--muted); margin: 12px 0 0; line-height: 1.4; }
+
+/* ---------- QR de instalação (cartões de convite) ---------- */
+.admin-install-qr {
+  width: 100%; margin-top: 6px; padding: 10px; border-radius: 8px; cursor: pointer;
+  border: 1.5px solid var(--primary); background: #fff; color: var(--primary); font-weight: 600; font-size: 0.88rem;
+}
+.installqr-cards { display: flex; flex-wrap: wrap; gap: 12px; }
+.installqr-card { flex: 1 1 200px; border: 1px solid #e2e8ec; border-radius: 10px; padding: 12px; background: #f7fafb; }
+.installqr-plat { font-weight: 700; color: var(--primary); margin-bottom: 8px; text-align: center; }
+.installqr-img img { width: 100%; max-width: 180px; height: auto; display: block; margin: 0 auto; image-rendering: pixelated; }
+.installqr-steps { margin: 10px 0 0; padding-left: 18px; font-size: 0.82rem; line-height: 1.45; }
+.installqr-steps li { margin-bottom: 4px; }
+.installqr-url { font-size: 0.8rem; color: var(--muted); margin: 12px 0 0; word-break: break-all; }
 
 /* ---------- Leitor de QR (câmera) ---------- */
 .qrscan-dialog { width: min(94vw, 460px); padding: 0; overflow: hidden; }

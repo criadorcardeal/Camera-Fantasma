@@ -334,6 +334,7 @@ const Account = {
         "<div class='vb-card-btns'>" +
         "<button type='button' data-act='codes' data-batch='" + b.id + "'>Ver códigos</button>" +
         "<button type='button' data-act='qr' data-batch='" + b.id + "'>QR codes</button>" +
+        "<button type='button' data-act='report' data-batch='" + b.id + "'>Relatório</button>" +
         "<button type='button' data-act='disable' data-batch='" + b.id + "'>Desativar</button>" +
         "<button type='button' data-act='delete' data-batch='" + b.id + "' data-active='" + b.active + "'>Excluir</button>" +
         "</div></div>";
@@ -353,7 +354,29 @@ const Account = {
     msg.textContent = lines.length + " código(s).";
   },
 
-  // Gera QR codes (deep link ?voucher=CODE) dos vouchers ativos de um grupo.
+  // Relatório de resgates: código, e-mail e data — para mostrar ao contratante.
+  async showReport(batch) {
+    const msg = document.getElementById("vb-msg");
+    const { data, error } = await this.sb.rpc("admin_batch_report", { p_batch: batch });
+    if (error) { msg.textContent = "Erro: " + this._err(error); return; }
+    const rows = data || [];
+    const fmt = (iso) => iso ? new Date(iso).toLocaleString("pt-BR") : "";
+    const lines = rows.map((r) => {
+      if (r.status === "redeemed") return r.code + "  |  " + (r.email || "?") + "  |  " + fmt(r.redeemed_at);
+      if (r.status === "disabled") return r.code + "  |  (desativado)";
+      return r.code + "  |  (não resgatado)";
+    });
+    const redeemed = rows.filter((r) => r.status === "redeemed").length;
+    const header = "RELATÓRIO DE VOUCHERS  (" + redeemed + " de " + rows.length + " resgatados)\n" +
+      "código  |  e-mail  |  data\n";
+    const ta = document.getElementById("vb-result");
+    ta.value = header + lines.join("\n");
+    document.getElementById("vb-result-wrap").hidden = false;
+    document.getElementById("vb-copy").hidden = false;
+    msg.textContent = "Relatório gerado — use 'Copiar códigos' para copiar.";
+  },
+
+  // Gera QR codes (código puro) dos vouchers ativos de um grupo.
   async showQR(batch) {
     const dlg = document.getElementById("qr-dialog");
     const grid = document.getElementById("qr-grid");
@@ -374,6 +397,25 @@ const Account = {
       return "<div class='qr-cell'>" + qr.createImgTag(4, 8) +
         "<div class='qr-code'>" + this._esc(v.code) + "</div></div>";
     }).join("");
+  },
+
+  // QR de instalação (Android/iPhone) para cartões de convite. Ambos apontam p/ o app.
+  showInstallQR() {
+    const dlg = document.getElementById("install-qr-dialog");
+    if (!dlg) return;
+    if (!dlg.open) dlg.showModal();
+    const url = location.origin + location.pathname;
+    const link = document.getElementById("installqr-link");
+    if (link) link.textContent = url;
+    const render = (id) => {
+      const box = document.getElementById(id);
+      if (!box) return;
+      if (typeof qrcode === "undefined") { box.textContent = "Precisa de internet."; return; }
+      const qr = qrcode(0, "M"); qr.addData(url); qr.make();
+      box.innerHTML = qr.createImgTag(5, 8);
+    };
+    render("installqr-ios");
+    render("installqr-android");
   },
 
   async disableBatch(batch) {
@@ -586,9 +628,13 @@ window.addEventListener("DOMContentLoaded", () => {
     const act = btn.getAttribute("data-act");
     if (act === "codes") Account.viewCodes(batch);
     else if (act === "qr") Account.showQR(batch);
+    else if (act === "report") Account.showReport(batch);
     else if (act === "disable") Account.disableBatch(batch);
     else if (act === "delete") Account.deleteBatch(batch, parseInt(btn.getAttribute("data-active"), 10) || 0);
   });
+  on("admin-install-qr", () => Account.showInstallQR());
+  on("installqr-close", () => { const d = document.getElementById("install-qr-dialog"); if (d && d.open) d.close(); });
+  on("installqr-x", () => { const d = document.getElementById("install-qr-dialog"); if (d && d.open) d.close(); });
   on("qr-close", () => { const d = document.getElementById("qr-dialog"); if (d && d.open) d.close(); });
   on("qr-x", () => { const d = document.getElementById("qr-dialog"); if (d && d.open) d.close(); });
 
