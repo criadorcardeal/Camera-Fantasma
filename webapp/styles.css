@@ -375,6 +375,10 @@ html, body {
 .od-check { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; margin-bottom: 6px; cursor: pointer; }
 .od-check input { width: 18px; height: 18px; }
 
+/* ---------- Bloqueio no navegador ---------- */
+.bb-steps { font-size: 0.9rem; line-height: 1.5; margin: 0 0 12px; padding-left: 20px; }
+.bb-steps li { margin-bottom: 8px; }
+
 /* ---------- Consentimento do paciente (LGPD) no rótulo ---------- */
 .dist-consent {
   display: flex; align-items: flex-start; gap: 8px; margin-top: 10px;

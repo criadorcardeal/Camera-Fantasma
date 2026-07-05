@@ -63,6 +63,10 @@ const DB = {
 
 /* ---------------- Utilidades ---------------- */
 const $ = (sel) => document.querySelector(sel);
+// true quando aberto pela tela de início (app instalado); false no navegador.
+const isStandalone = () =>
+  window.matchMedia("(display-mode: standalone)").matches ||
+  window.navigator.standalone === true;
 const fmtDate = (iso) => {
   const d = new Date(iso);
   const p = (n) => String(n).padStart(2, "0");
@@ -989,12 +993,16 @@ function showFollowHint() {
 /* ---------------- Eventos globais ---------------- */
 function wireEvents() {
   $("#btn-compare").addEventListener("click", () => {
+    // No navegador (fora da tela de início) as comparações podem ser perdidas:
+    // bloqueia a criação e orienta a instalar como app.
+    if (!isStandalone()) { $("#browser-block-dialog").showModal(); return; }
     if (!Credits.canStart()) {
       Credits.promptBuy("Você está sem créditos. Compre para fazer uma nova comparação.");
       return;
     }
     startNewComparison();
   });
+  $("#bb-close").addEventListener("click", () => $("#browser-block-dialog").close());
   // Avisos em sequência (cada um só reaparece se não marcou "não mostrar").
   $("#ondevice-ok").addEventListener("click", () => {
     if ($("#ondevice-dontshow").checked) localStorage.setItem("cc_ondevice_ack", "1");

@@ -24,7 +24,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v7.0</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v7.1</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -63,7 +63,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v7.0</span>
+      <span class="version-badge">v7.1</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -466,6 +466,21 @@
       desconectar a conta ou limpar o aplicativo, elas <b>não poderão ser recuperadas</b>.</p>
     <label class="od-check"><input type="checkbox" id="ondevice-dontshow" /> Não mostrar novamente</label>
     <menu><button id="ondevice-ok" class="primary">Entendi</button></menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: BLOQUEIO NO NAVEGADOR ============ -->
+  <dialog id="browser-block-dialog">
+    <h3>📲 Instale o app para continuar</h3>
+    <p class="od-text">Você está usando o ComparaCam pelo <b>navegador</b>. Aqui as
+      comparações podem ser <b>perdidas</b> ao fechar/abrir em outra aba. Para
+      <b>criar comparações com segurança</b>, adicione o app à tela de início:</p>
+    <ul class="bb-steps">
+      <li><b>iPhone/iPad (Safari):</b> toque em <b>“…”</b> (canto inferior direito) →
+        <b>Compartilhar</b> → <b>Adicionar à Tela de Início</b>.</li>
+      <li><b>Android (Chrome):</b> menu <b>⋮</b> → <b>Instalar app</b>.</li>
+    </ul>
+    <p class="od-text">Depois, abra o ComparaCam pelo <b>ícone</b> e entre novamente.</p>
+    <menu><button id="bb-close" class="primary">Entendi</button></menu>
   </dialog>
 
   <!-- ============ DIÁLOGO: EXPLICA AS 2 FOTOS ============ -->
