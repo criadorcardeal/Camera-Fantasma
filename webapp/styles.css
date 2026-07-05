@@ -290,6 +290,16 @@ html, body {
 .qr-cell { text-align: center; border: 1px solid #e2e8ec; border-radius: 8px; padding: 8px; background: #fff; }
 .qr-cell img { width: 100%; height: auto; display: block; image-rendering: pixelated; }
 .qr-code { font-family: monospace; font-size: 0.72rem; margin-top: 6px; word-break: break-all; color: #333; }
+.qr-valid { font-size: 0.66rem; color: var(--muted); margin-top: 2px; }
+
+/* ---------- Relatório de vouchers (popup + tabela) ---------- */
+.report-dialog { width: min(94vw, 620px); max-height: 88dvh; }
+.report-summary { font-size: 0.9rem; color: var(--primary); font-weight: 600; margin: 0 0 10px; }
+.report-table { overflow: auto; max-height: 60dvh; border: 1px solid #e2e8ec; border-radius: 8px; }
+.report-table table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.report-table th, .report-table td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #eef2f4; white-space: nowrap; }
+.report-table th { background: #eef3f6; color: var(--primary); position: sticky; top: 0; }
+.report-table td:first-child { font-family: monospace; }
 
 /* ---------- Título das características da marca d'água (Perfil) ---------- */
 .prof-wm-title { margin: 0 0 8px; font-size: 1rem; color: var(--primary); }

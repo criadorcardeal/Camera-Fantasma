@@ -474,6 +474,31 @@ grant execute on function public.admin_batch_report(uuid) to anon, authenticated
 
 ---
 
+## Parte 14 — Validade nos QR + PNGs por grupo (v6.4)
+
+Cada QR mostra a validade; o download de PNGs (só vouchers não resgatados) usa a mesma
+data. Basta a função de códigos devolver `expires_at`. Rode:
+
+```sql
+create or replace function public.admin_batch_codes(p_batch uuid)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_res jsonb;
+begin
+  if not public.is_admin() then raise exception 'sem permissao (admin)'; end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'code', code, 'status', status, 'expires_at', expires_at) order by code), '[]'::jsonb)
+    into v_res from public.vouchers where batch_id = p_batch;
+  return v_res;
+end $$;
+grant execute on function public.admin_batch_codes(uuid) to anon, authenticated;
+```
+
+> No app (v6.4): QR codes → mostra validade em cada QR e tem **"⬇️ Baixar PNGs"** (um PNG
+> por voucher não resgatado, com código + validade; via `JSZip` → .zip). Relatório → abre
+> em **popup com tabela** e **"⬇️ Baixar CSV"** (com BOM p/ Excel).
+
+---
+
 ## Pendências fora do código (responsabilidade do dono do produto)
 - **CNPJ/MEI** e **conta Mercado Pago empresarial** (para receber e emitir nota).
 - **Termos de Uso + Política de Privacidade** e conformidade **LGPD**.

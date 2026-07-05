@@ -354,33 +354,53 @@ const Account = {
     msg.textContent = lines.length + " código(s).";
   },
 
-  // Relatório de resgates: código, e-mail e data — para mostrar ao contratante.
+  // Relatório de resgates em popup, com tabela e download CSV.
+  _statusPt(s) { return s === "redeemed" ? "resgatado" : s === "disabled" ? "desativado" : "disponível"; },
+
   async showReport(batch) {
-    const msg = document.getElementById("vb-msg");
+    const dlg = document.getElementById("report-dialog");
+    const box = document.getElementById("report-table");
+    const sum = document.getElementById("report-summary");
+    if (!dlg) return;
+    sum.textContent = "Carregando…";
+    box.innerHTML = "";
+    if (!dlg.open) dlg.showModal();
     const { data, error } = await this.sb.rpc("admin_batch_report", { p_batch: batch });
-    if (error) { msg.textContent = "Erro: " + this._err(error); return; }
+    if (error) { sum.textContent = this._err(error); return; }
     const rows = data || [];
+    this._reportRows = rows;
     const fmt = (iso) => iso ? new Date(iso).toLocaleString("pt-BR") : "";
-    const lines = rows.map((r) => {
-      if (r.status === "redeemed") return r.code + "  |  " + (r.email || "?") + "  |  " + fmt(r.redeemed_at);
-      if (r.status === "disabled") return r.code + "  |  (desativado)";
-      return r.code + "  |  (não resgatado)";
-    });
+    box.innerHTML = "<table><thead><tr><th>Código</th><th>E-mail</th><th>Resgatado em</th><th>Status</th></tr></thead><tbody>" +
+      rows.map((r) => "<tr><td>" + this._esc(r.code) + "</td><td>" + this._esc(r.email || "") +
+        "</td><td>" + fmt(r.redeemed_at) + "</td><td>" + this._statusPt(r.status) + "</td></tr>").join("") +
+      "</tbody></table>";
     const redeemed = rows.filter((r) => r.status === "redeemed").length;
-    const header = "RELATÓRIO DE VOUCHERS  (" + redeemed + " de " + rows.length + " resgatados)\n" +
-      "código  |  e-mail  |  data\n";
-    const ta = document.getElementById("vb-result");
-    ta.value = header + lines.join("\n");
-    document.getElementById("vb-result-wrap").hidden = false;
-    document.getElementById("vb-copy").hidden = false;
-    msg.textContent = "Relatório gerado — use 'Copiar códigos' para copiar.";
+    sum.textContent = redeemed + " de " + rows.length + " resgatados";
   },
 
-  // Gera QR codes (código puro) dos vouchers ativos de um grupo.
+  reportCsv() {
+    const rows = this._reportRows || [];
+    const q = (s) => '"' + String(s == null ? "" : s).replace(/"/g, '""') + '"';
+    const fmt = (iso) => iso ? new Date(iso).toLocaleString("pt-BR") : "";
+    const lines = ["codigo,email,resgatado_em,status"];
+    rows.forEach((r) => lines.push([q(r.code), q(r.email || ""), q(fmt(r.redeemed_at)), q(this._statusPt(r.status))].join(",")));
+    // BOM para o Excel abrir com acentos corretos.
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const file = new File([blob], "relatorio-vouchers.csv", { type: "text/csv" });
+    this._shareOrDownload(file);
+  },
+
+  _fmtValidade(iso) {
+    return iso ? "Válido até " + new Date(iso).toLocaleDateString("pt-BR") : "Sem validade";
+  },
+
+  // Gera QR codes (código puro) dos vouchers AINDA NÃO resgatados de um grupo.
   async showQR(batch) {
     const dlg = document.getElementById("qr-dialog");
     const grid = document.getElementById("qr-grid");
     if (!dlg || !grid) return;
+    this._qrBatch = batch;                            // p/ o botão de download
+    document.getElementById("qr-dlmsg").textContent = "";
     grid.innerHTML = "<p class='qr-loading'>Carregando…</p>";
     if (!dlg.open) dlg.showModal();
     const { data, error } = await this.sb.rpc("admin_batch_codes", { p_batch: batch });
@@ -389,14 +409,67 @@ const Account = {
       grid.innerHTML = "<p class='qr-loading'>A biblioteca de QR não carregou (precisa de internet).</p>"; return;
     }
     const codes = (data || []).filter((v) => v.status === "active");
-    if (!codes.length) { grid.innerHTML = "<p class='qr-loading'>Nenhum voucher ativo neste grupo.</p>"; return; }
+    if (!codes.length) { grid.innerHTML = "<p class='qr-loading'>Nenhum voucher disponível neste grupo.</p>"; return; }
     // Codifica o CÓDIGO PURO (não uma URL): a câmera do celular não abre navegador;
     // a leitura é feita dentro do app (Adquirir → Ler QR code).
     grid.innerHTML = codes.map((v) => {
       const qr = qrcode(0, "M"); qr.addData(v.code); qr.make();
       return "<div class='qr-cell'>" + qr.createImgTag(4, 8) +
-        "<div class='qr-code'>" + this._esc(v.code) + "</div></div>";
+        "<div class='qr-code'>" + this._esc(v.code) + "</div>" +
+        "<div class='qr-valid'>" + this._esc(this._fmtValidade(v.expires_at)) + "</div></div>";
     }).join("");
+  },
+
+  // Desenha um PNG (QR + código + validade) para cada voucher.
+  async _qrPngBlob(code, validade) {
+    const qr = qrcode(0, "M"); qr.addData(code); qr.make();
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = qr.createDataURL(6, 4); });
+    const q = img.width, pad = 20, textH = 52;
+    const canvas = document.createElement("canvas");
+    canvas.width = q + pad * 2; canvas.height = q + pad + textH;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, pad, pad);
+    ctx.textAlign = "center"; ctx.fillStyle = "#000";
+    ctx.font = "bold 16px monospace"; ctx.fillText(code, canvas.width / 2, q + pad + 20);
+    ctx.font = "13px sans-serif"; ctx.fillStyle = "#555"; ctx.fillText(validade, canvas.width / 2, q + pad + 40);
+    return new Promise((res) => canvas.toBlob(res, "image/png"));
+  },
+
+  // Baixa um .zip com um PNG por voucher AINDA NÃO resgatado do grupo.
+  async downloadQRZip() {
+    const batch = this._qrBatch;
+    const msg = document.getElementById("qr-dlmsg");
+    if (!batch) return;
+    if (typeof JSZip === "undefined") { msg.textContent = "Compactador não carregou (precisa de internet)."; return; }
+    msg.textContent = "Gerando PNGs…";
+    const { data, error } = await this.sb.rpc("admin_batch_codes", { p_batch: batch });
+    if (error) { msg.textContent = "Erro: " + this._err(error); return; }
+    const codes = (data || []).filter((v) => v.status === "active");
+    if (!codes.length) { msg.textContent = "Nenhum voucher disponível para baixar."; return; }
+    const zip = new JSZip();
+    for (const v of codes) {
+      const blob = await this._qrPngBlob(v.code, this._fmtValidade(v.expires_at));
+      zip.file(v.code + ".png", blob);
+    }
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    const file = new File([zipBlob], "vouchers-qr.zip", { type: "application/zip" });
+    this._shareOrDownload(file);
+    msg.textContent = codes.length + " PNG(s) gerado(s).";
+  },
+
+  // iOS: Web Share (Salvar em Arquivos); desktop: download.
+  _shareOrDownload(file) {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file] }).catch(() => {});
+    } else {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
   },
 
   // QR de instalação (Android/iPhone) para cartões de convite. Ambos apontam p/ o app.
@@ -637,6 +710,10 @@ window.addEventListener("DOMContentLoaded", () => {
   on("installqr-x", () => { const d = document.getElementById("install-qr-dialog"); if (d && d.open) d.close(); });
   on("qr-close", () => { const d = document.getElementById("qr-dialog"); if (d && d.open) d.close(); });
   on("qr-x", () => { const d = document.getElementById("qr-dialog"); if (d && d.open) d.close(); });
+  on("qr-download", () => Account.downloadQRZip());
+  on("report-csv", () => Account.reportCsv());
+  on("report-close", () => { const d = document.getElementById("report-dialog"); if (d && d.open) d.close(); });
+  on("report-x", () => { const d = document.getElementById("report-dialog"); if (d && d.open) d.close(); });
 
   // Termos de uso
   const openTerms = (e) => {

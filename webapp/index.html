@@ -24,7 +24,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v6.3</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v6.4</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -63,7 +63,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v6.3</span>
+      <span class="version-badge">v6.4</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -568,9 +568,26 @@
     <button id="qr-x" class="dialog-x" type="button" aria-label="Fechar">✕</button>
     <h3 id="qr-title">QR codes dos vouchers</h3>
     <p class="qr-note">O médico lê o QR <b>dentro do app</b>: Adquirir créditos → “Ler QR code”.
-      Imprima, compartilhe ou tire uma captura de tela para enviar.</p>
+      Só aparecem os vouchers <b>ainda não resgatados</b>. Baixe os PNGs para enviar ao
+      contratante gerar os vouchers físicos.</p>
     <div id="qr-grid" class="qr-grid"></div>
-    <menu><button id="qr-close">Fechar</button></menu>
+    <p id="qr-dlmsg" class="acc-msg"></p>
+    <menu>
+      <button id="qr-download" class="primary">⬇️ Baixar PNGs</button>
+      <button id="qr-close">Fechar</button>
+    </menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: RELATÓRIO DE VOUCHERS (admin) ============ -->
+  <dialog id="report-dialog" class="report-dialog">
+    <button id="report-x" class="dialog-x" type="button" aria-label="Fechar">✕</button>
+    <h3>Relatório de vouchers</h3>
+    <p id="report-summary" class="report-summary"></p>
+    <div id="report-table" class="report-table"></div>
+    <menu>
+      <button id="report-csv" class="primary">⬇️ Baixar CSV</button>
+      <button id="report-close">Fechar</button>
+    </menu>
   </dialog>
 
   <!-- ============ DIÁLOGO: BACKUP DAS COMPARAÇÕES ============ -->
@@ -654,6 +671,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="./account.js"></script>
   <script src="./backup.js"></script>
   <script src="./install.js"></script>
