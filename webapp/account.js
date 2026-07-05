@@ -23,6 +23,7 @@ const Account = {
   sb: null,
   session: null,
   pendingEmail: "",
+  balance: null,          // saldo autoritativo do servidor (wallets)
 
   init() {
     // Sem a biblioteca (1º acesso offline): mantém o gate; login exige internet.
@@ -178,14 +179,36 @@ const Account = {
     if (em) em.focus();
   },
 
+  // Atualiza os 3 lugares que mostram o saldo (Perfil, Adquirir, barra da home).
+  _refreshBal() {
+    const v = (this.balance == null) ? "—" : this.balance;
+    ["prof-acc-bal", "buy-bal"].forEach((id) => { const el = document.getElementById(id); if (el) el.textContent = v; });
+    if (typeof Credits !== "undefined") Credits.render();
+  },
+
   async loadBalance() {
-    const els = [document.getElementById("prof-acc-bal"), document.getElementById("buy-bal")].filter(Boolean);
-    els.forEach((el) => { el.textContent = "…"; });
     try {
       const { data } = await this.sb.from("wallets").select("balance").maybeSingle();
-      const v = (data && data.balance != null) ? data.balance : 0;
-      els.forEach((el) => { el.textContent = v; });
-    } catch (_) { els.forEach((el) => { el.textContent = "—"; }); }
+      this.balance = (data && data.balance != null) ? data.balance : 0;
+    } catch (_) { this.balance = null; }
+    this._refreshBal();
+    return this.balance;
+  },
+
+  // Gasta/estorna crédito no SERVIDOR (fonte de verdade). Atômico via RPC.
+  async spend(n) {
+    const { data, error } = await this.sb.rpc("wallet_spend", { p_n: n || 1 });
+    if (error) throw error;
+    this.balance = data;
+    this._refreshBal();
+    return data;
+  },
+  async refundCredit(n) {
+    const { data, error } = await this.sb.rpc("wallet_refund", { p_n: n || 1 });
+    if (error) throw error;
+    this.balance = data;
+    this._refreshBal();
+    return data;
   },
 
   /* ---- Resgatar voucher (dentro de "Adquirir créditos") ---- */

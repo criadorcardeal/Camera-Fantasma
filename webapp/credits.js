@@ -17,25 +17,22 @@
 const Credits = {
   PACK: 10,
 
-  getBalance() { return parseInt(localStorage.getItem("ff_credits") || "0", 10) || 0; },
-  setBalance(n) {
-    localStorage.setItem("ff_credits", String(Math.max(0, Math.round(n))));
-    this.render();
-  },
   // Preço UNITÁRIO (por crédito). Chave nova p/ não herdar o antigo preço de pacote.
   getUnitPrice() { const v = parseFloat(localStorage.getItem("ff_unit_price")); return isNaN(v) ? 5 : v; },
   setUnitPrice(v) { localStorage.setItem("ff_unit_price", String(v)); },
   fmtPrice(v) { return "R$ " + Number(v).toFixed(2).replace(".", ","); },
 
-  canStart() { return this.getBalance() >= 1; },
-  reserve() { this.setBalance(this.getBalance() - 1); },
-  refund() { this.setBalance(this.getBalance() + 1); },
-  buyPack() { this.setBalance(this.getBalance() + this.PACK); },
+  // Saldo AUTORITATIVO no servidor (Account.balance). Sem contador local.
+  balance() { return (typeof Account !== "undefined" && typeof Account.balance === "number") ? Account.balance : null; },
+  canStart() { const b = this.balance(); return b != null && b >= 1; },
+  async reserve() { if (typeof Account !== "undefined") { try { await Account.spend(1); } catch (e) { console.error("reserve:", e); } } },
+  async refund() { if (typeof Account !== "undefined") { try { await Account.refundCredit(1); } catch (e) { console.error("refund:", e); } } },
 
   render() {
     const el = document.getElementById("cred-balance");
     if (!el) return;
-    const n = this.getBalance();
+    const n = this.balance();
+    if (n == null) { el.textContent = "🪙 … créditos"; el.classList.remove("cred-zero"); return; }
     el.textContent = "🪙 " + n + " crédito" + (n === 1 ? "" : "s");
     el.classList.toggle("cred-zero", n === 0);
   },
@@ -58,10 +55,8 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("cred-buy").addEventListener("click", () => Credits.promptBuy());
   document.getElementById("buy-close").addEventListener("click", () => buyDlg.close());
   document.getElementById("buy-confirm").addEventListener("click", () => {
-    Credits.buyPack();
-    buyDlg.close();
-    alert("Protótipo: " + Credits.PACK + " créditos adicionados (sem cobrança real).\n" +
-      "O pagamento via Mercado Pago entra na próxima fase.");
+    alert("A compra avulsa (Mercado Pago) entra em breve.\n" +
+      "Por enquanto, adicione créditos resgatando um voucher acima.");
   });
 
   // Administracao. A engrenagem so aparece para admins (account.js checa is_admin()),

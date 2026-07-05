@@ -268,6 +268,47 @@ grupo automaticamente. (Colar uma URL manual continua funcionando como alternati
 
 ---
 
+## Parte 9 — Saldo no servidor como fonte única (gasto/estorno) (v5.1)
+
+A barra da home e o Perfil agora mostram o MESMO saldo (o do servidor, `wallets`).
+Criar uma comparação **gasta 1 crédito no servidor**; excluir antes de concluir
+**estorna**. Rode este SQL uma vez:
+
+```sql
+create or replace function public.wallet_spend(p_n int default 1)
+returns int language plpgsql security definer set search_path=public as $$
+declare v_uid uuid := auth.uid(); v_bal int;
+begin
+  if v_uid is null then raise exception 'nao autenticado'; end if;
+  update public.wallets set balance = balance - p_n, updated_at=now()
+   where user_id=v_uid and balance >= p_n
+   returning balance into v_bal;
+  if v_bal is null then raise exception 'saldo insuficiente'; end if;
+  insert into public.credit_transactions(user_id,delta,reason) values (v_uid,-p_n,'uso');
+  return v_bal;
+end $$;
+
+create or replace function public.wallet_refund(p_n int default 1)
+returns int language plpgsql security definer set search_path=public as $$
+declare v_uid uuid := auth.uid(); v_bal int;
+begin
+  if v_uid is null then raise exception 'nao autenticado'; end if;
+  update public.wallets set balance = balance + p_n, updated_at=now()
+   where user_id=v_uid returning balance into v_bal;
+  insert into public.credit_transactions(user_id,delta,reason) values (v_uid,p_n,'estorno');
+  return v_bal;
+end $$;
+
+grant execute on function public.wallet_spend(int)  to anon, authenticated;
+grant execute on function public.wallet_refund(int) to anon, authenticated;
+```
+
+> O contador local antigo (`ff_credits` no localStorage) foi **abandonado**; o app
+> não o usa mais. A "compra avulsa" prototipada virou apenas um aviso ("Mercado Pago
+> em breve"); crédito real vem de **voucher** (ou, depois, do pagamento).
+
+---
+
 ## Pendências fora do código (responsabilidade do dono do produto)
 - **CNPJ/MEI** e **conta Mercado Pago empresarial** (para receber e emitir nota).
 - **Termos de Uso + Política de Privacidade** e conformidade **LGPD**.

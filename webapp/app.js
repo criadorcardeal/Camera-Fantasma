@@ -188,7 +188,7 @@ function attachSwipeDelete(card, s) {
     card.style.transition = "transform 0.15s";
     if (dx <= -THRESH && confirm("Excluir esta comparação? As fotos serão apagadas do aparelho.")) {
       card.style.transform = "translateX(-100%)";
-      if (s.creditState === "reserved") Credits.refund();
+      if (s.creditState === "reserved") await Credits.refund();
       await DB.remove(s.id);
       await renderHome();
     } else {
@@ -474,7 +474,7 @@ const Cam = {
         creditState: "reserved",
       };
       await DB.put(session);
-      Credits.reserve();
+      await Credits.reserve();
       this.stop();
       await openDetail(session.id);
     } else {
@@ -579,7 +579,7 @@ async function importBasePhoto(file, session) {
     creditState: "reserved",
   };
   await DB.put(newSession);
-  Credits.reserve();
+  await Credits.reserve();
   await openDetail(newSession.id);
 }
 
