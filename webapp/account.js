@@ -49,6 +49,20 @@ const Account = {
     }
   },
 
+  /* Extrai uma mensagem legível de qualquer forma de erro (objeto de erro do
+     JS aparece vazio "{}" ao ser exibido direto; Error tem props não-enumeráveis). */
+  _err(e) {
+    if (!e) return "erro desconhecido";
+    if (typeof e === "string") return e;
+    const parts = [];
+    if (e.message) parts.push(e.message);
+    else if (e.error_description) parts.push(e.error_description);
+    else if (e.msg) parts.push(e.msg);
+    if (e.status) parts.push("(HTTP " + e.status + ")");
+    if (!parts.length) { try { parts.push(JSON.stringify(e)); } catch (_) {} }
+    return parts.join(" ") || "falha ao contatar o servidor";
+  },
+
   /* ---- Passo 1: enviar o código de 6 dígitos ---- */
   async sendCode() {
     const email = document.getElementById("lg-email").value.trim();
@@ -58,10 +72,24 @@ const Account = {
     if (!this.sb) { msg.textContent = "Sem internet para o primeiro acesso. Conecte-se e tente de novo."; return; }
     btn.disabled = true;
     msg.textContent = "Enviando código…";
-    const { error } = await this.sb.auth.signInWithOtp({
-      email, options: { shouldCreateUser: true },
-    });
-    if (error) { btn.disabled = false; msg.textContent = "Erro: " + error.message; return; }
+    try {
+      const { error } = await this.sb.auth.signInWithOtp({
+        email, options: { shouldCreateUser: true },
+      });
+      if (error) {
+        console.error("signInWithOtp:", error);
+        btn.disabled = false;
+        msg.textContent = /sending|smtp|email/i.test(this._err(error))
+          ? "Não foi possível enviar o e-mail. Verifique a configuração de SMTP no Supabase (detalhe: " + this._err(error) + ")."
+          : "Erro ao enviar: " + this._err(error);
+        return;
+      }
+    } catch (e) {
+      console.error("signInWithOtp threw:", e);
+      btn.disabled = false;
+      msg.textContent = "Erro ao enviar: " + this._err(e);
+      return;
+    }
     this.pendingEmail = email;
     btn.disabled = false;
     msg.textContent = "";
@@ -82,13 +110,17 @@ const Account = {
     if (!this.sb) { msg.textContent = "Sem internet. Conecte-se e tente de novo."; return; }
     btn.disabled = true;
     msg.textContent = "Verificando…";
-    const { error } = await this.sb.auth.verifyOtp({
-      email: this.pendingEmail, token, type: "email",
-    });
+    let error;
+    try {
+      ({ error } = await this.sb.auth.verifyOtp({
+        email: this.pendingEmail, token, type: "email",
+      }));
+    } catch (e) { error = e; }
     if (error) {
+      console.error("verifyOtp:", error);
       btn.disabled = false;
-      msg.textContent = /expired|invalid|token/i.test(error.message)
-        ? "Código inválido ou expirado. Tente novamente ou reenvie." : "Erro: " + error.message;
+      msg.textContent = /expired|invalid|token/i.test(this._err(error))
+        ? "Código inválido ou expirado. Tente novamente ou reenvie." : "Erro: " + this._err(error);
       return;
     }
     btn.disabled = false;
