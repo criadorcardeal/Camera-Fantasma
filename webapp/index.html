@@ -25,11 +25,24 @@
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
       <div class="lg-name">ComparaCam</div>
-      <p class="lg-sub">Entre com seu e-mail para usar o app. Sem senha — você recebe um link de acesso.</p>
-      <label class="lg-label">E-mail
-        <input type="email" id="lg-email" inputmode="email" autocomplete="email" placeholder="voce@exemplo.com" />
-      </label>
-      <button id="lg-send" class="btn primary lg-send" type="button">Enviar link de acesso</button>
+
+      <div id="lg-step1">
+        <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
+        <label class="lg-label">E-mail
+          <input type="email" id="lg-email" inputmode="email" autocomplete="email" placeholder="voce@exemplo.com" />
+        </label>
+        <button id="lg-send" class="btn primary lg-send" type="button">Enviar código</button>
+      </div>
+
+      <div id="lg-step2" hidden>
+        <p class="lg-sub">Digite o código de 6 dígitos enviado para <b id="lg-email-shown"></b>.</p>
+        <label class="lg-label">Código
+          <input type="text" id="lg-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" />
+        </label>
+        <button id="lg-verify" class="btn primary" type="button">Entrar</button>
+        <button id="lg-back" class="btn outline" type="button" style="margin-top:8px">Trocar e-mail / reenviar</button>
+      </div>
+
       <p id="lg-msg" class="lg-msg"></p>
     </div>
   </div>
@@ -44,9 +57,9 @@
     <div class="credits-bar">
       <span class="cred-left">
         <span id="cred-balance">🪙 0 créditos</span>
-        <button id="cred-buy" class="cred-buy">Comprar</button>
+        <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v4.2</span>
+      <span class="version-badge">v4.3</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -169,7 +182,16 @@
 
   <!-- ============ DIÁLOGO: COMPRAR CRÉDITOS (v3.3) ============ -->
   <dialog id="buy-dialog">
-    <h3>Comprar créditos</h3>
+    <h3>Adquirir créditos</h3>
+    <div class="buy-bal-row">Seu saldo: <b id="buy-bal">…</b> créditos</div>
+    <label class="prof-acc-vlabel">Resgatar voucher
+      <span class="prof-voucher-row">
+        <input type="text" id="buy-voucher" autocomplete="off" placeholder="Código do voucher" />
+        <button id="buy-redeem" type="button">Resgatar</button>
+      </span>
+    </label>
+    <p id="buy-redeem-msg" class="acc-msg"></p>
+    <hr class="prof-sep" />
     <p id="buy-msg" hidden></p>
     <p id="buy-price" class="buy-price"></p>
     <p class="buy-note">Cada comparação consome 1 crédito (reservado ao abrir,
@@ -246,14 +268,10 @@
     <div class="prof-acc">
       <div class="prof-acc-row">Conta: <b id="prof-acc-email">—</b></div>
       <div class="prof-acc-bal-row">Saldo: <b id="prof-acc-bal">…</b> créditos</div>
-      <label class="prof-acc-vlabel">Resgatar voucher
-        <span class="prof-voucher-row">
-          <input type="text" id="prof-voucher" autocomplete="off" placeholder="Código" />
-          <button id="prof-redeem" type="button">Resgatar</button>
-        </span>
-      </label>
-      <p id="prof-redeem-msg" class="acc-msg"></p>
-      <button id="prof-logout" class="prof-logout" type="button">Trocar perfil</button>
+      <div class="prof-acc-btns">
+        <button id="prof-exit" type="button" class="prof-exit">Sair</button>
+        <button id="prof-logout" type="button" class="prof-logout">Trocar perfil</button>
+      </div>
     </div>
     <hr class="prof-sep" />
 
@@ -358,6 +376,23 @@
       <button id="save-warn-cancel">Cancelar</button>
       <button id="save-warn-ok" class="primary">Salvar</button>
     </menu>
+  </dialog>
+
+  <!-- ============ VÍDEO OBRIGATÓRIO (após resgate de voucher) ============ -->
+  <dialog id="reward-dialog" class="reward-dialog">
+    <div class="reward-head">Vídeo do patrocinador</div>
+    <div class="reward-stage">
+      <video id="reward-video" playsinline webkit-playsinline hidden></video>
+      <div id="reward-placeholder" class="reward-ph">
+        <div class="rp-logo">ComparaCam</div>
+        <div class="rp-sub">Espaço do patrocinador</div>
+        <div class="rp-bar"><div id="rp-fill"></div></div>
+      </div>
+    </div>
+    <div class="reward-btns">
+      <button id="reward-replay" type="button" disabled>Rever</button>
+      <button id="reward-exit" type="button" class="primary" disabled>Sair</button>
+    </div>
   </dialog>
 
   <!-- ============ DIÁLOGO: NOVA COMPARAÇÃO ============ -->

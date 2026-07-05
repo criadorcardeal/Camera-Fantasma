@@ -1,10 +1,12 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* v4.2 (fase paga): login OBRIGATORIO por link magico (Supabase) — o app fica
-   atras do #login-gate ate entrar; conta/saldo/voucher/"trocar perfil" dentro
-   do Perfil. Bibliotecas externas (supabase-js) sao cacheadas pelo fetch handler
-   apos o 1o acesso, para funcionar offline com sessao ja salva. */
-const CACHE = "fotos-fantasma-v40";
+/* v4.3 (fase paga): login OBRIGATORIO por CODIGO OTP de 6 digitos (Supabase) —
+   resolve a dissociacao do iOS (PWA na tela de inicio tem armazenamento separado
+   do Safari). Conta/saldo no Perfil (botoes Sair + Trocar perfil); resgatar
+   voucher em "Adquirir creditos", seguido de video obrigatorio do patrocinador.
+   Bibliotecas externas (supabase-js) sao cacheadas pelo fetch handler apos o 1o
+   acesso, para funcionar offline com sessao ja salva. */
+const CACHE = "fotos-fantasma-v43";
 const ASSETS = [
   "./",
   "./index.html",

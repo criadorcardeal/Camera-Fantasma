@@ -176,11 +176,58 @@ html, body {
   border: 1.5px solid var(--primary); background: #fff; color: var(--primary);
   border-radius: 8px; padding: 0 14px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
 }
-.prof-logout {
-  margin-top: 12px; width: 100%; padding: 10px; border: 1.5px solid #c0392b; background: #fff;
-  color: #c0392b; border-radius: 10px; font-weight: 600; font-size: 0.9rem; cursor: pointer;
+.prof-acc-btns { display: flex; gap: 10px; margin-top: 10px; }
+.prof-acc-btns button {
+  flex: 1; padding: 10px; border-radius: 10px; font-weight: 600; font-size: 0.9rem; cursor: pointer;
 }
+.prof-exit { border: 1.5px solid #c0392b; background: #fff; color: #c0392b; }
+.prof-logout { border: 1.5px solid var(--primary); background: #fff; color: var(--primary); }
 .acc-msg { font-size: 0.82rem; color: var(--primary); min-height: 16px; margin: 6px 0 0; }
+
+/* ---------- Passo 2 do login (código OTP) ---------- */
+#lg-step2[hidden], #lg-step1[hidden] { display: none; }
+#lg-code {
+  text-align: center; letter-spacing: 0.4em; font-size: 1.4rem; font-weight: 700;
+}
+#login-gate .btn.outline {
+  background: #fff; border: 1.5px solid var(--primary); color: var(--primary);
+}
+
+/* ---------- Saldo no diálogo "Adquirir créditos" ---------- */
+.buy-bal-row {
+  background: #eef3f6; border-radius: 10px; padding: 8px 12px; margin: 6px 0 12px;
+  font-size: 0.92rem; color: var(--primary);
+}
+.buy-bal-row b { font-size: 1.1rem; }
+.prof-sep { border: none; border-top: 1px solid #e2e8ec; margin: 14px 0; }
+
+/* ---------- Vídeo obrigatório do patrocinador ---------- */
+.reward-dialog {
+  border: none; border-radius: 16px; padding: 0; width: min(94vw, 460px); overflow: hidden;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.5);
+}
+.reward-dialog::backdrop { background: rgba(0,0,0,0.72); }
+.reward-head {
+  background: var(--primary); color: #fff; font-weight: 600; font-size: 0.9rem;
+  padding: 10px 16px; text-align: center;
+}
+.reward-stage { position: relative; background: #0e2a3b; aspect-ratio: 16/9; display: flex; }
+.reward-stage video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+.reward-ph {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff; gap: 8px; padding: 20px;
+}
+.rp-logo { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.02em; }
+.rp-sub { font-size: 0.82rem; opacity: 0.7; }
+.rp-bar { width: 80%; height: 6px; background: rgba(255,255,255,0.22); border-radius: 4px; margin-top: 14px; overflow: hidden; }
+#rp-fill { height: 100%; width: 0%; background: var(--accent, #f0b429); transition: width 0.1s linear; }
+.reward-btns { display: flex; gap: 10px; padding: 14px 16px; }
+.reward-btns button {
+  flex: 1; padding: 11px; border-radius: 10px; font-weight: 600; font-size: 0.92rem; cursor: pointer;
+  border: 1.5px solid var(--primary); background: #fff; color: var(--primary);
+}
+.reward-btns button.primary { background: var(--primary); color: #fff; }
+.reward-btns button:disabled { opacity: 0.45; cursor: default; }
 .cred-actions { display: flex; align-items: center; gap: 8px; }
 .cred-buy {
   background: var(--primary); color: #fff; border: none;
