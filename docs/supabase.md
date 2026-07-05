@@ -499,6 +499,46 @@ grant execute on function public.admin_batch_codes(uuid) to anon, authenticated;
 
 ---
 
+## Parte 15 — Nome do grupo separado do pré-código (v6.5)
+
+Agora "Nome do grupo" (guardado em `note`) é separado do "Pré-código do voucher"
+(`p_prefix`, usado só p/ montar os códigos). Recria a função com o novo parâmetro:
+
+```sql
+drop function if exists public.admin_create_batch(int,int,text,text,int);
+create or replace function public.admin_create_batch(
+  p_credits_each int, p_qty int, p_video_url text, p_note text default null,
+  p_expires_days int default null, p_prefix text default null)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_batch uuid; v_codes text[] := '{}'; v_code text; i int; v_exp timestamptz; v_prefix text;
+begin
+  if not public.is_admin() then raise exception 'sem permissao (admin)'; end if;
+  if p_qty < 1 or p_qty > 500 then raise exception 'quantidade invalida'; end if;
+  if p_credits_each < 1 then raise exception 'creditos invalidos'; end if;
+  if p_expires_days is not null and p_expires_days > 0 then
+    v_exp := now() + (p_expires_days || ' days')::interval; end if;
+  v_prefix := upper(regexp_replace(coalesce(p_prefix,''), '[^a-zA-Z0-9]+', '', 'g'));
+  v_prefix := substr(v_prefix, 1, 16);
+  insert into public.voucher_batches(credits_each, note, video_url)
+    values (p_credits_each, p_note, nullif(p_video_url,'')) returning id into v_batch;
+  for i in 1..p_qty loop
+    v_code := (case when v_prefix <> '' then v_prefix || '-' else '' end)
+              || upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
+    insert into public.vouchers(code, batch_id, credits, expires_at) values (v_code, v_batch, p_credits_each, v_exp);
+    v_codes := array_append(v_codes, v_code);
+  end loop;
+  return jsonb_build_object('batch_id', v_batch, 'codes', v_codes);
+end $$;
+grant execute on function public.admin_create_batch(int,int,text,text,int,text) to anon, authenticated;
+```
+
+> Admin (v6.5): janela tem **✕** no topo (sem "Fechar"), **Salvar** ao lado do preço,
+> **seletor de moeda**, e confirma ao fechar se houver preço/moeda não salvo ou grupo
+> iniciado. "Adquirir créditos" ficou **só com resgate de voucher** (compra avulsa sai
+> quando o Mercado Pago entrar).
+
+---
+
 ## Pendências fora do código (responsabilidade do dono do produto)
 - **CNPJ/MEI** e **conta Mercado Pago empresarial** (para receber e emitir nota).
 - **Termos de Uso + Política de Privacidade** e conformidade **LGPD**.

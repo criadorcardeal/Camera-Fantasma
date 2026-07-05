@@ -252,6 +252,15 @@ html, body {
 .terms-body li { margin-bottom: 5px; }
 .terms-note { font-size: 0.8rem; color: var(--muted); font-style: italic; }
 
+/* ---------- Admin: preço + moeda em linha ---------- */
+.admin-price-row { display: flex; gap: 8px; margin-top: 4px; align-items: stretch; }
+.admin-price-row select { flex: 0 0 auto; border: 1px solid #ccd4d9; border-radius: 8px; padding: 0 6px; font-size: 0.85rem; }
+.admin-price-row input { flex: 1; min-width: 0; padding: 9px 10px; border: 1px solid #ccd4d9; border-radius: 8px; font-size: 0.95rem; }
+.admin-price-row button {
+  flex: 0 0 auto; border: none; background: var(--primary); color: #fff; border-radius: 8px;
+  padding: 0 16px; font-weight: 600; cursor: pointer;
+}
+
 /* ---------- Admin: criar vouchers ---------- */
 .admin-sep { border: none; border-top: 1px solid #e2e8ec; margin: 16px 0 10px; }
 .admin-subh { margin: 0 0 8px; font-size: 1rem; color: var(--primary); }

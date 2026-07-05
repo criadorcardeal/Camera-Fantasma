@@ -24,7 +24,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v6.4</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v6.5</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -63,7 +63,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v6.4</span>
+      <span class="version-badge">v6.5</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -196,33 +196,38 @@
     </label>
     <button id="buy-scan" type="button" class="buy-scan">📷 Ler QR code do voucher</button>
     <p id="buy-redeem-msg" class="acc-msg"></p>
-    <hr class="prof-sep" />
-    <p id="buy-msg" hidden></p>
-    <p id="buy-price" class="buy-price"></p>
-    <p class="buy-note">Cada comparação consome 1 crédito (reservado ao abrir,
-      confirmado ao salvar/compartilhar). <b>Protótipo:</b> a compra adiciona
-      créditos sem cobrança real — o pagamento (Mercado Pago) entra na próxima fase.</p>
+    <p id="buy-msg" class="buy-msg" hidden></p>
+    <p class="buy-note">Cada comparação consome 1 crédito. A compra avulsa (Mercado Pago)
+      entra em breve — por enquanto, adicione créditos resgatando um voucher.</p>
     <menu>
-      <button id="buy-close">Fechar</button>
-      <button id="buy-confirm" class="primary">Compra avulsa (em breve)</button>
+      <button id="buy-close" class="primary">Fechar</button>
     </menu>
   </dialog>
 
   <!-- ============ DIÁLOGO: ADMINISTRAÇÃO (v3.3) ============ -->
   <dialog id="admin-dialog">
+    <button id="admin-x" class="dialog-x" type="button" aria-label="Fechar">✕</button>
     <h3>Administração</h3>
-    <label>Preço por crédito (R$)
-      <input type="text" id="admin-price" inputmode="decimal" />
+    <label>Preço por crédito
+      <span class="admin-price-row">
+        <select id="admin-currency">
+          <option value="BRL">R$ (Real)</option>
+          <option value="USD">US$ (Dólar)</option>
+          <option value="EUR">€ (Euro)</option>
+          <option value="GBP">£ (Libra)</option>
+        </select>
+        <input type="text" id="admin-price" inputmode="decimal" />
+        <button id="admin-save" class="primary">Salvar</button>
+      </span>
     </label>
-    <menu>
-      <button id="admin-close">Fechar</button>
-      <button id="admin-save" class="primary">Salvar preço</button>
-    </menu>
 
     <button id="admin-install-qr" type="button" class="admin-install-qr">📇 QR de instalação (convite)</button>
 
     <hr class="admin-sep" />
     <h4 class="admin-subh">Criar grupo de vouchers</h4>
+    <label>Nome do grupo
+      <input type="text" id="vb-name" autocomplete="off" placeholder="Ex.: Parceiro X — jul/2026" />
+    </label>
     <div class="vb-grid">
       <label>Créditos por voucher
         <input type="number" id="vb-credits" inputmode="numeric" min="1" value="10" />
@@ -238,8 +243,8 @@
       <input type="text" id="vb-video" autocomplete="off" placeholder="https://…/video.mp4" />
     </label>
     <div class="vb-grid">
-      <label>Observação (opcional)
-        <input type="text" id="vb-note" autocomplete="off" placeholder="Ex.: Parceiro X" />
+      <label>Pré-código do voucher (opcional)
+        <input type="text" id="vb-note" autocomplete="off" placeholder="Ex.: PARCEIROX" />
       </label>
       <label>Validade em dias (opcional)
         <input type="number" id="vb-expires" inputmode="numeric" min="1" placeholder="ex.: 180" />

@@ -17,10 +17,16 @@
 const Credits = {
   PACK: 10,
 
-  // Preço UNITÁRIO (por crédito). Chave nova p/ não herdar o antigo preço de pacote.
+  // Preço UNITÁRIO (por crédito) + moeda.
+  CURRENCIES: { BRL: { sym: "R$", loc: "pt-BR" }, USD: { sym: "US$", loc: "en-US" }, EUR: { sym: "€", loc: "de-DE" }, GBP: { sym: "£", loc: "en-GB" } },
   getUnitPrice() { const v = parseFloat(localStorage.getItem("ff_unit_price")); return isNaN(v) ? 5 : v; },
   setUnitPrice(v) { localStorage.setItem("ff_unit_price", String(v)); },
-  fmtPrice(v) { return "R$ " + Number(v).toFixed(2).replace(".", ","); },
+  getCurrency() { return localStorage.getItem("ff_currency") || "BRL"; },
+  setCurrency(c) { localStorage.setItem("ff_currency", c); },
+  fmtPrice(v) {
+    const c = this.CURRENCIES[this.getCurrency()] || this.CURRENCIES.BRL;
+    return c.sym + " " + Number(v).toLocaleString(c.loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  },
 
   // Saldo AUTORITATIVO no servidor (Account.balance). Sem contador local.
   balance() { return (typeof Account !== "undefined" && typeof Account.balance === "number") ? Account.balance : null; },
@@ -37,16 +43,25 @@ const Credits = {
     el.classList.toggle("cred-zero", n === 0);
   },
 
+  // Só resgate de voucher por enquanto (compra avulsa entra com o Mercado Pago).
   promptBuy(message) {
     const msg = document.getElementById("buy-msg");
-    msg.textContent = message || "";
-    msg.hidden = !message;
-    const unit = this.getUnitPrice();
-    document.getElementById("buy-price").textContent =
-      "Crédito: " + this.fmtPrice(unit) + " · Pacote de " + this.PACK + ": " + this.fmtPrice(unit * this.PACK);
+    if (msg) { msg.textContent = message || ""; msg.hidden = !message; }
     document.getElementById("buy-dialog").showModal();
   },
 };
+
+// Há alterações não salvas na Administração? (preço/moeda ou grupo iniciado)
+function adminDirty() {
+  const cur = parseFloat(String(document.getElementById("admin-price").value).replace(",", "."));
+  const priceChanged = !isNaN(cur) && Math.abs(cur - Credits.getUnitPrice()) > 0.0001;
+  const currChanged = document.getElementById("admin-currency").value !== Credits.getCurrency();
+  const val = (id) => (document.getElementById(id).value || "").trim();
+  const fileEl = document.getElementById("vb-video-file");
+  const fileSel = !!(fileEl && fileEl.files && fileEl.files.length);
+  const groupStarted = !!(val("vb-name") || val("vb-note") || val("vb-video") || val("vb-expires") || fileSel);
+  return { priceDirty: priceChanged || currChanged, groupStarted };
+}
 
 window.addEventListener("DOMContentLoaded", () => {
   Credits.render();
@@ -54,22 +69,33 @@ window.addEventListener("DOMContentLoaded", () => {
   const buyDlg = document.getElementById("buy-dialog");
   document.getElementById("cred-buy").addEventListener("click", () => Credits.promptBuy());
   document.getElementById("buy-close").addEventListener("click", () => buyDlg.close());
-  document.getElementById("buy-confirm").addEventListener("click", () => {
-    alert("A compra avulsa (Mercado Pago) entra em breve.\n" +
-      "Por enquanto, adicione créditos resgatando um voucher acima.");
-  });
 
   // Administracao. A engrenagem so aparece para admins (account.js checa is_admin()),
-  // e a criacao de vouchers e validada no servidor -> nao precisa mais de PIN local.
+  // e a criacao de vouchers e validada no servidor -> nao precisa de PIN local.
   const adminDlg = document.getElementById("admin-dialog");
   document.getElementById("cred-admin").addEventListener("click", () => {
     document.getElementById("admin-price").value = Credits.getUnitPrice().toFixed(2);
+    document.getElementById("admin-currency").value = Credits.getCurrency();
     adminDlg.showModal();
     if (typeof Account !== "undefined" && Account.listBatches) Account.listBatches();
   });
-  document.getElementById("admin-close").addEventListener("click", () => adminDlg.close());
   document.getElementById("admin-save").addEventListener("click", () => {
     const p = parseFloat(String(document.getElementById("admin-price").value).replace(",", "."));
-    if (!isNaN(p) && p >= 0) { Credits.setUnitPrice(p); alert("Preço salvo."); }
+    if (!isNaN(p) && p >= 0) Credits.setUnitPrice(p);
+    Credits.setCurrency(document.getElementById("admin-currency").value);
+    document.getElementById("admin-price").value = Credits.getUnitPrice().toFixed(2);
+    alert("Preço salvo.");
   });
+
+  // Fechar com confirmação se houver preço/moeda não salvo ou grupo não gerado.
+  function tryCloseAdmin() {
+    const d = adminDirty();
+    const parts = [];
+    if (d.priceDirty) parts.push("o preço/moeda foi alterado e não foi salvo");
+    if (d.groupStarted) parts.push("um grupo de vouchers foi iniciado e não foi gerado");
+    if (parts.length && !confirm("Atenção: " + parts.join(" e ") + ". Fechar mesmo assim?")) return;
+    adminDlg.close();
+  }
+  document.getElementById("admin-x").addEventListener("click", tryCloseAdmin);
+  adminDlg.addEventListener("cancel", (e) => { e.preventDefault(); tryCloseAdmin(); });
 });

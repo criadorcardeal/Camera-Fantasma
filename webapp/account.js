@@ -270,7 +270,8 @@ const Account = {
     const credits = parseInt(document.getElementById("vb-credits").value, 10);
     const qty = parseInt(document.getElementById("vb-qty").value, 10);
     let video = document.getElementById("vb-video").value.trim();
-    const note = document.getElementById("vb-note").value.trim();
+    const name = document.getElementById("vb-name").value.trim();     // nome do grupo
+    const prefix = document.getElementById("vb-note").value.trim();   // pré-código
     const expires = parseInt(document.getElementById("vb-expires").value, 10);
     const fileInput = document.getElementById("vb-video-file");
     const file = fileInput && fileInput.files && fileInput.files[0];
@@ -289,8 +290,8 @@ const Account = {
     }
     msg.textContent = "Gerando…";
     const { data, error } = await this.sb.rpc("admin_create_batch", {
-      p_credits_each: credits, p_qty: qty, p_video_url: video, p_note: note || null,
-      p_expires_days: (expires >= 1 ? expires : null),
+      p_credits_each: credits, p_qty: qty, p_video_url: video, p_note: name || null,
+      p_expires_days: (expires >= 1 ? expires : null), p_prefix: prefix || null,
     });
     if (error) {
       msg.textContent = /permiss|admin/i.test(this._err(error))
@@ -304,6 +305,9 @@ const Account = {
     ta.value = codes.join("\n");
     document.getElementById("vb-result-wrap").hidden = false;
     document.getElementById("vb-copy").hidden = false;
+    // Limpa os campos do grupo (deixa de contar como "grupo iniciado não gerado").
+    ["vb-name", "vb-video", "vb-note", "vb-expires"].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ""; });
+    const fileEl = document.getElementById("vb-video-file"); if (fileEl) fileEl.value = "";
     this.listBatches();                              // atualiza a lista de grupos
   },
 
