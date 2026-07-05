@@ -969,6 +969,15 @@ function renderCompare(mode) {
   requestAnimationFrame(sizeWmNames);
 }
 
+/* Checa crédito e inicia a sequência de nova comparação. */
+function proceedNewComparison() {
+  if (!Credits.canStart()) {
+    Credits.promptBuy("Você está sem créditos. Resgate um voucher para fazer uma nova comparação.");
+    return;
+  }
+  startNewComparison();
+}
+
 /* ---- Sequência de avisos antes de escolher a foto base ---- */
 let _ncQueue = [];
 function startNewComparison() {
@@ -994,15 +1003,15 @@ function showFollowHint() {
 function wireEvents() {
   $("#btn-compare").addEventListener("click", () => {
     // No navegador (fora da tela de início) as comparações podem ser perdidas:
-    // bloqueia a criação e orienta a instalar como app.
+    // avisa e orienta a instalar, mas permite continuar mesmo assim.
     if (!isStandalone()) { $("#browser-block-dialog").showModal(); return; }
-    if (!Credits.canStart()) {
-      Credits.promptBuy("Você está sem créditos. Compre para fazer uma nova comparação.");
-      return;
-    }
-    startNewComparison();
+    proceedNewComparison();
   });
   $("#bb-close").addEventListener("click", () => $("#browser-block-dialog").close());
+  $("#bb-continue").addEventListener("click", () => {
+    $("#browser-block-dialog").close();
+    proceedNewComparison();
+  });
   // Avisos em sequência (cada um só reaparece se não marcou "não mostrar").
   $("#ondevice-ok").addEventListener("click", () => {
     if ($("#ondevice-dontshow").checked) localStorage.setItem("cc_ondevice_ack", "1");
