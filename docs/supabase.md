@@ -422,6 +422,28 @@ grant execute on function public.admin_create_batch(int,int,text,text,int) to an
 
 ---
 
+## Parte 12 — Excluir grupo de vouchers (v6.2)
+
+Botão "Excluir" em cada card de "Grupos criados" (o app só confirma se ainda houver
+vouchers a resgatar). Rode este SQL uma vez:
+
+```sql
+create or replace function public.admin_delete_batch(p_batch uuid)
+returns void language plpgsql security definer set search_path=public as $$
+begin
+  if not public.is_admin() then raise exception 'sem permissao (admin)'; end if;
+  delete from public.vouchers where batch_id = p_batch;
+  delete from public.voucher_batches where id = p_batch;
+end $$;
+grant execute on function public.admin_delete_batch(uuid) to anon, authenticated;
+```
+
+> O QR do voucher passou a codificar **só o código** (não uma URL): a câmera do celular
+> não abre navegador; o médico lê **dentro do app** (Adquirir créditos → “Ler QR code”,
+> que usa `jsQR` via CDN). Assim a experiência não “vaza” para o Safari.
+
+---
+
 ## Pendências fora do código (responsabilidade do dono do produto)
 - **CNPJ/MEI** e **conta Mercado Pago empresarial** (para receber e emitir nota).
 - **Termos de Uso + Política de Privacidade** e conformidade **LGPD**.

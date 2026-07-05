@@ -335,6 +335,7 @@ const Account = {
         "<button type='button' data-act='codes' data-batch='" + b.id + "'>Ver códigos</button>" +
         "<button type='button' data-act='qr' data-batch='" + b.id + "'>QR codes</button>" +
         "<button type='button' data-act='disable' data-batch='" + b.id + "'>Desativar</button>" +
+        "<button type='button' data-act='delete' data-batch='" + b.id + "' data-active='" + b.active + "'>Excluir</button>" +
         "</div></div>";
     }).join("");
   },
@@ -366,10 +367,10 @@ const Account = {
     }
     const codes = (data || []).filter((v) => v.status === "active");
     if (!codes.length) { grid.innerHTML = "<p class='qr-loading'>Nenhum voucher ativo neste grupo.</p>"; return; }
-    const base = location.origin + location.pathname;
+    // Codifica o CÓDIGO PURO (não uma URL): a câmera do celular não abre navegador;
+    // a leitura é feita dentro do app (Adquirir → Ler QR code).
     grid.innerHTML = codes.map((v) => {
-      const url = base + "?voucher=" + encodeURIComponent(v.code);
-      const qr = qrcode(0, "M"); qr.addData(url); qr.make();
+      const qr = qrcode(0, "M"); qr.addData(v.code); qr.make();
       return "<div class='qr-cell'>" + qr.createImgTag(4, 8) +
         "<div class='qr-code'>" + this._esc(v.code) + "</div></div>";
     }).join("");
@@ -381,6 +382,16 @@ const Account = {
     const { data, error } = await this.sb.rpc("admin_disable_batch", { p_batch: batch });
     if (error) { msg.textContent = "Erro: " + this._err(error); return; }
     msg.textContent = data + " voucher(s) desativado(s).";
+    this.listBatches();
+  },
+
+  // Exclui o grupo da lista. Só pergunta se ainda houver vouchers a resgatar.
+  async deleteBatch(batch, active) {
+    if (active > 0 && !confirm("Ainda há " + active + " voucher(s) sem resgatar neste grupo. Excluir mesmo assim? Esta ação não pode ser desfeita.")) return;
+    const msg = document.getElementById("vb-msg");
+    const { error } = await this.sb.rpc("admin_delete_batch", { p_batch: batch });
+    if (error) { msg.textContent = "Erro: " + this._err(error); return; }
+    msg.textContent = "Grupo excluído.";
     this.listBatches();
   },
 
@@ -464,6 +475,70 @@ const Reward = {
   },
 };
 
+/* ============= Leitor de QR do voucher (câmera, dentro do app) ============= */
+const QRScan = {
+  stream: null, raf: null, onResult: null,
+
+  async open(onResult) {
+    this.onResult = onResult;
+    const dlg = document.getElementById("qrscan-dialog");
+    const video = document.getElementById("qrscan-video");
+    const msg = document.getElementById("qrscan-msg");
+    if (!dlg) return;
+    msg.textContent = "";
+    if (!dlg.open) dlg.showModal();
+    if (typeof jsQR === "undefined") { msg.textContent = "Leitor de QR não carregou (precisa de internet)."; return; }
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+      msg.textContent = "Este aparelho não permite abrir a câmera aqui."; return;
+    }
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      video.srcObject = this.stream;
+      await video.play();
+      this._loop();
+    } catch (e) {
+      msg.textContent = "Não foi possível abrir a câmera. Digite o código manualmente. (" + (e.message || e) + ")";
+    }
+  },
+
+  _loop() {
+    const video = document.getElementById("qrscan-video");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const tick = () => {
+      if (!this.stream) return;
+      if (video.readyState >= 2 && typeof jsQR !== "undefined") {
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        if (canvas.width && canvas.height) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const found = jsQR(img.data, img.width, img.height);
+          if (found && found.data) { this._done(found.data); return; }
+        }
+      }
+      this.raf = requestAnimationFrame(tick);
+    };
+    this.raf = requestAnimationFrame(tick);
+  },
+
+  _done(text) {
+    let code = String(text || "").trim();
+    const m = /[?&]voucher=([^&\s]+)/i.exec(code);   // aceita também um link antigo
+    if (m) code = decodeURIComponent(m[1]);
+    this.close();
+    if (this.onResult) this.onResult(code);
+  },
+
+  close() {
+    if (this.raf) { cancelAnimationFrame(this.raf); this.raf = null; }
+    if (this.stream) { this.stream.getTracks().forEach((t) => t.stop()); this.stream = null; }
+    const video = document.getElementById("qrscan-video");
+    if (video) video.srcObject = null;
+    const dlg = document.getElementById("qrscan-dialog");
+    if (dlg && dlg.open) dlg.close();
+  },
+};
+
 window.addEventListener("DOMContentLoaded", () => {
   Account.init();
   const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener("click", fn); };
@@ -479,6 +554,15 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // Adquirir créditos / voucher
   on("buy-redeem", () => Account.redeem());
+  on("buy-scan", () => QRScan.open((code) => {
+    const inp = document.getElementById("buy-voucher");
+    if (inp) inp.value = code;
+    const msg = document.getElementById("buy-redeem-msg");
+    if (msg) msg.textContent = "Código lido — toque em Resgatar.";
+  }));
+  on("qrscan-cancel", () => QRScan.close());
+  const qsd = document.getElementById("qrscan-dialog");
+  if (qsd) qsd.addEventListener("cancel", () => QRScan.close());
 
   // Perfil
   on("prof-exit", () => Account.exit());
@@ -503,6 +587,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (act === "codes") Account.viewCodes(batch);
     else if (act === "qr") Account.showQR(batch);
     else if (act === "disable") Account.disableBatch(batch);
+    else if (act === "delete") Account.deleteBatch(batch, parseInt(btn.getAttribute("data-active"), 10) || 0);
   });
   on("qr-close", () => { const d = document.getElementById("qr-dialog"); if (d && d.open) d.close(); });
   on("qr-x", () => { const d = document.getElementById("qr-dialog"); if (d && d.open) d.close(); });

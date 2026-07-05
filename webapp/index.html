@@ -24,7 +24,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v6.1</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v6.2</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -41,6 +41,7 @@
         </label>
         <button id="lg-verify" class="btn primary" type="button">Entrar</button>
         <button id="lg-back" class="btn outline" type="button" style="margin-top:8px">Trocar e-mail / reenviar</button>
+        <p class="lg-spam">Não chegou? O e-mail pode levar alguns instantes — verifique também a <b>caixa de spam</b>.</p>
       </div>
 
       <p id="lg-msg" class="lg-msg"></p>
@@ -62,7 +63,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v6.1</span>
+      <span class="version-badge">v6.2</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -193,6 +194,7 @@
         <button id="buy-redeem" type="button">Resgatar</button>
       </span>
     </label>
+    <button id="buy-scan" type="button" class="buy-scan">📷 Ler QR code do voucher</button>
     <p id="buy-redeem-msg" class="acc-msg"></p>
     <hr class="prof-sep" />
     <p id="buy-msg" hidden></p>
@@ -499,12 +501,20 @@
     <menu><button id="terms-close" class="primary">Entendi</button></menu>
   </dialog>
 
+  <!-- ============ DIÁLOGO: LER QR CODE (câmera, no app) ============ -->
+  <dialog id="qrscan-dialog" class="qrscan-dialog">
+    <div class="qrscan-head">Aponte a câmera para o QR code do voucher</div>
+    <div class="qrscan-stage"><video id="qrscan-video" playsinline muted></video></div>
+    <p id="qrscan-msg" class="qrscan-msg"></p>
+    <menu><button id="qrscan-cancel">Cancelar</button></menu>
+  </dialog>
+
   <!-- ============ DIÁLOGO: QR CODES DOS VOUCHERS (admin) ============ -->
   <dialog id="qr-dialog" class="qr-dialog">
     <button id="qr-x" class="dialog-x" type="button" aria-label="Fechar">✕</button>
     <h3 id="qr-title">QR codes dos vouchers</h3>
-    <p class="qr-note">Cada QR abre o app e já preenche o voucher para o médico resgatar.
-      Imprima, compartilhe ou tire uma captura de tela.</p>
+    <p class="qr-note">O médico lê o QR <b>dentro do app</b>: Adquirir créditos → “Ler QR code”.
+      Imprima, compartilhe ou tire uma captura de tela para enviar.</p>
     <div id="qr-grid" class="qr-grid"></div>
     <menu><button id="qr-close">Fechar</button></menu>
   </dialog>
@@ -589,6 +599,7 @@
   <script src="./share.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="./account.js"></script>
   <script src="./backup.js"></script>
   <script src="./install.js"></script>

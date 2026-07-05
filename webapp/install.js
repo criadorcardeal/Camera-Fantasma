@@ -43,16 +43,12 @@ window.addEventListener("load", () => {
       '<div class="ihelp-step"><span class="ihelp-num">1</span><p>Toque em <b>Compartilhar</b> ' + shareIcon + " na barra do Safari.</p></div>" +
       '<div class="ihelp-step"><span class="ihelp-num">2</span><p>Role e toque em <b>Adicionar à Tela de Início</b> ' + plusIcon + ".</p></div>" +
       '<div class="ihelp-step"><span class="ihelp-num">3</span><p>Toque em <b>Adicionar</b>, no canto superior direito.</p></div>' +
-      '<button class="ihelp-backup" type="button">💾 Fazer backup agora</button>' +
       '<button class="ihelp-ok" type="button">Entendi</button>' +
       "</div>";
     document.body.appendChild(o);
     const close = () => o.remove();
     o.querySelector(".ihelp-close").addEventListener("click", close);
     o.querySelector(".ihelp-ok").addEventListener("click", close);
-    o.querySelector(".ihelp-backup").addEventListener("click", () => {
-      if (typeof Backup !== "undefined") Backup.openDialog();
-    });
     o.addEventListener("click", (e) => { if (e.target === o) close(); });
   }
 
