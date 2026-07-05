@@ -1069,9 +1069,14 @@ const ScrollHint = {
     if (dlgs.length) return dlgs[dlgs.length - 1];
     const gate = document.getElementById("login-gate");
     if (gate && !gate.hidden) return gate;
-    return null;
+    // Telas do app (Início, Montagem, Ajuste de imagens…) rolam pelo .content.
+    return document.querySelector(".screen.active .content") || null;
   },
   update() {
+    if (this._raf) return;
+    this._raf = requestAnimationFrame(() => { this._raf = null; this._render(); });
+  },
+  _render() {
     const s = this._scroller();
     if (!s) { this.up.hidden = true; this.down.hidden = true; return; }
     // Diálogos modais ficam na "top layer": as setas precisam ser filhas do diálogo
@@ -1084,8 +1089,10 @@ const ScrollHint = {
     const x = Math.round(r.left + r.width / 2);
     const atTop = s.scrollTop <= 4;
     const atBottom = s.scrollTop + s.clientHeight >= s.scrollHeight - 4;
+    // Em telas (host = body) o rodapé tem o botão flutuante; sobe a seta p/ não cobrir.
+    const downOff = (host === document.body) ? 90 : 36;
     this._place(this.up, x, Math.round(r.top + 8), !atTop);
-    this._place(this.down, x, Math.round(r.bottom - 36), !atBottom);
+    this._place(this.down, x, Math.round(r.bottom - downOff), !atBottom);
   },
   _place(el, x, y, show) { el.style.left = x + "px"; el.style.top = y + "px"; el.hidden = !show; },
   _page(dir) { const s = this._scroller(); if (s) s.scrollBy({ top: dir * s.clientHeight * 0.8, behavior: "smooth" }); },
