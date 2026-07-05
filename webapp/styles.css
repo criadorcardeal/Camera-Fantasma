@@ -252,6 +252,18 @@ html, body {
 .terms-body li { margin-bottom: 5px; }
 .terms-note { font-size: 0.8rem; color: var(--muted); font-style: italic; }
 
+/* ---------- Admin: criar vouchers ---------- */
+.admin-sep { border: none; border-top: 1px solid #e2e8ec; margin: 16px 0 10px; }
+.admin-subh { margin: 0 0 8px; font-size: 1rem; color: var(--primary); }
+.vb-grid { display: flex; gap: 10px; }
+.vb-grid label { flex: 1; }
+.vb-create { width: 100%; margin-top: 8px; }
+.vb-copy {
+  width: 100%; margin-top: 8px; border: 1.5px solid var(--primary); background: #fff;
+  color: var(--primary); border-radius: 8px; padding: 9px; font-weight: 600; cursor: pointer;
+}
+#vb-result { width: 100%; font-family: monospace; font-size: 0.95rem; letter-spacing: 1px; resize: vertical; }
+
 /* ---------- Aviso "só neste aparelho" ---------- */
 .od-text { font-size: 0.95rem; line-height: 1.55; margin: 4px 0 14px; }
 .od-check { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; margin-bottom: 6px; cursor: pointer; }

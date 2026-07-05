@@ -24,7 +24,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v4.8</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v4.9</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -60,7 +60,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v4.8</span>
+      <span class="version-badge">v4.9</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -217,6 +217,29 @@
       <button id="admin-close">Cancelar</button>
       <button id="admin-save" class="primary">Salvar</button>
     </menu>
+
+    <hr class="admin-sep" />
+    <h4 class="admin-subh">Criar grupo de vouchers</h4>
+    <div class="vb-grid">
+      <label>Créditos por voucher
+        <input type="number" id="vb-credits" inputmode="numeric" min="1" value="10" />
+      </label>
+      <label>Quantidade de vouchers
+        <input type="number" id="vb-qty" inputmode="numeric" min="1" max="500" value="10" />
+      </label>
+    </div>
+    <label>URL do vídeo (opcional)
+      <input type="text" id="vb-video" autocomplete="off" placeholder="https://…/video.mp4" />
+    </label>
+    <label>Observação (opcional)
+      <input type="text" id="vb-note" autocomplete="off" placeholder="Ex.: Parceiro X — jul/2026" />
+    </label>
+    <button id="vb-create" type="button" class="primary vb-create">Gerar vouchers</button>
+    <p id="vb-msg" class="acc-msg"></p>
+    <label id="vb-result-wrap" hidden>Códigos gerados (copie e envie aos médicos)
+      <textarea id="vb-result" readonly rows="6"></textarea>
+    </label>
+    <button id="vb-copy" type="button" class="vb-copy" hidden>Copiar códigos</button>
   </dialog>
 
   <!-- ============ DIÁLOGO: SALVAR / COMPARTILHAR (v3.0) ============ -->

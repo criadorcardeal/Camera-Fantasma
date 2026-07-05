@@ -191,6 +191,69 @@ end $$;
 
 ---
 
+## Parte 7 — Painel de criação de vouchers no app (admin) (v4.9)
+
+Cria grupos de vouchers direto pelo app (⚙ Administração → "Criar grupo de vouchers"),
+definindo créditos por voucher, quantidade e vídeo. **Só funciona para contas
+administradoras** — a criação passa por um RPC que valida `auth.uid()` na tabela `admins`.
+
+### A) SQL (rode uma vez em SQL Editor)
+```sql
+-- Tabela de administradores (quem pode criar vouchers)
+create table if not exists public.admins (
+  user_id uuid primary key references auth.users on delete cascade,
+  created_at timestamptz default now());
+alter table public.admins enable row level security;   -- sem policies: só via função/dashboard
+
+create or replace function public.is_admin() returns boolean
+language sql security definer set search_path=public stable as $$
+  select exists(select 1 from public.admins where user_id = auth.uid());
+$$;
+
+-- Cria o lote + N vouchers com códigos aleatórios (admin apenas)
+create or replace function public.admin_create_batch(
+  p_credits_each int, p_qty int, p_video_url text, p_note text default null)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_batch uuid; v_codes text[] := '{}'; v_code text; i int;
+begin
+  if not public.is_admin() then raise exception 'sem permissao (admin)'; end if;
+  if p_qty < 1 or p_qty > 500 then raise exception 'quantidade invalida'; end if;
+  if p_credits_each < 1 then raise exception 'creditos invalidos'; end if;
+  insert into public.voucher_batches(credits_each, note, video_url)
+    values (p_credits_each, p_note, nullif(p_video_url,''))
+    returning id into v_batch;
+  for i in 1..p_qty loop
+    v_code := upper(substr(replace(gen_random_uuid()::text,'-',''),1,8));
+    insert into public.vouchers(code, batch_id, credits) values (v_code, v_batch, p_credits_each);
+    v_codes := array_append(v_codes, v_code);
+  end loop;
+  return jsonb_build_object('batch_id', v_batch, 'codes', v_codes);
+end $$;
+
+grant execute on function public.is_admin() to anon, authenticated;
+grant execute on function public.admin_create_batch(int,int,text,text) to anon, authenticated;
+```
+
+### B) Marcar sua conta como administradora (uma vez)
+1. **Authentication → Users** → clique no seu usuário (`criadorcardeal@gmail.com`) →
+   copie o **UID** (User UID).
+2. **SQL Editor** → rode (troque o UID):
+   ```sql
+   insert into public.admins(user_id) values ('COLE_SEU_UID_AQUI')
+     on conflict do nothing;
+   ```
+
+### C) Usar no app
+No app, logado como admin: **⚙ (topo esquerdo) → PIN** (padrão `1234`) →
+**Criar grupo de vouchers** → preencha créditos/quantidade/URL do vídeo → **Gerar vouchers**.
+Os códigos aparecem numa caixa para copiar e enviar aos médicos. O vídeo colado fica
+associado a todos os vouchers daquele grupo.
+
+> O PIN local (`1234`) só abre a janela; a segurança real é o `is_admin()` no servidor.
+> Troque o PIN no próprio painel de Administração.
+
+---
+
 ## Pendências fora do código (responsabilidade do dono do produto)
 - **CNPJ/MEI** e **conta Mercado Pago empresarial** (para receber e emitir nota).
 - **Termos de Uso + Política de Privacidade** e conformidade **LGPD**.

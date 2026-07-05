@@ -196,6 +196,37 @@ const Account = {
     Reward.open(videoUrl);                           // vídeo do grupo do voucher (obrigatório)
   },
 
+  /* ---- Admin: criar um grupo (lote) de vouchers + gerar os códigos ----
+     Seguro: o RPC admin_create_batch só cria se auth.uid() estiver na tabela
+     admins (a chave pública não permite ninguém "cunhar" vouchers). ---- */
+  async createBatch() {
+    const msg = document.getElementById("vb-msg");
+    const credits = parseInt(document.getElementById("vb-credits").value, 10);
+    const qty = parseInt(document.getElementById("vb-qty").value, 10);
+    const video = document.getElementById("vb-video").value.trim();
+    const note = document.getElementById("vb-note").value.trim();
+    if (!(credits >= 1)) { msg.textContent = "Créditos por voucher inválido."; return; }
+    if (!(qty >= 1 && qty <= 500)) { msg.textContent = "Quantidade deve ser de 1 a 500."; return; }
+    if (!this.sb) { msg.textContent = "Sem internet."; return; }
+    if (!this.session) { msg.textContent = "Entre na sua conta de administrador primeiro."; return; }
+    msg.textContent = "Gerando…";
+    const { data, error } = await this.sb.rpc("admin_create_batch", {
+      p_credits_each: credits, p_qty: qty, p_video_url: video, p_note: note || null,
+    });
+    if (error) {
+      msg.textContent = /permiss|admin/i.test(this._err(error))
+        ? "Sua conta não é administradora. Adicione seu usuário à tabela admins (veja o guia)."
+        : "Erro: " + this._err(error);
+      return;
+    }
+    const codes = (data && data.codes) || [];
+    msg.textContent = "✔ " + codes.length + " vouchers criados.";
+    const ta = document.getElementById("vb-result");
+    ta.value = codes.join("\n");
+    document.getElementById("vb-result-wrap").hidden = false;
+    document.getElementById("vb-copy").hidden = false;
+  },
+
   /* ---- "Sair": desabilita o app neste aparelho (exige novo login) ---- */
   async exit() {
     if (!this.sb) return;
@@ -296,6 +327,16 @@ window.addEventListener("DOMContentLoaded", () => {
   on("prof-exit", () => Account.exit());
   on("prof-logout", () => Account.logout());
 
+  // Admin — criar vouchers
+  on("vb-create", () => Account.createBatch());
+  on("vb-copy", () => {
+    const ta = document.getElementById("vb-result");
+    if (!ta) return;
+    ta.select();
+    if (navigator.clipboard) navigator.clipboard.writeText(ta.value).catch(() => {});
+    else document.execCommand("copy");
+  });
+
   // Termos de uso
   const openTerms = (e) => {
     if (e) e.preventDefault();
@@ -314,6 +355,9 @@ window.addEventListener("DOMContentLoaded", () => {
   on("reward-exit", () => {
     const dlg = document.getElementById("reward-dialog");
     if (dlg && dlg.open) dlg.close();
+    // Volta à tela ComparaCam, fechando o popup "Adquirir créditos".
+    const buy = document.getElementById("buy-dialog");
+    if (buy && buy.open) buy.close();
   });
   const rdlg = document.getElementById("reward-dialog");
   if (rdlg) rdlg.addEventListener("cancel", (e) => {
