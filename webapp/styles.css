@@ -262,6 +262,25 @@ html, body {
   border: none; border-radius: 10px; background: var(--primary); color: #fff; cursor: pointer;
 }
 #vb-video-file { width: 100%; font-size: 0.85rem; }
+.vb-list-head { display: flex; align-items: center; justify-content: space-between; }
+.vb-refresh {
+  border: 1.5px solid var(--primary); background: #fff; color: var(--primary);
+  border-radius: 8px; padding: 5px 12px; font-weight: 600; font-size: 0.82rem; cursor: pointer;
+}
+.vb-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.vb-empty { color: var(--muted); font-size: 0.88rem; margin: 4px 0; }
+.vb-card { border: 1px solid #dce4e9; border-radius: 10px; padding: 10px 12px; background: #f7fafb; }
+.vb-card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.vb-card-top b { color: var(--primary); }
+.vb-card-top span { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+.vb-card-row { font-size: 0.88rem; margin-top: 3px; }
+.vb-card-row.vb-muted { color: var(--muted); font-size: 0.8rem; }
+.vb-card-btns { display: flex; gap: 8px; margin-top: 8px; }
+.vb-card-btns button {
+  flex: 1; border: 1.5px solid var(--primary); background: #fff; color: var(--primary);
+  border-radius: 8px; padding: 7px; font-weight: 600; font-size: 0.8rem; cursor: pointer;
+}
+.vb-card-btns button[data-act="disable"] { border-color: #c0392b; color: #c0392b; }
 .vb-copy {
   width: 100%; margin-top: 8px; border: 1.5px solid var(--primary); background: #fff;
   color: var(--primary); border-radius: 8px; padding: 9px; font-weight: 600; cursor: pointer;

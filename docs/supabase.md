@@ -309,6 +309,83 @@ grant execute on function public.wallet_refund(int) to anon, authenticated;
 
 ---
 
+## Parte 10 — Gestão de vouchers no admin (listar/validade/desativar) (v5.2)
+
+O painel passa a **listar os grupos** (resgatados/restantes, validade, vídeo), permite
+**validade** na criação, **ver os códigos** de um grupo e **desativar** os que sobraram.
+Rode este SQL uma vez (recria `admin_create_batch` com validade + 3 funções novas):
+
+```sql
+-- create_batch agora aceita validade em dias (p_expires_days)
+drop function if exists public.admin_create_batch(int,int,text,text);
+create or replace function public.admin_create_batch(
+  p_credits_each int, p_qty int, p_video_url text, p_note text default null, p_expires_days int default null)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_batch uuid; v_codes text[] := '{}'; v_code text; i int; v_exp timestamptz;
+begin
+  if not public.is_admin() then raise exception 'sem permissao (admin)'; end if;
+  if p_qty < 1 or p_qty > 500 then raise exception 'quantidade invalida'; end if;
+  if p_credits_each < 1 then raise exception 'creditos invalidos'; end if;
+  if p_expires_days is not null and p_expires_days > 0 then
+    v_exp := now() + (p_expires_days || ' days')::interval; end if;
+  insert into public.voucher_batches(credits_each, note, video_url)
+    values (p_credits_each, p_note, nullif(p_video_url,'')) returning id into v_batch;
+  for i in 1..p_qty loop
+    v_code := upper(substr(replace(gen_random_uuid()::text,'-',''),1,8));
+    insert into public.vouchers(code, batch_id, credits, expires_at) values (v_code, v_batch, p_credits_each, v_exp);
+    v_codes := array_append(v_codes, v_code);
+  end loop;
+  return jsonb_build_object('batch_id', v_batch, 'codes', v_codes);
+end $$;
+
+create or replace function public.admin_list_batches()
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_res jsonb;
+begin
+  if not public.is_admin() then raise exception 'sem permissao (admin)'; end if;
+  select coalesce(jsonb_agg(row_to_json(t)), '[]'::jsonb) into v_res from (
+    select b.id, b.note, b.credits_each, b.video_url, b.created_at,
+      count(v.code) as total,
+      count(v.code) filter (where v.status='redeemed') as redeemed,
+      count(v.code) filter (where v.status='active') as active,
+      count(v.code) filter (where v.status='disabled') as disabled,
+      min(v.expires_at) as expires_at
+    from public.voucher_batches b
+    left join public.vouchers v on v.batch_id = b.id
+    group by b.id order by b.created_at desc) t;
+  return v_res;
+end $$;
+
+create or replace function public.admin_batch_codes(p_batch uuid)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_res jsonb;
+begin
+  if not public.is_admin() then raise exception 'sem permissao (admin)'; end if;
+  select coalesce(jsonb_agg(jsonb_build_object('code',code,'status',status) order by code), '[]'::jsonb)
+    into v_res from public.vouchers where batch_id = p_batch;
+  return v_res;
+end $$;
+
+create or replace function public.admin_disable_batch(p_batch uuid)
+returns int language plpgsql security definer set search_path=public as $$
+declare n int;
+begin
+  if not public.is_admin() then raise exception 'sem permissao (admin)'; end if;
+  update public.vouchers set status='disabled' where batch_id=p_batch and status='active';
+  get diagnostics n = row_count; return n;
+end $$;
+
+grant execute on function public.admin_create_batch(int,int,text,text,int) to anon, authenticated;
+grant execute on function public.admin_list_batches() to anon, authenticated;
+grant execute on function public.admin_batch_codes(uuid) to anon, authenticated;
+grant execute on function public.admin_disable_batch(uuid) to anon, authenticated;
+```
+
+No painel: os grupos aparecem em "Grupos criados" (botão **Atualizar**); cada card mostra
+resgatados/restantes, validade e se tem vídeo, com **Ver códigos** e **Desativar restantes**.
+
+---
+
 ## Pendências fora do código (responsabilidade do dono do produto)
 - **CNPJ/MEI** e **conta Mercado Pago empresarial** (para receber e emitir nota).
 - **Termos de Uso + Política de Privacidade** e conformidade **LGPD**.

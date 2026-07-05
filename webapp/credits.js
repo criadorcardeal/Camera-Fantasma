@@ -65,6 +65,7 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("cred-admin").addEventListener("click", () => {
     document.getElementById("admin-price").value = Credits.getUnitPrice().toFixed(2);
     adminDlg.showModal();
+    if (typeof Account !== "undefined" && Account.listBatches) Account.listBatches();
   });
   document.getElementById("admin-close").addEventListener("click", () => adminDlg.close());
   document.getElementById("admin-save").addEventListener("click", () => {

@@ -255,6 +255,7 @@ const Account = {
     const qty = parseInt(document.getElementById("vb-qty").value, 10);
     let video = document.getElementById("vb-video").value.trim();
     const note = document.getElementById("vb-note").value.trim();
+    const expires = parseInt(document.getElementById("vb-expires").value, 10);
     const fileInput = document.getElementById("vb-video-file");
     const file = fileInput && fileInput.files && fileInput.files[0];
     if (!(credits >= 1)) { msg.textContent = "Créditos por voucher inválido."; return; }
@@ -273,6 +274,7 @@ const Account = {
     msg.textContent = "Gerando…";
     const { data, error } = await this.sb.rpc("admin_create_batch", {
       p_credits_each: credits, p_qty: qty, p_video_url: video, p_note: note || null,
+      p_expires_days: (expires >= 1 ? expires : null),
     });
     if (error) {
       msg.textContent = /permiss|admin/i.test(this._err(error))
@@ -286,6 +288,60 @@ const Account = {
     ta.value = codes.join("\n");
     document.getElementById("vb-result-wrap").hidden = false;
     document.getElementById("vb-copy").hidden = false;
+    this.listBatches();                              // atualiza a lista de grupos
+  },
+
+  _esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g,
+      (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  },
+
+  /* ---- Admin: listar grupos criados com contagens ---- */
+  async listBatches() {
+    const box = document.getElementById("vb-list");
+    if (!box) return;
+    if (!this.sb || !this.session) { box.innerHTML = ""; return; }
+    box.innerHTML = "<p class='vb-empty'>Carregando…</p>";
+    const { data, error } = await this.sb.rpc("admin_list_batches");
+    if (error) { box.innerHTML = "<p class='vb-empty'>" + this._esc(this._err(error)) + "</p>"; return; }
+    const arr = data || [];
+    if (!arr.length) { box.innerHTML = "<p class='vb-empty'>Nenhum grupo criado ainda.</p>"; return; }
+    box.innerHTML = arr.map((b) => {
+      const exp = b.expires_at ? "vence " + new Date(b.expires_at).toLocaleDateString("pt-BR") : "sem validade";
+      const vid = b.video_url ? "com vídeo" : "sem vídeo";
+      const dis = b.disabled ? " · Desativados: " + b.disabled : "";
+      return "<div class='vb-card'>" +
+        "<div class='vb-card-top'><b>" + this._esc(b.note || "Sem nome") + "</b>" +
+        "<span>" + b.credits_each + " créd/voucher</span></div>" +
+        "<div class='vb-card-row'>Resgatados: <b>" + b.redeemed + "/" + b.total + "</b> · Restantes: <b>" + b.active + "</b>" + dis + "</div>" +
+        "<div class='vb-card-row vb-muted'>" + exp + " · " + vid + "</div>" +
+        "<div class='vb-card-btns'>" +
+        "<button type='button' data-act='codes' data-batch='" + b.id + "'>Ver códigos</button>" +
+        "<button type='button' data-act='disable' data-batch='" + b.id + "'>Desativar restantes</button>" +
+        "</div></div>";
+    }).join("");
+  },
+
+  async viewCodes(batch) {
+    const msg = document.getElementById("vb-msg");
+    const { data, error } = await this.sb.rpc("admin_batch_codes", { p_batch: batch });
+    if (error) { msg.textContent = "Erro: " + this._err(error); return; }
+    const lines = (data || []).map((v) =>
+      v.code + (v.status === "redeemed" ? "  (resgatado)" : v.status === "disabled" ? "  (desativado)" : ""));
+    const ta = document.getElementById("vb-result");
+    ta.value = lines.join("\n");
+    document.getElementById("vb-result-wrap").hidden = false;
+    document.getElementById("vb-copy").hidden = false;
+    msg.textContent = lines.length + " código(s).";
+  },
+
+  async disableBatch(batch) {
+    if (!confirm("Desativar todos os vouchers ainda não resgatados deste grupo? Eles deixarão de funcionar.")) return;
+    const msg = document.getElementById("vb-msg");
+    const { data, error } = await this.sb.rpc("admin_disable_batch", { p_batch: batch });
+    if (error) { msg.textContent = "Erro: " + this._err(error); return; }
+    msg.textContent = data + " voucher(s) desativado(s).";
+    this.listBatches();
   },
 
   /* ---- "Sair": desabilita o app neste aparelho (exige novo login) ---- */
@@ -388,14 +444,23 @@ window.addEventListener("DOMContentLoaded", () => {
   on("prof-exit", () => Account.exit());
   on("prof-logout", () => Account.logout());
 
-  // Admin — criar vouchers
+  // Admin — criar / gerir vouchers
   on("vb-create", () => Account.createBatch());
+  on("vb-list-refresh", () => Account.listBatches());
   on("vb-copy", () => {
     const ta = document.getElementById("vb-result");
     if (!ta) return;
     ta.select();
     if (navigator.clipboard) navigator.clipboard.writeText(ta.value).catch(() => {});
     else document.execCommand("copy");
+  });
+  const vbList = document.getElementById("vb-list");
+  if (vbList) vbList.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const batch = btn.getAttribute("data-batch");
+    if (btn.getAttribute("data-act") === "codes") Account.viewCodes(batch);
+    else if (btn.getAttribute("data-act") === "disable") Account.disableBatch(batch);
   });
 
   // Termos de uso
