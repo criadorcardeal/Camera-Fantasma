@@ -30,7 +30,7 @@
 
 /* ---------- Convite para instalar na tela de início ---------- */
 .install-banner {
-  position: fixed; left: 12px; right: 12px; z-index: 9998;
+  position: fixed; left: 12px; right: 12px; z-index: 9990;
   bottom: calc(12px + env(safe-area-inset-bottom));
   display: flex; align-items: center; gap: 12px;
   background: #fff; border: 1px solid #dbe3e9; border-radius: 14px; padding: 10px 12px;
@@ -138,23 +138,49 @@ html, body {
 }
 /* Badge da versão, agora na barra de créditos (fundo claro). */
 .credits-bar .version-badge { width: auto; white-space: nowrap; color: var(--muted); }
-/* Botão de conta (login / fase paga) */
-.cc-account {
-  background: #fff; border: 1.5px solid var(--primary); color: var(--primary);
-  border-radius: 16px; padding: 5px 12px; font-size: 0.82rem; font-weight: 600;
-  cursor: pointer; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* ---------- Login obrigatório (gate) ---------- */
+#login-gate {
+  position: fixed; inset: 0; z-index: 9995; overflow-y: auto;
+  background: #0e2a3b; display: flex; align-items: center; justify-content: center; padding: 24px;
 }
-.cc-account.logged { background: var(--primary); color: #fff; }
+#login-gate[hidden] { display: none; }
+#login-gate .lg-card {
+  background: #fff; border-radius: 18px; padding: 26px 22px; width: min(92vw, 380px);
+  text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+#login-gate .lg-ic { width: 96px; height: 96px; border-radius: 22px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+#login-gate .lg-name { font-size: 1.35rem; font-weight: 700; color: var(--primary); margin: 12px 0 4px; }
+#login-gate .lg-sub { font-size: 0.88rem; color: var(--muted); line-height: 1.5; margin: 0 0 16px; }
+#login-gate .lg-label { display: block; text-align: left; font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
+#login-gate input {
+  width: 100%; padding: 12px; font-size: 1rem; border: 1px solid #ccd4d9; border-radius: 10px;
+}
+#login-gate .lg-send { margin-top: 12px; }
+#login-gate .lg-send:disabled { opacity: 0.55; cursor: default; }
+#login-gate .lg-msg { font-size: 0.82rem; color: var(--primary); min-height: 16px; margin: 12px 0 0; line-height: 1.45; }
 
-/* Diálogo de Conta */
-.acc-hint { font-size: 0.85rem; color: var(--muted); margin: 0 0 10px; line-height: 1.5; }
-.acc-user-line { font-size: 0.9rem; margin: 0 0 6px; }
-.acc-balance {
-  background: #eef3f6; border-radius: 10px; padding: 10px 12px; margin: 6px 0 12px;
-  font-size: 0.95rem; color: var(--primary);
+/* ---------- Seção Conta dentro do Perfil ---------- */
+.prof-acc-row { font-size: 0.9rem; margin: 0 0 4px; }
+.prof-acc-row b { color: var(--primary); }
+.prof-acc-bal-row {
+  background: #eef3f6; border-radius: 10px; padding: 8px 12px; margin: 6px 0 10px;
+  font-size: 0.92rem; color: var(--primary);
 }
-.acc-balance b { font-size: 1.2rem; }
-.acc-msg { font-size: 0.82rem; color: var(--primary); min-height: 16px; margin: 8px 0 0; }
+.prof-acc-bal-row b { font-size: 1.1rem; }
+.prof-acc-vlabel { display: block; font-weight: 600; font-size: 0.85rem; margin: 4px 0; }
+.prof-voucher-row { display: flex; gap: 8px; margin-top: 4px; }
+.prof-voucher-row input {
+  flex: 1; padding: 9px 10px; border: 1px solid #ccd4d9; border-radius: 8px; font-size: 0.95rem;
+}
+.prof-voucher-row button {
+  border: 1.5px solid var(--primary); background: #fff; color: var(--primary);
+  border-radius: 8px; padding: 0 14px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+}
+.prof-logout {
+  margin-top: 12px; width: 100%; padding: 10px; border: 1.5px solid #c0392b; background: #fff;
+  color: #c0392b; border-radius: 10px; font-weight: 600; font-size: 0.9rem; cursor: pointer;
+}
+.acc-msg { font-size: 0.82rem; color: var(--primary); min-height: 16px; margin: 6px 0 0; }
 .cred-actions { display: flex; align-items: center; gap: 8px; }
 .cred-buy {
   background: var(--primary); color: #fff; border: none;

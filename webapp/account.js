@@ -1,10 +1,10 @@
 "use strict";
 
 /* =========================================================================
-   ComparaCam - Conta (fase paga, Stage 1).
-   Login por LINK MÁGICO (Supabase Auth) + saldo de créditos no SERVIDOR +
-   resgate de VOUCHER. As fotos continuam só no aparelho — aqui só trafega
-   conta/saldo/voucher. Chaves PÚBLICAS (protegidas por RLS) — ok no frontend.
+   ComparaCam - Conta (fase paga). Login OBRIGATÓRIO por LINK MÁGICO
+   (Supabase Auth). Sem sessão => o app fica atrás do #login-gate. Depois de
+   logado, a conta (e-mail, saldo, resgatar voucher, trocar perfil) fica dentro
+   da janela Perfil. As fotos continuam só no aparelho. Chaves PÚBLICAS (RLS).
    ========================================================================= */
 
 const CC_SB_URL = "https://djrzihtdlzaqtdmjvdvx.supabase.co";
@@ -12,57 +12,52 @@ const CC_SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 
 const Account = {
   sb: null,
+  session: null,
 
   init() {
-    if (!(window.supabase && window.supabase.createClient)) return; // lib não carregou (offline)
+    // Sem a biblioteca (1º acesso offline): mantém o gate; login exige internet.
+    if (!(window.supabase && window.supabase.createClient)) return;
     this.sb = window.supabase.createClient(CC_SB_URL, CC_SB_KEY);
-    this.sb.auth.onAuthStateChange((_e, session) => this.render(session));
-    this.sb.auth.getSession().then(({ data }) => this.render(data.session)).catch(() => {});
+    this.sb.auth.onAuthStateChange((_e, session) => this.apply(session));
+    this.sb.auth.getSession().then(({ data }) => this.apply(data.session)).catch(() => {});
+    // Recarrega o saldo ao abrir o Perfil.
+    ["cred-profile", "detail-profile"].forEach((id) => {
+      const b = document.getElementById(id);
+      if (b) b.addEventListener("click", () => { if (this.session) this.loadBalance(); });
+    });
   },
 
-  render(session) {
+  apply(session) {
+    this.session = session || null;
     const logged = !!(session && session.user);
-    const btn = document.getElementById("cc-account");
-    if (btn) {
-      btn.textContent = logged ? session.user.email.split("@")[0] : "Entrar";
-      btn.classList.toggle("logged", logged);
+    const gate = document.getElementById("login-gate");
+    if (gate) gate.hidden = logged;                 // logado => libera o app
+    if (logged) {
+      const em = document.getElementById("prof-acc-email");
+      if (em) em.textContent = session.user.email;
+      this.loadBalance();
     }
-    const out = document.getElementById("acc-out");
-    const inn = document.getElementById("acc-in");
-    if (out && inn) {
-      out.hidden = logged;
-      inn.hidden = !logged;
-      if (logged) {
-        document.getElementById("acc-user").textContent = session.user.email;
-        this.loadBalance();
-      }
-    }
-  },
-
-  async open() {
-    if (!this.sb) { alert("Sem conexão para entrar na conta. Tente com internet."); return; }
-    const { data } = await this.sb.auth.getSession();
-    this.render(data.session);
-    document.getElementById("acc-msg").textContent = "";
-    document.getElementById("acc-redeem-msg").textContent = "";
-    document.getElementById("account-dialog").showModal();
   },
 
   async sendLink() {
-    const email = document.getElementById("acc-email").value.trim();
-    const msg = document.getElementById("acc-msg");
-    if (!email) { msg.textContent = "Digite seu e-mail."; return; }
+    const email = document.getElementById("lg-email").value.trim();
+    const msg = document.getElementById("lg-msg");
+    const btn = document.getElementById("lg-send");
+    if (!/.+@.+\..+/.test(email)) { msg.textContent = "Digite um e-mail válido."; return; }
+    if (!this.sb) { msg.textContent = "Sem internet para o primeiro acesso. Conecte-se e tente de novo."; return; }
+    btn.disabled = true;
     msg.textContent = "Enviando…";
     const { error } = await this.sb.auth.signInWithOtp({
       email, options: { emailRedirectTo: location.origin + location.pathname },
     });
-    msg.textContent = error
-      ? "Erro: " + error.message
-      : "Enviamos um link de acesso para " + email + ". Abra o link neste mesmo aparelho.";
+    if (error) { btn.disabled = false; msg.textContent = "Erro: " + error.message; return; }
+    btn.textContent = "Link enviado ✓";            // permanece desabilitado
+    msg.textContent = "Enviamos um link de acesso para " + email +
+      ". Abra o link neste mesmo aparelho para entrar.";
   },
 
   async loadBalance() {
-    const el = document.getElementById("acc-bal");
+    const el = document.getElementById("prof-acc-bal");
     if (el) el.textContent = "…";
     try {
       const { data } = await this.sb.from("wallets").select("balance").maybeSingle();
@@ -71,8 +66,8 @@ const Account = {
   },
 
   async redeem() {
-    const code = document.getElementById("acc-voucher").value.trim();
-    const msg = document.getElementById("acc-redeem-msg");
+    const code = document.getElementById("prof-voucher").value.trim();
+    const msg = document.getElementById("prof-redeem-msg");
     if (!code) { msg.textContent = "Digite o código do voucher."; return; }
     msg.textContent = "Resgatando…";
     const { data, error } = await this.sb.rpc("redeem_voucher", { p_code: code });
@@ -82,22 +77,26 @@ const Account = {
       return;
     }
     msg.textContent = "✔ +" + data + " créditos adicionados!";
-    document.getElementById("acc-voucher").value = "";
+    document.getElementById("prof-voucher").value = "";
     this.loadBalance();
   },
 
   async logout() {
-    if (this.sb) await this.sb.auth.signOut();
-    document.getElementById("account-dialog").close();
+    if (!this.sb) return;
+    if (!confirm("Trocar de perfil? Você vai sair desta conta.")) return;
+    await this.sb.auth.signOut();
+    const pd = document.getElementById("profile-dialog");
+    if (pd && pd.open) pd.close();
+    // onAuthStateChange(SIGNED_OUT) -> apply() reabre o gate.
   },
 };
 
 window.addEventListener("DOMContentLoaded", () => {
   Account.init();
   const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener("click", fn); };
-  on("cc-account", () => Account.open());
-  on("acc-x", () => document.getElementById("account-dialog").close());
-  on("acc-send", () => Account.sendLink());
-  on("acc-redeem", () => Account.redeem());
-  on("acc-logout", () => Account.logout());
+  on("lg-send", () => Account.sendLink());
+  on("prof-redeem", () => Account.redeem());
+  on("prof-logout", () => Account.logout());
+  const email = document.getElementById("lg-email");
+  if (email) email.addEventListener("keydown", (e) => { if (e.key === "Enter") Account.sendLink(); });
 });

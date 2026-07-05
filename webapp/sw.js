@@ -1,9 +1,10 @@
 /* Service worker: network-first (sempre pega a versao nova quando online;
    usa o cache apenas como reserva offline). */
-/* v4.2 (inicio da fase paga): Conta com login por link magico (Supabase),
-   saldo de creditos no servidor e resgate de voucher (aditivo; o gating de
-   credito segue local por enquanto). Bibliotecas externas nao entram no cache. */
-const CACHE = "fotos-fantasma-v39";
+/* v4.2 (fase paga): login OBRIGATORIO por link magico (Supabase) — o app fica
+   atras do #login-gate ate entrar; conta/saldo/voucher/"trocar perfil" dentro
+   do Perfil. Bibliotecas externas (supabase-js) sao cacheadas pelo fetch handler
+   apos o 1o acesso, para funcionar offline com sessao ja salva. */
+const CACHE = "fotos-fantasma-v40";
 const ASSETS = [
   "./",
   "./index.html",

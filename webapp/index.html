@@ -20,6 +20,20 @@
     <div class="splash-name">ComparaCam</div>
   </div>
 
+  <!-- ============ LOGIN OBRIGATÓRIO ============ -->
+  <div id="login-gate">
+    <div class="lg-card">
+      <img src="./icon.svg" alt="" class="lg-ic" />
+      <div class="lg-name">ComparaCam</div>
+      <p class="lg-sub">Entre com seu e-mail para usar o app. Sem senha — você recebe um link de acesso.</p>
+      <label class="lg-label">E-mail
+        <input type="email" id="lg-email" inputmode="email" autocomplete="email" placeholder="voce@exemplo.com" />
+      </label>
+      <button id="lg-send" class="btn primary lg-send" type="button">Enviar link de acesso</button>
+      <p id="lg-msg" class="lg-msg"></p>
+    </div>
+  </div>
+
   <!-- ============ TELA: INÍCIO ============ -->
   <section id="screen-home" class="screen active">
     <header class="topbar">
@@ -32,7 +46,6 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Comprar</button>
       </span>
-      <button id="cc-account" class="cc-account" type="button">Entrar</button>
       <span class="version-badge">v4.2</span>
     </div>
     <div class="content" id="home-list"></div>
@@ -229,6 +242,21 @@
   <dialog id="profile-dialog">
     <button id="prof-x" class="dialog-x" type="button" aria-label="Fechar sem salvar">✕</button>
     <h3>Perfil</h3>
+
+    <div class="prof-acc">
+      <div class="prof-acc-row">Conta: <b id="prof-acc-email">—</b></div>
+      <div class="prof-acc-bal-row">Saldo: <b id="prof-acc-bal">…</b> créditos</div>
+      <label class="prof-acc-vlabel">Resgatar voucher
+        <span class="prof-voucher-row">
+          <input type="text" id="prof-voucher" autocomplete="off" placeholder="Código" />
+          <button id="prof-redeem" type="button">Resgatar</button>
+        </span>
+      </label>
+      <p id="prof-redeem-msg" class="acc-msg"></p>
+      <button id="prof-logout" class="prof-logout" type="button">Trocar perfil</button>
+    </div>
+    <hr class="prof-sep" />
+
     <label>Nome
       <input type="text" id="prof-name" placeholder="Seu nome" autocomplete="off" />
     </label>
@@ -330,33 +358,6 @@
       <button id="save-warn-cancel">Cancelar</button>
       <button id="save-warn-ok" class="primary">Salvar</button>
     </menu>
-  </dialog>
-
-  <!-- ============ DIÁLOGO: CONTA (fase paga, v4.2) ============ -->
-  <dialog id="account-dialog">
-    <button id="acc-x" class="dialog-x" type="button" aria-label="Fechar">✕</button>
-    <h3>Conta</h3>
-
-    <div id="acc-out">
-      <p class="acc-hint">Entre para guardar seus créditos na sua conta e usá-los em
-        qualquer aparelho. Sem senha — você recebe um link de acesso por e-mail.</p>
-      <label>E-mail
-        <input type="email" id="acc-email" inputmode="email" autocomplete="email" placeholder="voce@exemplo.com" />
-      </label>
-      <button id="acc-send" class="btn primary" style="margin-top:10px">Enviar link de acesso</button>
-      <p id="acc-msg" class="acc-msg"></p>
-    </div>
-
-    <div id="acc-in" hidden>
-      <p class="acc-user-line">Conectado como <b id="acc-user"></b></p>
-      <div class="acc-balance">Saldo: <b id="acc-bal">…</b> créditos</div>
-      <label>Resgatar voucher
-        <input type="text" id="acc-voucher" autocomplete="off" placeholder="Código do voucher" />
-      </label>
-      <button id="acc-redeem" class="btn primary" style="margin-top:10px">Resgatar</button>
-      <p id="acc-redeem-msg" class="acc-msg"></p>
-      <button id="acc-logout" class="btn outline" style="margin-top:14px">Sair</button>
-    </div>
   </dialog>
 
   <!-- ============ DIÁLOGO: NOVA COMPARAÇÃO ============ -->

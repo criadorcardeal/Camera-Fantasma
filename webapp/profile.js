@@ -345,9 +345,11 @@ window.addEventListener("DOMContentLoaded", () => {
   // Cancelar fecha SEM salvar (só habilita quando há alteração).
   $("#prof-close").addEventListener("click", () => $("#profile-dialog").close());
   $("#prof-save").addEventListener("click", () => Profile.save());
-  // Qualquer mudança nos campos do diálogo habilita Cancelar/Salvar.
-  $("#profile-dialog").addEventListener("input", () => Profile._markDirty());
-  $("#profile-dialog").addEventListener("change", () => Profile._markDirty());
+  // Qualquer mudança nos campos do diálogo habilita Cancelar/Salvar
+  // (exceto a seção Conta, que tem ações próprias).
+  const dirtyIf = (e) => { if (!e.target.closest(".prof-acc")) Profile._markDirty(); };
+  $("#profile-dialog").addEventListener("input", dirtyIf);
+  $("#profile-dialog").addEventListener("change", dirtyIf);
   $("#prof-transp").addEventListener("input", (e) => {
     $("#prof-transp-val").textContent = e.target.value + "%";
     Profile._applyPreviewOpacity();
