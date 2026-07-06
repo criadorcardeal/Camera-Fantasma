@@ -30,7 +30,17 @@ function downloadFile(file) {
 // Resolve true quando salvou/compartilhou; false se o usuário cancelou.
 function shareFile(file) {
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    return navigator.share({ files: [file], title: file.name }).then(() => true).catch(() => false);
+    return navigator.share({ files: [file], title: file.name })
+      .then(() => true)
+      .catch((err) => {
+        // AbortError = usuário cancelou de propósito: não faz nada. Qualquer
+        // outra falha (comum no Android ao compartilhar VÍDEO, quando nenhum
+        // destino aceita o formato) baixa o arquivo como alternativa, para o
+        // vídeo não sumir sem aviso.
+        if (err && err.name === "AbortError") return false;
+        downloadFile(file);
+        return true;
+      });
   }
   downloadFile(file);
   return Promise.resolve(true);
@@ -39,7 +49,13 @@ function shareFile(file) {
 // Compartilha/salva VÁRIOS arquivos (ex.: as 2 fotos separadas).
 function shareFiles(files) {
   if (navigator.canShare && navigator.canShare({ files })) {
-    return navigator.share({ files }).then(() => true).catch(() => false);
+    return navigator.share({ files })
+      .then(() => true)
+      .catch((err) => {
+        if (err && err.name === "AbortError") return false;
+        files.forEach((f, i) => setTimeout(() => downloadFile(f), i * 400));
+        return true;
+      });
   }
   files.forEach((f, i) => setTimeout(() => downloadFile(f), i * 400));
   return Promise.resolve(true);

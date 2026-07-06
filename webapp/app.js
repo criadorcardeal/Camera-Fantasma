@@ -934,8 +934,19 @@ function renderCompare(mode) {
       <div class="seg" style="margin-top:8px;background:transparent;padding:0">
         <input type="range" min="0" max="1" step="0.01" value="0.5" id="ov-range" style="width:100%" />
       </div>`;
+    // Rótulos só aparecem quando a respectiva foto tem MAIS de 50% visível.
+    // No Sobrepor, a "visibilidade" do acompanhamento é a própria opacidade.
+    const ovStage = host.querySelector(".compare-stage");
+    const ovCapB = ovStage.querySelector(".cap-left");
+    const ovCapF = ovStage.querySelector(".cap-right");
+    const ovCaps = (v) => {
+      if (ovCapB) ovCapB.style.visibility = v < 0.5 ? "" : "hidden";
+      if (ovCapF) ovCapF.style.visibility = v > 0.5 ? "" : "hidden";
+    };
+    ovCaps(0.5);
     $("#ov-range").addEventListener("input", (e) => {
       $("#ov-after").style.opacity = e.target.value;
+      ovCaps(parseFloat(e.target.value));
     });
     requestAnimationFrame(sizeWmNames);
     return;
@@ -956,6 +967,8 @@ function renderCompare(mode) {
   const clip = stage.querySelector(".after-clip");
   const after = $("#cur-after");
   const line = $("#cur-line");
+  const capBEl = stage.querySelector(".cap-left");
+  const capFEl = stage.querySelector(".cap-right");
   const setSplit = (ratio) => {
     ratio = Math.max(0, Math.min(1, ratio));
     const w = stage.clientWidth;
@@ -963,6 +976,10 @@ function renderCompare(mode) {
     after.style.width = w + "px";
     after.style.maxWidth = "none";
     line.style.left = (ratio * 100) + "%";
+    // ratio = fração do acompanhamento à mostra; a base ocupa (1 - ratio).
+    // Cada rótulo só aparece quando sua foto tem MAIS de 50% visível.
+    if (capBEl) capBEl.style.visibility = ratio < 0.5 ? "" : "hidden";
+    if (capFEl) capFEl.style.visibility = ratio > 0.5 ? "" : "hidden";
   };
   setSplit(0.5);
   $("#cur-range").addEventListener("input", (e) => setSplit(parseFloat(e.target.value)));

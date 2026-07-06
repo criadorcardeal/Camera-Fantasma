@@ -715,6 +715,24 @@
   <script src="./profile.js"></script>
   <script src="./share.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    /* Fallback p/ Safari antigo (ex.: iPad no iOS 12.5 / Safari 12.1): o bundle
+       acima usa sintaxe nova (optional chaining "?.") que o Safari 12 não
+       interpreta, deixando window.supabase indefinido e o login "sem internet".
+       Se isso ocorrer, carregamos uma versão transpilada para ES2017 (esm.sh)
+       como módulo e avisamos o app ("cc-supabase-ready"). Aparelhos modernos,
+       onde o bundle acima funcionou, nem entram aqui. */
+    if (!(window.supabase && window.supabase.createClient)) {
+      var _sbm = document.createElement("script");
+      _sbm.type = "module";
+      _sbm.textContent =
+        'import { createClient } from "https://esm.sh/@supabase/supabase-js@2?target=es2017";' +
+        'window.supabase = window.supabase || {};' +
+        'window.supabase.createClient = createClient;' +
+        'window.dispatchEvent(new Event("cc-supabase-ready"));';
+      document.head.appendChild(_sbm);
+    }
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
