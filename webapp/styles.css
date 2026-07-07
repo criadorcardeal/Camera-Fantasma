@@ -767,6 +767,27 @@ dialog {
   max-height: 90dvh; overflow-y: auto;
 }
 dialog::backdrop { background: rgba(0,0,0,0.5); }
+
+/* ---- Polyfill de <dialog> (Safari antigo, ex.: iPad iOS 12.5) ----
+   Quando o <dialog> nativo não existe, dialog-polyfill.js põe .no-dialog no
+   <html>. Aqui escondemos os diálogos fechados (o Safari os mostraria todos
+   empilhados) e centralizamos os abertos como modal, com backdrop. O Safari
+   12.1 também não entende a unidade dvh, então repomos com vh. */
+html.no-dialog dialog { display: none; }
+html.no-dialog dialog[open] {
+  display: block; position: fixed; left: 50%; top: 50%;
+  transform: translate(-50%, -50%); margin: 0; z-index: 1000;
+  max-height: 90vh;
+}
+html.no-dialog .reward-dialog[open] {
+  left: 0; top: 0; transform: none; width: 100vw; height: 100vh; max-height: 100vh;
+}
+html.no-dialog .reward-inner { height: 100vh; }
+html.no-dialog .screen { height: 100vh; }
+.dialog-backdrop-polyfill {
+  display: none; position: fixed; left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 999;
+}
 dialog h3 { margin: 0 0 12px; }
 dialog label { display: block; margin: 8px 0 4px; font-weight: 600; }
 dialog input { width: 100%; padding: 10px; font-size: 1.1rem; border: 1px solid #ccc; border-radius: 8px; }

@@ -12,6 +12,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="ComparaCam" />
   <link rel="stylesheet" href="./styles.css" />
+  <!-- Polyfill de <dialog> p/ Safari antigo (iPad iOS 12.5); no <head> p/ a
+       classe .no-dialog entrar antes do body renderizar (sem flash). -->
+  <script src="./dialog-polyfill.js"></script>
 </head>
 <body>
   <!-- ============ SPLASH (abertura com cara de app) ============ -->
