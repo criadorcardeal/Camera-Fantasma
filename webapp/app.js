@@ -560,8 +560,12 @@ function captureViaNativeCamera(mode, session) {
   inp.type = "file";
   inp.accept = "image/*";
   inp.setAttribute("capture", "environment"); // pede a câmera direto
+  // iOS antigo (iOS 12) só dispara o "change" se o input estiver ANEXADO ao DOM.
+  inp.style.cssText = "position:fixed;left:-9999px;width:1px;height:1px;opacity:0";
+  document.body.appendChild(inp);
   inp.onchange = async () => {
     const file = inp.files && inp.files[0];
+    try { inp.remove(); } catch (_) {}
     if (!file) return;
     if (mode === "follow" && session) {
       await importFollowPhoto(session, file);
@@ -624,7 +628,10 @@ function pickImage() {
     const inp = document.createElement("input");
     inp.type = "file";
     inp.accept = "image/*";
-    inp.onchange = () => resolve(inp.files && inp.files[0]);
+    // iOS antigo (iOS 12) só dispara o "change" com o input ANEXADO ao DOM.
+    inp.style.cssText = "position:fixed;left:-9999px;width:1px;height:1px;opacity:0";
+    document.body.appendChild(inp);
+    inp.onchange = () => { const f = inp.files && inp.files[0]; try { inp.remove(); } catch (_) {} resolve(f); };
     inp.click();
   });
 }
