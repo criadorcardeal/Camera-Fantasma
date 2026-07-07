@@ -289,6 +289,16 @@ const Cam = {
   },
 
   async open(mode, session) {
+    // Fallback p/ aparelhos sem câmera AO VIVO (getUserMedia): ex.: iPad iOS 12
+    // instalado na tela de início, onde a API não existe. Usa a câmera NATIVA
+    // do sistema (input type=file capture) — a foto segue o mesmo caminho da
+    // importação (base → rótulo; acompanhamento → janela de alinhamento, já que
+    // não dá para sobrepor o fantasma ao vivo). No Safari do mesmo iPad a câmera
+    // ao vivo funciona e este atalho nem é usado.
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+      captureViaNativeCamera(mode, session || null);
+      return;
+    }
     // Tela para onde voltar se a câmera não for autorizada (ou falhar).
     this._returnScreen = (document.querySelector(".screen.active") || {}).id || "screen-home";
     this.mode = mode;
@@ -534,6 +544,23 @@ function downscaleImage(file, maxSize) {
     reader.onerror = () => reject(new Error("Falha ao abrir o arquivo."));
     reader.readAsDataURL(file);
   });
+}
+
+// Captura pela câmera NATIVA do sistema (input type=file com "capture"). Usado
+// como fallback quando a câmera ao vivo (getUserMedia) não existe — ex.: iPad
+// iOS 12 instalado. A foto segue o mesmo caminho da importação.
+function captureViaNativeCamera(mode, session) {
+  const inp = document.createElement("input");
+  inp.type = "file";
+  inp.accept = "image/*";
+  inp.setAttribute("capture", "environment"); // pede a câmera direto
+  inp.onchange = async () => {
+    const file = inp.files && inp.files[0];
+    if (!file) return;
+    if (mode === "follow" && session) await importFollowPhoto(session, file);
+    else await importBasePhoto(file, session);
+  };
+  inp.click();
 }
 
 // Abre o seletor de arquivos (galeria/nuvem via app Arquivos no iOS) e
