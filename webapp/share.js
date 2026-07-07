@@ -234,7 +234,19 @@ async function generateVideo(s, kind) {
   };
 
   drawFrame(0, 0);
-  const stream = c.captureStream(30);
+  // No Android, o modo AUTOMATICO do captureStream(fps) faz o encoder de
+  // hardware "comprimir" os timestamps sob carga e o MP4 sai curto (~2.8s em vez
+  // de 4s). Solucao: captureStream(0) + track.requestFrame() empurrando 1 quadro
+  // a cada ~40ms em TEMPO REAL, para a duracao acompanhar o relogio. Onde
+  // requestFrame nao existe (ex.: Safari/iOS), cai no modo automatico, que ja
+  // produz o mp4 na duracao certa.
+  let stream, track = null;
+  try {
+    stream = c.captureStream(0);
+    const t0 = stream.getVideoTracks()[0];
+    if (t0 && typeof t0.requestFrame === "function") track = t0;
+    else stream = c.captureStream(30);
+  } catch (_) { stream = c.captureStream(30); track = null; }
   const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
   const chunks = [];
   rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
@@ -264,16 +276,18 @@ async function generateVideo(s, kind) {
     rec.onerror = (e) => reject(e.error || new Error("Falha na gravação."));
     rec.start();
     const t0 = performance.now();
-    const tick = () => {
-      const t = performance.now() - t0;
-      drawFrame(ratioAt(Math.min(t, TOTAL)), Math.min(t, TOTAL));
-      if (t >= TOTAL) {
-        if (rec.state !== "inactive") rec.stop();
-      } else {
-        requestAnimationFrame(tick);
-      }
+    let done = false;
+    const finish = () => { if (!done) { done = true; if (rec.state !== "inactive") rec.stop(); } };
+    // Cadencia por TEMPO REAL (nao por rAF): o ratio vem do relogio, entao mesmo
+    // sob carga a animacao fica correta e a gravacao dura os 4s cheios.
+    const step = () => {
+      const t = Math.min(performance.now() - t0, TOTAL);
+      drawFrame(ratioAt(t), t);
+      if (track) track.requestFrame();   // empurra o quadro (modo manual)
+      if (t >= TOTAL) finish();
+      else setTimeout(step, 40);          // ~25 fps
     };
-    requestAnimationFrame(tick);
+    setTimeout(step, 0);
   });
 }
 
