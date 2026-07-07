@@ -94,6 +94,35 @@
     if (notPrevented) top.close();
   });
 
+  // <form method="dialog">: o <dialog> nativo fecha o diálogo ao submeter e põe
+  // returnValue = value do botão. O Safari 12 não faz isso (o método "dialog"
+  // vira submit normal e RECARREGA a página, perdendo o fluxo). Rastreamos o
+  // botão clicado (event.submitter não existe no Safari 12) e, no submit,
+  // impedimos a navegação e fechamos o diálogo com o value correto.
+  document.addEventListener("click", function (e) {
+    var btn = e.target;
+    while (btn && btn !== document && btn.tagName !== "BUTTON") btn = btn.parentNode;
+    if (!btn || btn.tagName !== "BUTTON") return;
+    if ((btn.getAttribute("type") || "submit").toLowerCase() !== "submit") return;
+    if (btn.form) btn.form._dlgSubmitter = btn.hasAttribute("value") ? btn.value : "";
+  }, true);
+
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if ((form.getAttribute("method") || "").toLowerCase() !== "dialog") return;
+    var dlg = form;
+    while (dlg && dlg.tagName !== "DIALOG") dlg = dlg.parentNode;
+    if (!dlg) return;
+    e.preventDefault();
+    var val = form._dlgSubmitter;
+    if (val == null) {                       // submit por Enter (sem clique)
+      var pb = form.querySelector("button.primary, button[value]");
+      val = pb ? pb.value : "";
+    }
+    form._dlgSubmitter = null;
+    dlg.close(val);
+  }, true);
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", patchAll);
   } else {
