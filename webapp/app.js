@@ -514,6 +514,12 @@ const Cam = {
       this.stop();
       await openDetail(s.id);
     }
+
+    // Oferece salvar a foto tirada na galeria/Fototeca do aparelho (opcional).
+    try {
+      const nm = (this.mode === "follow" ? "acompanhamento" : "foto-base") + ".jpg";
+      await offerSaveToDevice(await dataUrlToFile(dataUrl, nm));
+    } catch (_) {}
   },
 };
 
@@ -557,10 +563,58 @@ function captureViaNativeCamera(mode, session) {
   inp.onchange = async () => {
     const file = inp.files && inp.files[0];
     if (!file) return;
-    if (mode === "follow" && session) await importFollowPhoto(session, file);
-    else await importBasePhoto(file, session);
+    if (mode === "follow" && session) {
+      await importFollowPhoto(session, file);
+    } else {
+      await importBasePhoto(file, session);
+      await offerSaveToDevice(file);   // foto tirada pela câmera nativa
+    }
   };
   inp.click();
+}
+
+// Oferece salvar a foto recém-TIRADA na galeria/Fototeca (além de guardá-la na
+// comparação). Respeita o toggle do Perfil (padrão ligado). Nunca bloqueia nem
+// quebra o fluxo — o salvamento é opcional.
+//   - iOS 15+/Android: Web Share com arquivo → "Salvar em Fotos"/galeria (1 toque).
+//   - iOS antigo (sem compartilhar arquivo): mostra a foto e orienta segurar e
+//     escolher "Salvar Imagem" (única forma possível no iOS 12).
+async function offerSaveToDevice(file) {
+  try {
+    if (!file || !Profile.config().saveToDevice) return;
+    const dlg = $("#savedev-dialog");
+    if (!dlg) return;
+    const canFiles = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+    const skipBtn = $("#savedev-skip");
+    const doBtn = $("#savedev-do");
+    $("#savedev-modern").hidden = !canFiles;
+    $("#savedev-legacy").hidden = canFiles;
+    doBtn.hidden = !canFiles;                 // no modo legado só há a imagem
+    skipBtn.textContent = canFiles ? "Agora não" : "Fechar";
+    $("#savedev-never").checked = false;
+    let objUrl = null;
+    if (!canFiles) { objUrl = URL.createObjectURL(file); $("#savedev-img").src = objUrl; }
+    await new Promise((resolve) => {
+      const finish = () => {
+        doBtn.onclick = null; skipBtn.onclick = null;
+        dlg.removeEventListener("close", finish);
+        if (objUrl) { try { URL.revokeObjectURL(objUrl); } catch (_) {} }
+        if ($("#savedev-never").checked) {     // desliga o pedido automático
+          const p = Profile.get(); p.saveToDevice = false; Profile.set(p);
+        }
+        resolve();
+      };
+      dlg.addEventListener("close", finish);
+      doBtn.onclick = () => {
+        // O clique é o gesto do usuário exigido pelo iOS para compartilhar.
+        const pr = navigator.share({ files: [file] });
+        if (pr && pr.catch) pr.catch(() => {});
+        if (dlg.open) dlg.close();
+      };
+      skipBtn.onclick = () => { if (dlg.open) dlg.close(); };
+      dlg.showModal();
+    });
+  } catch (_) { /* salvamento é opcional: nunca interrompe o fluxo */ }
 }
 
 // Abre o seletor de arquivos (galeria/nuvem via app Arquivos no iOS) e

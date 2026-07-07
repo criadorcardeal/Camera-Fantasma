@@ -405,6 +405,13 @@
       </select>
     </label>
 
+    <hr class="prof-sep" />
+    <label class="prof-toggle">
+      <input type="checkbox" id="prof-savedev" />
+      <span>Salvar cada foto na galeria/Fototeca do aparelho</span>
+    </label>
+    <small>Ao tirar ou importar uma foto, o app oferece salvá-la também na galeria do aparelho (além de guardar na comparação). Em iPhone/iPad e Android é preciso confirmar; em iOS muito antigo pode não ser possível.</small>
+
     <menu>
       <button id="prof-close" disabled>Cancelar</button>
       <button id="prof-save" class="primary" disabled>Salvar</button>
@@ -426,6 +433,26 @@
     <div class="saved-ic">✅</div>
     <h3 id="saved-title">Foto salva!</h3>
     <menu><button id="saved-ok" class="primary">OK</button></menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: SALVAR FOTO NA GALERIA (v7.3) ============ -->
+  <dialog id="savedev-dialog">
+    <h3>Salvar foto no aparelho</h3>
+    <div id="savedev-modern">
+      <p>Deseja salvar esta foto na <b>galeria/Fototeca</b> do aparelho? (Ela já ficou guardada na comparação.)</p>
+    </div>
+    <div id="savedev-legacy" hidden>
+      <p>Para guardar na Fototeca deste aparelho: <b>toque e segure</b> a imagem abaixo e escolha <b>“Salvar Imagem”</b>.</p>
+      <img id="savedev-img" alt="" style="max-width:100%;border-radius:8px;display:block;margin:8px auto" />
+    </div>
+    <label class="prof-toggle">
+      <input type="checkbox" id="savedev-never" />
+      <span>Não perguntar mais (desliga no Perfil)</span>
+    </label>
+    <menu>
+      <button id="savedev-skip">Agora não</button>
+      <button id="savedev-do" class="primary">Salvar</button>
+    </menu>
   </dialog>
 
   <!-- ============ DIÁLOGO: AVISO AO SALVAR (v3.5.6) ============ -->
