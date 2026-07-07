@@ -49,7 +49,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v7.3</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v7.3.1</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -88,7 +88,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v7.3</span>
+      <span class="version-badge">v7.3.1</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -427,6 +427,13 @@
       </select>
     </label>
 
+    <hr class="prof-sep" />
+    <label class="prof-toggle">
+      <input type="checkbox" id="prof-savedev" />
+      <span>Salvar fotos tiradas na galeria/Fototeca</span>
+    </label>
+    <small>Ao tirar uma foto (base ou acompanhamento), o app oferece salvá-la também na galeria do aparelho, além de guardar na comparação.</small>
+
     <menu>
       <button id="prof-close" disabled>Cancelar</button>
       <button id="prof-save" class="primary" disabled>Salvar</button>
@@ -448,6 +455,20 @@
     <div class="saved-ic">✅</div>
     <h3 id="saved-title">Foto salva!</h3>
     <menu><button id="saved-ok" class="primary">OK</button></menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: SALVAR FOTO NA GALERIA (v7.3) ============ -->
+  <dialog id="savedev-dialog">
+    <h3>Salvar foto no aparelho</h3>
+    <p>Deseja salvar esta foto na <b>galeria/Fototeca</b> do aparelho? (Ela já ficou guardada na comparação.)</p>
+    <label class="prof-toggle">
+      <input type="checkbox" id="savedev-never" />
+      <span>Não perguntar mais (mudar no Perfil)</span>
+    </label>
+    <menu>
+      <button id="savedev-skip">Agora não</button>
+      <button id="savedev-do" class="primary">Salvar</button>
+    </menu>
   </dialog>
 
   <!-- ============ DIÁLOGO: AVISO AO SALVAR (v3.5.6) ============ -->

@@ -200,9 +200,12 @@ const Aligner = {
   z: 1, tx: 0, ty: 0, rot: 0,
   baseW: 1, baseH: 1,
 
-  async open(session, followUrl) {
+  // isReposition=true quando é só reajuste/reposicionamento de uma foto já
+  // adquirida (NÃO pede rótulo na saída — o rótulo só é pedido ao ADQUIRIR).
+  async open(session, followUrl, isReposition) {
     this.session = session;
     this.followUrl = followUrl;
+    this.isReposition = !!isReposition;
     this.z = 1; this.tx = 0; this.ty = 0; this.rot = 0;
     $("#al-zoom").value = 1;
     $("#al-rotate").value = 0;
@@ -265,13 +268,16 @@ const Aligner = {
     ctx.restore();
     const aligned = c.toDataURL("image/jpeg", 0.9);
 
-    const res = await openLabelDialog(this.session.followLabel || defaultLabel("follow"));
-    if (res == null) { await openDetail(this.session.id); return; }
-
     const s = this.session;
+    // O rótulo só é pedido ao ADQUIRIR a foto. No reposicionamento/reajuste de
+    // uma foto já existente, mantém o rótulo e a data atuais (sem popup).
+    if (!this.isReposition) {
+      const res = await openLabelDialog(s.followLabel || defaultLabel("follow"));
+      if (res == null) { await openDetail(s.id); return; }
+      s.followLabel = res.label;
+      s.followAt = new Date().toISOString();
+    }
     s.followImage = aligned;
-    s.followLabel = res.label;
-    s.followAt = new Date().toISOString();
     // Nova imagem: zera ajustes/versao anteriores do acompanhamento.
     s.followImageView = null;
     s.followAdj = null;

@@ -453,6 +453,7 @@ const Cam = {
     const res = await openLabelDialog(seed, this.mode === "base" && !this.session);
     if (res == null) return; // usuario escolheu refazer
     const { label } = res;
+    const shotFollow = this.mode === "follow";   // guarda antes do stop()
 
     if (this.mode === "base" && this.session) {
       // Refazer a foto base de uma comparação já existente (não cria sessão nova).
@@ -491,6 +492,12 @@ const Cam = {
       this.stop();
       await openDetail(s.id);
     }
+
+    // Oferece salvar a foto TIRADA na galeria/Fototeca do aparelho (opcional).
+    try {
+      const nm = (shotFollow ? "acompanhamento" : "foto-base") + ".jpg";
+      await offerSaveToDevice(await dataUrlToFile(dataUrl, nm));
+    } catch (_) {}
   },
 };
 
@@ -618,6 +625,42 @@ function openLabelDialog(labelValue, requireConsent) {
   });
 }
 
+/* ---- Salvar a foto tirada na galeria/Fototeca do aparelho (opcional) ----
+   Só oferece se o Perfil tiver "Salvar fotos na galeria" ligado (padrão). Ao
+   confirmar, usa o Web Share ("Salvar em Fotos"/galeria) — o clique no botão é
+   o gesto exigido pelo iOS; no desktop (sem Web Share de arquivos) baixa. */
+async function offerSaveToDevice(file) {
+  try {
+    if (!file || !Profile.config().saveToDevice) return;
+    const dlg = $("#savedev-dialog");
+    if (!dlg) return;
+    const doBtn = $("#savedev-do"), skipBtn = $("#savedev-skip");
+    $("#savedev-never").checked = false;
+    await new Promise((resolve) => {
+      const finish = () => {
+        doBtn.onclick = null; skipBtn.onclick = null;
+        dlg.removeEventListener("close", finish);
+        if ($("#savedev-never").checked) {   // desliga o pedido automático
+          const p = Profile.get(); p.saveToDevice = false; Profile.set(p);
+        }
+        resolve();
+      };
+      dlg.addEventListener("close", finish);
+      doBtn.onclick = () => {
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          const pr = navigator.share({ files: [file] });   // gesto do usuário
+          if (pr && pr.catch) pr.catch(() => {});
+        } else {
+          downloadFile(file);   // desktop / sem Web Share de arquivos
+        }
+        if (dlg.open) dlg.close();
+      };
+      skipBtn.onclick = () => { if (dlg.open) dlg.close(); };
+      dlg.showModal();
+    });
+  } catch (_) { /* salvamento é opcional: nunca interrompe o fluxo */ }
+}
+
 /* ---------------- Tela de detalhe / comparação ---------------- */
 let _detailSession = null;
 
@@ -714,7 +757,7 @@ async function openDetail(id) {
   requestAnimationFrame(sizeWmNames);
 
   if ($("#btn-adjust")) $("#btn-adjust").addEventListener("click", () => Editor.open(s));
-  if ($("#btn-reposition")) $("#btn-reposition").addEventListener("click", () => Aligner.open(s, s.followImage));
+  if ($("#btn-reposition")) $("#btn-reposition").addEventListener("click", () => Aligner.open(s, s.followImage, true));
   if ($("#btn-redo")) $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
   if ($("#btn-follow-import")) $("#btn-follow-import").addEventListener("click", () =>
     pickImage().then((file) => importFollowPhoto(s, file)));

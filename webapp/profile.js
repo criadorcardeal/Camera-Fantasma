@@ -56,6 +56,7 @@ const Profile = {
       footerFontKey: ff, footerFamily: FONT_FAMILIES[ff] || FONT_FAMILIES.system,
       footerScale: p.footerScale != null ? p.footerScale : 1,
       footerDate: p.footerDate || "date",   // none | date | datetime
+      saveToDevice: p.saveToDevice != null ? !!p.saveToDevice : true, // salvar na galeria
     };
   },
 
@@ -69,6 +70,7 @@ const Profile = {
     $("#prof-footer-size").value = Math.round(c.footerScale * 100);
     $("#prof-footer-size-val").textContent = Math.round(c.footerScale * 100) + "%";
     $("#prof-footer-date").value = c.footerDate;
+    $("#prof-savedev").checked = c.saveToDevice;
     $("#prof-logo-on").checked = c.logoOn;
     $("#prof-name-on").checked = c.nameOn;
     const transp = Math.round((1 - c.opacity) * 100);
@@ -225,6 +227,7 @@ const Profile = {
       footerFont: $("#prof-footer-font").value,
       footerScale,
       footerDate: $("#prof-footer-date").value,
+      saveToDevice: $("#prof-savedev").checked,
     });
     $("#profile-dialog").close();
     this.updateAvatar();
