@@ -1050,7 +1050,7 @@ function renderCompare(mode) {
   host.innerHTML = `
     <div class="compare-stage" id="curtain">
       <img src="${baseSrc(s)}" />
-      <div class="after-clip" style="position:absolute;inset:0;width:50%"><img src="${followSrc(s)}" style="width:200%;max-width:none" id="cur-after"/></div>
+      <div class="after-clip" style="position:absolute;top:0;left:0;height:100%;width:50%"><img src="${followSrc(s)}" style="width:200%;max-width:none" id="cur-after"/></div>
       <div class="curtain-line" id="cur-line" style="left:50%"></div>
       ${capB}${capF}${wm}
     </div>

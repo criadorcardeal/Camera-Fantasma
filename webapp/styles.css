@@ -596,6 +596,14 @@ html, body {
 }
 .compare-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .compare-stage .after-clip { overflow: hidden; }
+
+/* Safari antigo (iPad iOS 12.5, marcado por .no-dialog): NÃO suporta
+   aspect-ratio (Safari 15) — o palco 3:4 ficava com altura 0 e a foto base
+   sumia. Repomos a proporção com o "padding hack" (padding-bottom = 4/3 da
+   largura). A img filha já preenche via `height:100%` (resolve contra a caixa
+   de padding — funciona com box-sizing:border-box). */
+html.no-dialog .compare-stage { height: 0; padding-bottom: 133.33%; }
+html.no-dialog .side-by-side img { aspect-ratio: auto; height: auto; }
 /* Linha fina do corte da cortina (só indica a divisão; sem knob). */
 .curtain-line {
   position: absolute; top: 0; bottom: 0; width: 2px; z-index: 4;
