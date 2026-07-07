@@ -364,10 +364,23 @@ const Cam = {
       // Sem permissão (ou câmera indisponível): avisa e volta para a tela anterior.
       this.stop();
       showScreen(this._returnScreen || "screen-home");
-      alert(
-        "Não foi possível acessar a câmera. Verifique a permissão da câmera " +
-        "para este site nas configurações do navegador."
-      );
+      // iOS antigo (ex.: iPad iOS 12) NÃO expõe a câmera (getUserMedia) no app
+      // instalado na tela de início — só no Safari. Não é falta de permissão;
+      // é limitação do sistema. Orienta importar da galeria ou usar o Safari.
+      const noCam = !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      if (noCam && isStandalone()) {
+        alert(
+          "Este aparelho não permite usar a câmera pelo app instalado na tela de " +
+          "início (limitação do iOS antigo). Use \"Importar da galeria\" para " +
+          "escolher uma foto já tirada, ou abra o ComparaCam pelo Safari para " +
+          "fotografar ao vivo com o Ghost Overlay."
+        );
+      } else {
+        alert(
+          "Não foi possível acessar a câmera. Verifique a permissão da câmera " +
+          "para este site nas configurações do navegador."
+        );
+      }
     }
   },
 

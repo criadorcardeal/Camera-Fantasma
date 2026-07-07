@@ -765,6 +765,10 @@ dialog {
   border: none; border-radius: 16px; padding: 20px; width: min(90vw, 340px);
   /* Janelas maiores que a tela ganham rolagem vertical. */
   max-height: 90dvh; overflow-y: auto;
+  /* Fundo/cor explícitos: o <dialog> nativo já traz isso por padrão, mas no
+     Safari antigo (polyfill, sem <dialog> nativo) o elemento sairia transparente
+     e o conteúdo apareceria "solto" sobre a página. */
+  background: #fff; color: var(--text, #1a1a1a);
 }
 dialog::backdrop { background: rgba(0,0,0,0.5); }
 
