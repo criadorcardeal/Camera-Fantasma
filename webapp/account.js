@@ -28,30 +28,16 @@ const Account = {
   init() {
     // Deep link de voucher: QR/URL "?voucher=CODE" -> preenche após o login.
     try { this.pendingVoucher = new URLSearchParams(location.search).get("voucher") || ""; } catch (_) {}
-    // Tenta criar o cliente agora. Se a lib ainda não carregou — caso do Safari
-    // antigo (iOS 12.5), onde o bundle padrão do supabase-js é substituído por
-    // um fallback transpilado (ES2017) carregado de forma assíncrona — espera o
-    // evento "cc-supabase-ready" e tenta de novo. Sem a lib de jeito nenhum
-    // (1º acesso offline), o gate continua e o login exige internet.
-    if (!this._makeClient()) {
-      window.addEventListener("cc-supabase-ready", () => this._makeClient(), { once: true });
-    }
+    // Sem a biblioteca (1º acesso offline): mantém o gate; login exige internet.
+    if (!(window.supabase && window.supabase.createClient)) return;
+    this.sb = window.supabase.createClient(CC_SB_URL, CC_SB_KEY);
+    this.sb.auth.onAuthStateChange((_e, session) => this.apply(session));
+    this.sb.auth.getSession().then(({ data }) => this.apply(data.session)).catch(() => {});
     // Recarrega o saldo ao abrir o Perfil / o diálogo Adquirir.
     ["cred-profile", "detail-profile", "cred-buy"].forEach((id) => {
       const b = document.getElementById(id);
       if (b) b.addEventListener("click", () => { if (this.session) this.loadBalance(); });
     });
-  },
-
-  /* Cria o cliente Supabase se a lib estiver disponível. Idempotente: retorna
-     true quando o cliente existe (agora ou já existia), false se a lib não veio. */
-  _makeClient() {
-    if (this.sb) return true;
-    if (!(window.supabase && window.supabase.createClient)) return false;
-    this.sb = window.supabase.createClient(CC_SB_URL, CC_SB_KEY);
-    this.sb.auth.onAuthStateChange((_e, session) => this.apply(session));
-    this.sb.auth.getSession().then(({ data }) => this.apply(data.session)).catch(() => {});
-    return true;
   },
 
   apply(session) {
@@ -126,26 +112,13 @@ const Account = {
     return parts.join(" ") || "falha ao contatar o servidor";
   },
 
-  /* Mensagem quando o cliente Supabase não existe (this.sb == null). Distingue
-     "sem internet" de "biblioteca não carregou" — no iPad/iPhone com iOS antigo
-     o bundle do Supabase não é interpretado pelo Safari e este.sb fica null
-     MESMO com internet, o que antes exibia por engano "Sem internet". */
-  _noSbMsg(firstAccess) {
-    if (!navigator.onLine) {
-      return firstAccess
-        ? "Sem internet para o primeiro acesso. Conecte-se e tente de novo."
-        : "Sem internet. Conecte-se e tente de novo.";
-    }
-    return "Não foi possível carregar o login neste aparelho. O sistema (iOS/navegador) pode estar desatualizado — atualize-o e tente novamente.";
-  },
-
   /* ---- Passo 1: enviar o código de 6 dígitos ---- */
   async sendCode() {
     const email = document.getElementById("lg-email").value.trim();
     const msg = document.getElementById("lg-msg");
     const btn = document.getElementById("lg-send");
     if (!/.+@.+\..+/.test(email)) { msg.textContent = "Digite um e-mail válido."; return; }
-    if (!this.sb) { msg.textContent = this._noSbMsg(true); return; }
+    if (!this.sb) { msg.textContent = "Sem internet para o primeiro acesso. Conecte-se e tente de novo."; return; }
     btn.disabled = true;
     msg.textContent = "Enviando código…";
     try {
@@ -190,7 +163,7 @@ const Account = {
     const btn = document.getElementById("lg-verify");
     // Aceita códigos de 4 a 8 dígitos (o tamanho do OTP é configurável no Supabase).
     if (!/^\d{4,8}$/.test(token)) { msg.textContent = "Digite o código recebido por e-mail."; return; }
-    if (!this.sb) { msg.textContent = this._noSbMsg(false); return; }
+    if (!this.sb) { msg.textContent = "Sem internet. Conecte-se e tente de novo."; return; }
     btn.disabled = true;
     msg.textContent = "Verificando…";
     // Tenta como login de e-mail; se falhar, tenta como confirmação de cadastro
@@ -259,7 +232,7 @@ const Account = {
     const code = document.getElementById("buy-voucher").value.trim();
     const msg = document.getElementById("buy-redeem-msg");
     if (!code) { msg.textContent = "Digite o código do voucher."; return; }
-    if (!this.sb) { msg.textContent = this._noSbMsg(false); return; }
+    if (!this.sb) { msg.textContent = "Sem internet. Conecte-se e tente de novo."; return; }
     msg.textContent = "Resgatando…";
     const { data, error } = await this.sb.rpc("redeem_voucher", { p_code: code });
     if (error) {
@@ -304,7 +277,7 @@ const Account = {
     const file = fileInput && fileInput.files && fileInput.files[0];
     if (!(credits >= 1)) { msg.textContent = "Créditos por voucher inválido."; return; }
     if (!(qty >= 1 && qty <= 500)) { msg.textContent = "Quantidade deve ser de 1 a 500."; return; }
-    if (!this.sb) { msg.textContent = this._noSbMsg(false); return; }
+    if (!this.sb) { msg.textContent = "Sem internet."; return; }
     if (!this.session) { msg.textContent = "Entre na sua conta de administrador primeiro."; return; }
     // Se escolheu um arquivo, envia para o Storage e usa a URL resultante.
     if (file) {

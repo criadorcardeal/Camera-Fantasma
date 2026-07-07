@@ -12,11 +12,33 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="ComparaCam" />
   <link rel="stylesheet" href="./styles.css" />
-  <!-- Polyfill de <dialog> p/ Safari antigo (iPad iOS 12.5); no <head> p/ a
-       classe .no-dialog entrar antes do body renderizar (sem flash). -->
-  <script src="./dialog-polyfill.js"></script>
+  <!-- Checagem de compatibilidade: o app precisa de recursos modernos
+       (elemento <dialog>, aspect-ratio) presentes no iOS 15.4+ / navegadores
+       atuais. Em sistemas antigos (ex.: iPad no iOS 12) marca .compat-bad no
+       <html> ANTES do body renderizar, e o CSS mostra o aviso em tela cheia. -->
+  <script>
+    (function () {
+      var okDialog = false, okAspect = false;
+      try { okDialog = typeof document.createElement("dialog").showModal === "function"; } catch (e) {}
+      try { okAspect = !!(window.CSS && CSS.supports && CSS.supports("aspect-ratio", "1")); } catch (e) {}
+      if (!(okDialog && okAspect)) document.documentElement.className += " compat-bad";
+    })();
+  </script>
 </head>
 <body>
+  <!-- ============ AVISO DE INCOMPATIBILIDADE (sistema antigo) ============ -->
+  <div id="compat-gate">
+    <img src="./icon.svg" alt="" class="compat-ic" />
+    <h1>Atualize seu sistema</h1>
+    <p>O <b>ComparaCam</b> precisa de um sistema mais recente para funcionar
+    corretamente.</p>
+    <p>Em iPhone/iPad, atualize para <b>iOS 15.4 ou mais recente</b>
+    (<b>Ajustes → Geral → Atualização de Software</b>). Em outros aparelhos,
+    use um navegador atualizado.</p>
+    <p class="compat-sub">Aparelhos muito antigos podem não receber essa
+    atualização e não conseguirão usar o app.</p>
+  </div>
+
   <!-- ============ SPLASH (abertura com cara de app) ============ -->
   <div id="app-splash" aria-hidden="true">
     <img src="./icon.svg" alt="" class="splash-ic" />
@@ -27,7 +49,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v7.3.2</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v7.3</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -66,7 +88,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v7.3.2</span>
+      <span class="version-badge">v7.3</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -405,13 +427,6 @@
       </select>
     </label>
 
-    <hr class="prof-sep" />
-    <label class="prof-toggle">
-      <input type="checkbox" id="prof-savedev" />
-      <span>Salvar cada foto na galeria/Fototeca do aparelho</span>
-    </label>
-    <small>Ao tirar ou importar uma foto, o app oferece salvá-la também na galeria do aparelho (além de guardar na comparação). Em iPhone/iPad e Android é preciso confirmar; em iOS muito antigo pode não ser possível.</small>
-
     <menu>
       <button id="prof-close" disabled>Cancelar</button>
       <button id="prof-save" class="primary" disabled>Salvar</button>
@@ -433,26 +448,6 @@
     <div class="saved-ic">✅</div>
     <h3 id="saved-title">Foto salva!</h3>
     <menu><button id="saved-ok" class="primary">OK</button></menu>
-  </dialog>
-
-  <!-- ============ DIÁLOGO: SALVAR FOTO NA GALERIA (v7.3) ============ -->
-  <dialog id="savedev-dialog">
-    <h3>Salvar foto no aparelho</h3>
-    <div id="savedev-modern">
-      <p>Deseja salvar esta foto na <b>galeria/Fototeca</b> do aparelho? (Ela já ficou guardada na comparação.)</p>
-    </div>
-    <div id="savedev-legacy" hidden>
-      <p>Para guardar na Fototeca deste aparelho: <b>toque e segure</b> a imagem abaixo e escolha <b>“Salvar Imagem”</b>.</p>
-      <img id="savedev-img" alt="" style="max-width:100%;border-radius:8px;display:block;margin:8px auto" />
-    </div>
-    <label class="prof-toggle">
-      <input type="checkbox" id="savedev-never" />
-      <span>Não perguntar mais (desliga no Perfil)</span>
-    </label>
-    <menu>
-      <button id="savedev-skip">Agora não</button>
-      <button id="savedev-do" class="primary">Salvar</button>
-    </menu>
   </dialog>
 
   <!-- ============ DIÁLOGO: AVISO AO SALVAR (v3.5.6) ============ -->
@@ -745,22 +740,6 @@
   <script src="./profile.js"></script>
   <script src="./share.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    /* Fallback p/ Safari antigo (ex.: iPad no iOS 12.5 / Safari 12.1): o bundle
-       acima usa sintaxe nova (optional chaining "?.") que o Safari 12 não
-       interpreta, deixando window.supabase indefinido e o login "sem internet".
-       Se isso ocorrer, carregamos um bundle próprio do supabase-js transpilado
-       para ES2017 (script clássico, hospedado no app — sem módulos nem CDN de
-       transpilação, que também falhavam no Safari 12) e avisamos o app
-       ("cc-supabase-ready"). Aparelhos modernos, onde o bundle da CDN funcionou,
-       nem entram aqui. */
-    if (!(window.supabase && window.supabase.createClient)) {
-      var _sbf = document.createElement("script");
-      _sbf.src = "./vendor/supabase.es2017.js";
-      _sbf.onload = function () { window.dispatchEvent(new Event("cc-supabase-ready")); };
-      document.head.appendChild(_sbf);
-    }
-  </script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>

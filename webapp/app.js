@@ -289,16 +289,6 @@ const Cam = {
   },
 
   async open(mode, session) {
-    // Fallback p/ aparelhos sem câmera AO VIVO (getUserMedia): ex.: iPad iOS 12
-    // instalado na tela de início, onde a API não existe. Usa a câmera NATIVA
-    // do sistema (input type=file capture) — a foto segue o mesmo caminho da
-    // importação (base → rótulo; acompanhamento → janela de alinhamento, já que
-    // não dá para sobrepor o fantasma ao vivo). No Safari do mesmo iPad a câmera
-    // ao vivo funciona e este atalho nem é usado.
-    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
-      captureViaNativeCamera(mode, session || null);
-      return;
-    }
     // Tela para onde voltar se a câmera não for autorizada (ou falhar).
     this._returnScreen = (document.querySelector(".screen.active") || {}).id || "screen-home";
     this.mode = mode;
@@ -374,23 +364,10 @@ const Cam = {
       // Sem permissão (ou câmera indisponível): avisa e volta para a tela anterior.
       this.stop();
       showScreen(this._returnScreen || "screen-home");
-      // iOS antigo (ex.: iPad iOS 12) NÃO expõe a câmera (getUserMedia) no app
-      // instalado na tela de início — só no Safari. Não é falta de permissão;
-      // é limitação do sistema. Orienta importar da galeria ou usar o Safari.
-      const noCam = !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-      if (noCam && isStandalone()) {
-        alert(
-          "Este aparelho não permite usar a câmera pelo app instalado na tela de " +
-          "início (limitação do iOS antigo). Use \"Importar da galeria\" para " +
-          "escolher uma foto já tirada, ou abra o ComparaCam pelo Safari para " +
-          "fotografar ao vivo com o Ghost Overlay."
-        );
-      } else {
-        alert(
-          "Não foi possível acessar a câmera. Verifique a permissão da câmera " +
-          "para este site nas configurações do navegador."
-        );
-      }
+      alert(
+        "Não foi possível acessar a câmera. Verifique a permissão da câmera " +
+        "para este site nas configurações do navegador."
+      );
     }
   },
 
@@ -514,12 +491,6 @@ const Cam = {
       this.stop();
       await openDetail(s.id);
     }
-
-    // Oferece salvar a foto tirada na galeria/Fototeca do aparelho (opcional).
-    try {
-      const nm = (this.mode === "follow" ? "acompanhamento" : "foto-base") + ".jpg";
-      await offerSaveToDevice(await dataUrlToFile(dataUrl, nm));
-    } catch (_) {}
   },
 };
 
@@ -552,75 +523,6 @@ function downscaleImage(file, maxSize) {
   });
 }
 
-// Captura pela câmera NATIVA do sistema (input type=file com "capture"). Usado
-// como fallback quando a câmera ao vivo (getUserMedia) não existe — ex.: iPad
-// iOS 12 instalado. A foto segue o mesmo caminho da importação.
-function captureViaNativeCamera(mode, session) {
-  const inp = document.createElement("input");
-  inp.type = "file";
-  inp.accept = "image/*";
-  inp.setAttribute("capture", "environment"); // pede a câmera direto
-  // iOS antigo (iOS 12) só dispara o "change" se o input estiver ANEXADO ao DOM.
-  inp.style.cssText = "position:fixed;left:-9999px;width:1px;height:1px;opacity:0";
-  document.body.appendChild(inp);
-  inp.onchange = async () => {
-    const file = inp.files && inp.files[0];
-    try { inp.remove(); } catch (_) {}
-    if (!file) return;
-    if (mode === "follow" && session) {
-      await importFollowPhoto(session, file);
-    } else {
-      await importBasePhoto(file, session);
-      await offerSaveToDevice(file);   // foto tirada pela câmera nativa
-    }
-  };
-  inp.click();
-}
-
-// Oferece salvar a foto recém-TIRADA na galeria/Fototeca (além de guardá-la na
-// comparação). Respeita o toggle do Perfil (padrão ligado). Nunca bloqueia nem
-// quebra o fluxo — o salvamento é opcional.
-//   - iOS 15+/Android: Web Share com arquivo → "Salvar em Fotos"/galeria (1 toque).
-//   - iOS antigo (sem compartilhar arquivo): mostra a foto e orienta segurar e
-//     escolher "Salvar Imagem" (única forma possível no iOS 12).
-async function offerSaveToDevice(file) {
-  try {
-    if (!file || !Profile.config().saveToDevice) return;
-    const dlg = $("#savedev-dialog");
-    if (!dlg) return;
-    const canFiles = !!(navigator.canShare && navigator.canShare({ files: [file] }));
-    const skipBtn = $("#savedev-skip");
-    const doBtn = $("#savedev-do");
-    $("#savedev-modern").hidden = !canFiles;
-    $("#savedev-legacy").hidden = canFiles;
-    doBtn.hidden = !canFiles;                 // no modo legado só há a imagem
-    skipBtn.textContent = canFiles ? "Agora não" : "Fechar";
-    $("#savedev-never").checked = false;
-    let objUrl = null;
-    if (!canFiles) { objUrl = URL.createObjectURL(file); $("#savedev-img").src = objUrl; }
-    await new Promise((resolve) => {
-      const finish = () => {
-        doBtn.onclick = null; skipBtn.onclick = null;
-        dlg.removeEventListener("close", finish);
-        if (objUrl) { try { URL.revokeObjectURL(objUrl); } catch (_) {} }
-        if ($("#savedev-never").checked) {     // desliga o pedido automático
-          const p = Profile.get(); p.saveToDevice = false; Profile.set(p);
-        }
-        resolve();
-      };
-      dlg.addEventListener("close", finish);
-      doBtn.onclick = () => {
-        // O clique é o gesto do usuário exigido pelo iOS para compartilhar.
-        const pr = navigator.share({ files: [file] });
-        if (pr && pr.catch) pr.catch(() => {});
-        if (dlg.open) dlg.close();
-      };
-      skipBtn.onclick = () => { if (dlg.open) dlg.close(); };
-      dlg.showModal();
-    });
-  } catch (_) { /* salvamento é opcional: nunca interrompe o fluxo */ }
-}
-
 // Abre o seletor de arquivos (galeria/nuvem via app Arquivos no iOS) e
 // devolve o arquivo escolhido. Criado sob demanda dentro do gesto do usuario.
 function pickImage() {
@@ -628,10 +530,7 @@ function pickImage() {
     const inp = document.createElement("input");
     inp.type = "file";
     inp.accept = "image/*";
-    // iOS antigo (iOS 12) só dispara o "change" com o input ANEXADO ao DOM.
-    inp.style.cssText = "position:fixed;left:-9999px;width:1px;height:1px;opacity:0";
-    document.body.appendChild(inp);
-    inp.onchange = () => { const f = inp.files && inp.files[0]; try { inp.remove(); } catch (_) {} resolve(f); };
+    inp.onchange = () => resolve(inp.files && inp.files[0]);
     inp.click();
   });
 }
@@ -1057,7 +956,7 @@ function renderCompare(mode) {
   host.innerHTML = `
     <div class="compare-stage" id="curtain">
       <img src="${baseSrc(s)}" />
-      <div class="after-clip" style="position:absolute;top:0;left:0;height:100%;width:50%"><img src="${followSrc(s)}" style="width:200%;max-width:none" id="cur-after"/></div>
+      <div class="after-clip" style="position:absolute;inset:0;width:50%"><img src="${followSrc(s)}" style="width:200%;max-width:none" id="cur-after"/></div>
       <div class="curtain-line" id="cur-line" style="left:50%"></div>
       ${capB}${capF}${wm}
     </div>
