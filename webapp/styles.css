@@ -438,16 +438,38 @@ html, body {
 .card .info b { display: block; font-size: 0.95rem; }
 .card .info span { color: var(--muted); font-size: 0.82rem; }
 
-/* Swipe-para-excluir (arrastar o card para a esquerda) */
+/* Swipe: arrastar p/ ESQUERDA = excluir; arrastar p/ DIREITA = Duplicar/Renomear */
 .card-swipe {
   position: relative; overflow: hidden; border-radius: 12px; margin-bottom: 10px;
 }
 .card-del-bg {
-  position: absolute; inset: 0; background: #c0392b; color: #fff;
+  position: absolute; inset: 0; z-index: 0; background: #c0392b; color: #fff;
   display: flex; align-items: center; justify-content: flex-end;
   padding-right: 22px; font-weight: 700; gap: 8px;
 }
-.card-swipe .card { margin-bottom: 0; touch-action: pan-y; will-change: transform; }
+/* Ações reveladas ao arrastar para a direita (ficam sob o card, à esquerda) */
+.card-actions {
+  position: absolute; inset: 0; z-index: 1;
+  display: flex; align-items: stretch; justify-content: flex-start;
+}
+.ca-btn {
+  width: 88px; border: none; color: #fff; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; font-size: 1.3rem; line-height: 1;
+}
+.ca-btn span { font-size: 0.72rem; font-weight: 700; }
+.ca-dup { background: var(--primary); }
+.ca-ren { background: #2e8b6f; }
+.card-swipe .card {
+  position: relative; z-index: 2; margin-bottom: 0;
+  touch-action: pan-y; will-change: transform;
+}
+/* Campo de renomear direto no card */
+.card-rename {
+  width: 100%; font-size: 0.95rem; font-weight: 700; font-family: inherit;
+  color: var(--text); border: 1px solid var(--primary);
+  border-radius: 6px; padding: 2px 6px;
+}
 
 .empty {
   text-align: center;
@@ -661,13 +683,6 @@ html, body {
 .lock-note {
   background: #fbeecb; color: #7a5b00; border-radius: 10px;
   padding: 10px 12px; margin-top: 12px; font-size: 0.85rem; font-weight: 600;
-}
-
-/* Campo de nome do card (na tela de detalhe) */
-.name-field { display: block; font-size: 0.78rem; color: var(--muted); font-weight: 600; }
-.name-field input {
-  width: 100%; margin-top: 6px; padding: 8px 10px; border: 1px solid #ccd4d9;
-  border-radius: 8px; font-size: 0.9rem; color: var(--text); font-weight: 400;
 }
 
 /* Linhas de 2 botões lado a lado + card de acompanhamento */

@@ -158,7 +158,12 @@ async function renderHome() {
   for (const s of list) {
     const wrap = document.createElement("div");
     wrap.className = "card-swipe";
-    wrap.innerHTML = `<div class="card-del-bg">🗑 Excluir</div>`;
+    wrap.innerHTML = `
+      <div class="card-actions">
+        <button type="button" class="ca-btn ca-dup">📑<span>Duplicar</span></button>
+        <button type="button" class="ca-btn ca-ren">✏️<span>Renomear</span></button>
+      </div>
+      <div class="card-del-bg">🗑 Excluir</div>`;
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
@@ -170,45 +175,106 @@ async function renderHome() {
       <div>${s.followImage ? "🔀" : "➕"}</div>`;
     wrap.appendChild(card);
     el.appendChild(wrap);
-    attachSwipeDelete(card, s);
+    attachSwipe(card, s, wrap);
   }
 }
 
-// Arraste o card para a esquerda para excluir (com confirmação e devolução de
-// crédito se a comparação não foi concluída).
-function attachSwipeDelete(card, s) {
-  let startX = 0, dx = 0, dragging = false, moved = false;
-  const THRESH = 90;
+// Gestos no card da home:
+//  • arrastar para a ESQUERDA → excluir (confirma; devolve crédito se não concluída);
+//  • arrastar para a DIREITA → revela as ações "Duplicar" e "Renomear".
+function attachSwipe(card, s, wrap) {
+  const ACT_W = 176;             // largura das 2 ações reveladas
+  const DEL_THRESH = 90;         // arrastar além disso p/ a esquerda = excluir
+  const OPEN_THRESH = ACT_W / 2; // arrastar além disso p/ a direita = abrir ações
+  let startX = 0, dx = 0, dragging = false, moved = false, open = false;
+
+  const setX = (x, anim) => {
+    card.style.transition = anim ? "transform 0.15s" : "none";
+    card.style.transform = `translateX(${x}px)`;
+  };
+  const close = () => { open = false; setX(0, true); };
+
   card.addEventListener("pointerdown", (e) => {
-    dragging = true; moved = false; startX = e.clientX; dx = 0;
+    if (card._editing) return;
+    dragging = true; moved = false; startX = e.clientX;
     card.style.transition = "none";
     try { card.setPointerCapture(e.pointerId); } catch (_) {}
   });
   card.addEventListener("pointermove", (e) => {
     if (!dragging) return;
-    dx = Math.min(0, e.clientX - startX);   // só para a esquerda
-    if (Math.abs(dx) > 6) moved = true;
-    card.style.transform = `translateX(${dx}px)`;
+    const raw = e.clientX - startX;
+    if (Math.abs(raw) > 6) moved = true;
+    let x = (open ? ACT_W : 0) + raw;
+    x = Math.max(-card.offsetWidth, Math.min(ACT_W, x));
+    setX(x, false);
+    dx = x;
   });
   const end = async () => {
     if (!dragging) return;
     dragging = false;
-    card.style.transition = "transform 0.15s";
-    if (dx <= -THRESH && confirm("Excluir esta comparação? As fotos serão apagadas do aparelho.")) {
-      card.style.transform = "translateX(-100%)";
-      if (s.creditState === "reserved") await Credits.refund();
-      await DB.remove(s.id);
-      await renderHome();
-    } else {
-      card.style.transform = "translateX(0)";
+    if (dx <= -DEL_THRESH) {
+      if (confirm("Excluir esta comparação? As fotos serão apagadas do aparelho.")) {
+        setX(-(card.offsetWidth || 400), true);
+        if (s.creditState === "reserved") await Credits.refund();
+        await DB.remove(s.id);
+        await renderHome();
+        return;
+      }
+      close();
+      return;
     }
+    if (dx >= OPEN_THRESH) { open = true; setX(ACT_W, true); }
+    else close();
   };
   card.addEventListener("pointerup", end);
   card.addEventListener("pointercancel", end);
   card.addEventListener("click", (e) => {
     if (moved) { e.preventDefault(); e.stopPropagation(); return; }
+    if (open) { close(); return; }   // toque no card fecha as ações
+    if (card._editing) return;
     openDetail(s.id);
   });
+
+  wrap.querySelector(".ca-dup").addEventListener("click", (e) => {
+    e.stopPropagation(); close(); duplicateComparison(s);
+  });
+  wrap.querySelector(".ca-ren").addEventListener("click", (e) => {
+    e.stopPropagation(); close(); startRename(card, s);
+  });
+}
+
+// Renomear direto no card: troca o título por um campo de edição.
+// Enter/sair do campo salva; Esc cancela. Vazio volta ao título padrão (data).
+function startRename(card, s) {
+  if (card._editing) return;
+  card._editing = true;
+  const b = card.querySelector(".info b");
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "card-rename";
+  input.value = s.name || "";
+  input.placeholder = defaultTitle(s);
+  input.autocomplete = "off";
+  b.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+  const finish = async (save) => {
+    if (done) return;
+    done = true;
+    if (save) { s.name = input.value; await DB.put(s); }
+    card._editing = false;
+    await renderHome();
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    else if (e.key === "Escape") { e.preventDefault(); done = true; card._editing = false; renderHome(); }
+  });
+  input.addEventListener("blur", () => finish(true));
+  // O toque no campo não deve iniciar o swipe nem abrir a Montagem.
+  ["pointerdown", "pointerup", "click"].forEach((ev) =>
+    input.addEventListener(ev, (e) => e.stopPropagation()));
 }
 
 /* ---------------- Câmera ---------------- */
@@ -645,14 +711,6 @@ async function openDetail(id) {
   // Depois de gerar a comparação (crédito confirmado), as fotos ficam travadas.
   const locked = s.creditState === "confirmed";
 
-  // Nome do card (editável a qualquer momento, mesmo com a comparação travada).
-  const nameHtml = `
-    <div class="act-card">
-      <label class="name-field">Nome desta comparação
-        <input type="text" id="cmp-name" value="${escAttr(s.name || "")}" placeholder="${escAttr(defaultTitle(s))}" autocomplete="off" />
-      </label>
-    </div>`;
-
   const labelHtml = `
     <div class="label-card" id="label-card">
       <div class="label-head">
@@ -692,8 +750,7 @@ async function openDetail(id) {
     </div>`;
 
   const lockNote = locked
-    ? `<p class="lock-note">🔒 Comparação concluída — as fotos não podem mais ser alteradas.</p>
-       <button class="btn outline" id="btn-duplicate">📑 Duplicar para nova comparação</button>`
+    ? `<p class="lock-note">🔒 Comparação concluída — as fotos não podem mais ser alteradas.</p>`
     : "";
 
   // Ajustar e Reposicionar continuam disponíveis mesmo depois de "Comparar"
@@ -707,7 +764,7 @@ async function openDetail(id) {
     ${locked ? "" : `<button class="btn outline" id="btn-swap" style="margin-top:8px">🔁 Trocar base ↔ acompanhamento</button>`}
     <button class="btn primary" id="btn-share">🔀 Comparar</button>` : "";
 
-  c.innerHTML = compareHtml + nameHtml + labelHtml + lockNote + baseCard + acCard + secondRow;
+  c.innerHTML = compareHtml + labelHtml + lockNote + baseCard + acCard + secondRow;
 
   // Ativa a tela ANTES de montar a comparação, para o palco já ter largura
   // (a cortina depende de clientWidth para dimensionar a foto de acompanhamento).
@@ -736,13 +793,6 @@ async function openDetail(id) {
     pickImage().then((file) => importBasePhoto(file, s)));
   if ($("#btn-share")) $("#btn-share").addEventListener("click", () => confirmThenSave(s));
   if ($("#btn-swap")) $("#btn-swap").addEventListener("click", () => swapPhotos(s));
-  if ($("#btn-duplicate")) $("#btn-duplicate").addEventListener("click", () => duplicateComparison(s));
-
-  // Nome do card: salva a cada digitação (vazio volta ao título padrão com a data).
-  $("#cmp-name").addEventListener("input", async (e) => {
-    s.name = e.target.value;
-    await DB.put(s);
-  });
 
   // Card de rótulo: seta de expansão abre/fecha os campos de edição.
   $("#lbl-chev").addEventListener("click", () => $("#label-card").classList.toggle("open"));
@@ -773,28 +823,36 @@ async function swapPhotos(s) {
 // Duplica uma comparação já concluída (travada) para uma NOVA comparação editável.
 // Copia as fotos e ajustes, cobra 1 crédito (reserva) e abre a cópia destravada,
 // permitindo trocar/refazer as fotos.
-async function duplicateComparison(s) {
+function duplicateComparison(s) {
   if (!Credits.canStart()) {
     Credits.promptBuy("Você está sem créditos. Resgate um voucher para duplicar como nova comparação.");
     return;
   }
-  if (!confirm(
-    "Duplicar cria uma NOVA comparação (cópia editável) e usa 1 crédito. " +
-    "Você poderá trocar as fotos da cópia. Continuar?"
-  )) return;
-
-  // Cópia profunda para não compartilhar objetos (filtros/ajustes) com o original.
-  const clone = (typeof structuredClone === "function")
-    ? structuredClone(s)
-    : JSON.parse(JSON.stringify(s));
-  clone.id = String(Date.now());
-  clone.createdAt = new Date().toISOString();
-  clone.name = sessionTitle(s) + " (cópia)";
-  clone.creditState = "reserved";   // destravada: pode trocar fotos e recompara
-
-  await DB.put(clone);
-  await Credits.reserve();
-  await openDetail(clone.id);
+  const dlg = $("#dup-dialog");
+  const ok = $("#dup-ok"), cancel = $("#dup-cancel");
+  const doDup = async () => {
+    cleanup();
+    dlg.close();
+    // Cópia profunda para não compartilhar objetos (filtros/ajustes) com o original.
+    const clone = (typeof structuredClone === "function")
+      ? structuredClone(s)
+      : JSON.parse(JSON.stringify(s));
+    clone.id = String(Date.now());
+    clone.createdAt = new Date().toISOString();
+    clone.name = sessionTitle(s) + " (cópia)";
+    clone.creditState = "reserved";   // destravada: pode trocar fotos e recomparar
+    await DB.put(clone);
+    await Credits.reserve();
+    await openDetail(clone.id);
+  };
+  const onCancel = () => { cleanup(); dlg.close(); };
+  function cleanup() {
+    ok.removeEventListener("click", doDup);
+    cancel.removeEventListener("click", onCancel);
+  }
+  ok.addEventListener("click", doDup);
+  cancel.addEventListener("click", onCancel);
+  dlg.showModal();
 }
 
 // Clicar em "Comparar" TRAVA a comparação (as fotos não podem mais ser alteradas)
