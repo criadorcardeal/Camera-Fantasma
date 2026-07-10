@@ -156,11 +156,17 @@ async function renderHome() {
   }
   el.innerHTML = "";
   for (const s of list) {
+    // Travada = comparação concluída (fotos não podem mais ser trocadas).
+    const locked = s.creditState === "confirmed";
+    // Ícone: só base (➕); 2 fotos ainda destravado p/ troca (🔓); comparação feita (🔀).
+    const icon = s.followImage ? (locked ? "🔀" : "🔓") : "➕";
+
     const wrap = document.createElement("div");
     wrap.className = "card-swipe";
+    // Duplicar só faz sentido numa comparação já concluída (travada).
     wrap.innerHTML = `
       <div class="card-actions">
-        <button type="button" class="ca-btn ca-dup">📑<span>Duplicar</span></button>
+        <button type="button" class="ca-btn ca-dup"${locked ? "" : " disabled"}>📑<span>Duplicar</span></button>
         <button type="button" class="ca-btn ca-ren">✏️<span>Renomear</span></button>
       </div>
       <div class="card-del-bg">🗑 Excluir</div>`;
@@ -172,7 +178,7 @@ async function renderHome() {
         <b>${escHtml(sessionTitle(s))}</b>
         <span>${s.followImage ? "Base + acompanhamento" : "Só foto base"}</span>
       </div>
-      <div>${s.followImage ? "🔀" : "➕"}</div>`;
+      <div>${icon}</div>`;
     wrap.appendChild(card);
     el.appendChild(wrap);
     attachSwipe(card, s, wrap);
@@ -183,9 +189,11 @@ async function renderHome() {
 //  • arrastar para a ESQUERDA → excluir (confirma; devolve crédito se não concluída);
 //  • arrastar para a DIREITA → revela as ações "Duplicar" e "Renomear".
 function attachSwipe(card, s, wrap) {
-  const ACT_W = 176;             // largura das 2 ações reveladas
   const DEL_THRESH = 90;         // arrastar além disso p/ a esquerda = excluir
-  const OPEN_THRESH = ACT_W / 2; // arrastar além disso p/ a direita = abrir ações
+  // Extensão máxima do arraste (cada lado) = METADE da largura do card, para as
+  // ações reveladas não vazarem sobre o fundo do lado oposto. As ações ocupam
+  // exatamente essa metade (CSS .card-actions { width: 50% }).
+  const half = () => (card.offsetWidth || 320) / 2;
   let startX = 0, dx = 0, dragging = false, moved = false, open = false;
 
   const setX = (x, anim) => {
@@ -202,10 +210,11 @@ function attachSwipe(card, s, wrap) {
   });
   card.addEventListener("pointermove", (e) => {
     if (!dragging) return;
+    const h = half();
     const raw = e.clientX - startX;
     if (Math.abs(raw) > 6) moved = true;
-    let x = (open ? ACT_W : 0) + raw;
-    x = Math.max(-card.offsetWidth, Math.min(ACT_W, x));
+    let x = (open ? h : 0) + raw;
+    x = Math.max(-h, Math.min(h, x));   // nunca passa de meia largura p/ nenhum lado
     setX(x, false);
     dx = x;
   });
@@ -223,7 +232,7 @@ function attachSwipe(card, s, wrap) {
       close();
       return;
     }
-    if (dx >= OPEN_THRESH) { open = true; setX(ACT_W, true); }
+    if (dx >= half() / 2) { open = true; setX(half(), true); }
     else close();
   };
   card.addEventListener("pointerup", end);
@@ -236,7 +245,9 @@ function attachSwipe(card, s, wrap) {
   });
 
   wrap.querySelector(".ca-dup").addEventListener("click", (e) => {
-    e.stopPropagation(); close(); duplicateComparison(s);
+    e.stopPropagation();
+    if (e.currentTarget.disabled) return;   // só duplica comparação travada
+    close(); duplicateComparison(s);
   });
   wrap.querySelector(".ca-ren").addEventListener("click", (e) => {
     e.stopPropagation(); close(); startRename(card, s);
