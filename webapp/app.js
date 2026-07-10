@@ -98,6 +98,10 @@ function defaultLabel(kind) {
 const baseSrc = (s) => s.baseImageView || s.baseImage;
 const followSrc = (s) => s.followImageView || s.followImage;
 
+// Título do card: nome personalizado (se o usuário definiu) ou o padrão com a data.
+const defaultTitle = (s) => "Comparação de " + fmtDate(s.createdAt);
+const sessionTitle = (s) => (s.name && s.name.trim()) ? s.name.trim() : defaultTitle(s);
+
 // Aplica brilho/contraste/saturacao (mesma semantica do CSS filter) direto nos
 // pixels de um canvas. Usado na CAPTURA porque em alguns iPhones o ctx.filter
 // nao surte efeito — assim o ajuste sempre fica "impresso" na foto.
@@ -160,7 +164,7 @@ async function renderHome() {
     card.innerHTML = `
       <img src="${baseSrc(s)}" alt="" />
       <div class="info">
-        <b>Comparação de ${fmtDate(s.createdAt)}</b>
+        <b>${escHtml(sessionTitle(s))}</b>
         <span>${s.followImage ? "Base + acompanhamento" : "Só foto base"}</span>
       </div>
       <div>${s.followImage ? "🔀" : "➕"}</div>`;
@@ -641,6 +645,14 @@ async function openDetail(id) {
   // Depois de gerar a comparação (crédito confirmado), as fotos ficam travadas.
   const locked = s.creditState === "confirmed";
 
+  // Nome do card (editável a qualquer momento, mesmo com a comparação travada).
+  const nameHtml = `
+    <div class="act-card">
+      <label class="name-field">Nome desta comparação
+        <input type="text" id="cmp-name" value="${escAttr(s.name || "")}" placeholder="${escAttr(defaultTitle(s))}" autocomplete="off" />
+      </label>
+    </div>`;
+
   const labelHtml = `
     <div class="label-card" id="label-card">
       <div class="label-head">
@@ -680,7 +692,8 @@ async function openDetail(id) {
     </div>`;
 
   const lockNote = locked
-    ? `<p class="lock-note">🔒 Comparação concluída — as fotos não podem mais ser alteradas.</p>`
+    ? `<p class="lock-note">🔒 Comparação concluída — as fotos não podem mais ser alteradas.</p>
+       <button class="btn outline" id="btn-duplicate">📑 Duplicar para nova comparação</button>`
     : "";
 
   // Ajustar e Reposicionar continuam disponíveis mesmo depois de "Comparar"
@@ -694,7 +707,7 @@ async function openDetail(id) {
     ${locked ? "" : `<button class="btn outline" id="btn-swap" style="margin-top:8px">🔁 Trocar base ↔ acompanhamento</button>`}
     <button class="btn primary" id="btn-share">🔀 Comparar</button>` : "";
 
-  c.innerHTML = compareHtml + labelHtml + lockNote + baseCard + acCard + secondRow;
+  c.innerHTML = compareHtml + nameHtml + labelHtml + lockNote + baseCard + acCard + secondRow;
 
   // Ativa a tela ANTES de montar a comparação, para o palco já ter largura
   // (a cortina depende de clientWidth para dimensionar a foto de acompanhamento).
@@ -723,6 +736,13 @@ async function openDetail(id) {
     pickImage().then((file) => importBasePhoto(file, s)));
   if ($("#btn-share")) $("#btn-share").addEventListener("click", () => confirmThenSave(s));
   if ($("#btn-swap")) $("#btn-swap").addEventListener("click", () => swapPhotos(s));
+  if ($("#btn-duplicate")) $("#btn-duplicate").addEventListener("click", () => duplicateComparison(s));
+
+  // Nome do card: salva a cada digitação (vazio volta ao título padrão com a data).
+  $("#cmp-name").addEventListener("input", async (e) => {
+    s.name = e.target.value;
+    await DB.put(s);
+  });
 
   // Card de rótulo: seta de expansão abre/fecha os campos de edição.
   $("#lbl-chev").addEventListener("click", () => $("#label-card").classList.toggle("open"));
@@ -748,6 +768,33 @@ async function swapPhotos(s) {
   swap("baseTarget", "followTarget");
   await DB.put(s);
   await openDetail(s.id);
+}
+
+// Duplica uma comparação já concluída (travada) para uma NOVA comparação editável.
+// Copia as fotos e ajustes, cobra 1 crédito (reserva) e abre a cópia destravada,
+// permitindo trocar/refazer as fotos.
+async function duplicateComparison(s) {
+  if (!Credits.canStart()) {
+    Credits.promptBuy("Você está sem créditos. Resgate um voucher para duplicar como nova comparação.");
+    return;
+  }
+  if (!confirm(
+    "Duplicar cria uma NOVA comparação (cópia editável) e usa 1 crédito. " +
+    "Você poderá trocar as fotos da cópia. Continuar?"
+  )) return;
+
+  // Cópia profunda para não compartilhar objetos (filtros/ajustes) com o original.
+  const clone = (typeof structuredClone === "function")
+    ? structuredClone(s)
+    : JSON.parse(JSON.stringify(s));
+  clone.id = String(Date.now());
+  clone.createdAt = new Date().toISOString();
+  clone.name = sessionTitle(s) + " (cópia)";
+  clone.creditState = "reserved";   // destravada: pode trocar fotos e recompara
+
+  await DB.put(clone);
+  await Credits.reserve();
+  await openDetail(clone.id);
 }
 
 // Clicar em "Comparar" TRAVA a comparação (as fotos não podem mais ser alteradas)
