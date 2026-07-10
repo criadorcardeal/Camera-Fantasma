@@ -460,9 +460,10 @@ html, body {
 }
 .ca-btn .ca-ic { font-size: 1.3rem; line-height: 1; }
 .ca-btn .ca-tx { font-size: 0.72rem; font-weight: 700; }
-/* Duplicar indisponível (comparação não concluída): fundo cinza + ícone a 50% */
+/* Duplicar indisponível (comparação não concluída): fundo cinza + ícone e texto a 50% */
 .ca-dup.ca-off { background: #9aa5ab; }
-.ca-dup.ca-off .ca-ic { opacity: 0.5; }
+.ca-dup.ca-off .ca-ic,
+.ca-dup.ca-off .ca-tx { opacity: 0.5; }
 .ca-dup { background: var(--primary); }
 .ca-ren { background: #2e8b6f; }
 .card-swipe .card {

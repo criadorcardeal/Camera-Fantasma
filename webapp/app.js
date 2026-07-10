@@ -158,8 +158,8 @@ async function renderHome() {
   for (const s of list) {
     // Travada = comparação concluída (fotos não podem mais ser trocadas).
     const locked = s.creditState === "confirmed";
-    // Ícone: só base (➕); 2 fotos ainda destravado p/ troca (🔓); comparação feita (🔀).
-    const icon = s.followImage ? (locked ? "🔀" : "🔓") : "➕";
+    // Ícone: só base (➕); 2 fotos ainda destravado p/ troca (✔️); comparação feita (🔀).
+    const icon = s.followImage ? (locked ? "🔀" : "✔️") : "➕";
 
     const wrap = document.createElement("div");
     wrap.className = "card-swipe";
