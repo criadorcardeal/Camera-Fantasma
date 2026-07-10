@@ -163,11 +163,12 @@ async function renderHome() {
 
     const wrap = document.createElement("div");
     wrap.className = "card-swipe";
-    // Duplicar só faz sentido numa comparação já concluída (travada).
+    // Duplicar só faz sentido numa comparação já concluída (travada): quando não,
+    // fica com aparência de desabilitado (.ca-off) e avisa ao ser tocado.
     wrap.innerHTML = `
       <div class="card-actions">
-        <button type="button" class="ca-btn ca-dup"${locked ? "" : " disabled"}>📑<span>Duplicar</span></button>
-        <button type="button" class="ca-btn ca-ren">✏️<span>Renomear</span></button>
+        <button type="button" class="ca-btn ca-dup${locked ? "" : " ca-off"}"><span class="ca-ic">📑</span><span class="ca-tx">Duplicar</span></button>
+        <button type="button" class="ca-btn ca-ren"><span class="ca-ic">✏️</span><span class="ca-tx">Renomear</span></button>
       </div>
       <div class="card-del-bg">🗑 Excluir</div>`;
     const card = document.createElement("div");
@@ -246,8 +247,12 @@ function attachSwipe(card, s, wrap) {
 
   wrap.querySelector(".ca-dup").addEventListener("click", (e) => {
     e.stopPropagation();
-    if (e.currentTarget.disabled) return;   // só duplica comparação travada
-    close(); duplicateComparison(s);
+    close();
+    if (s.creditState !== "confirmed") {   // só duplica comparação concluída/travada
+      alert("A duplicação só está disponível em comparações concluídas.");
+      return;
+    }
+    duplicateComparison(s);
   });
   wrap.querySelector(".ca-ren").addEventListener("click", (e) => {
     e.stopPropagation(); close(); startRename(card, s);
@@ -710,11 +715,14 @@ async function openDetail(id) {
 
   const hasFollow = !!s.followImage;
 
+  // Aba de comparação lembrada da última vez nesta comparação (Cortina por padrão).
+  const MODES = ["curtain", "side", "overlay"];
+  const mode0 = MODES.includes(s.compareMode) ? s.compareMode : "curtain";
+  const segBtn = (m, label) => `<button data-mode="${m}"${m === mode0 ? ' class="active"' : ""}>${label}</button>`;
+
   const compareHtml = hasFollow
     ? `<div class="seg" id="cmp-seg">
-         <button data-mode="curtain" class="active">Cortina</button>
-         <button data-mode="side">Lado a lado</button>
-         <button data-mode="overlay">Sobrepor</button>
+         ${segBtn("curtain", "Cortina")}${segBtn("side", "Lado a lado")}${segBtn("overlay", "Sobrepor")}
        </div>
        <div id="cmp-host"></div>`
     : `<div class="compare-stage" id="cmp-host"><img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}</div>`;
@@ -782,11 +790,13 @@ async function openDetail(id) {
   showScreen("screen-detail");
 
   if (hasFollow) {
-    renderCompare("curtain");
+    renderCompare(mode0);
     $("#cmp-seg").querySelectorAll("button").forEach((b) => {
-      b.addEventListener("click", () => {
+      b.addEventListener("click", async () => {
         $("#cmp-seg").querySelectorAll("button").forEach((x) => x.classList.remove("active"));
         b.classList.add("active");
+        s.compareMode = b.dataset.mode;   // lembra a aba p/ quando voltar à Montagem
+        await DB.put(s);
         renderCompare(b.dataset.mode);
       });
     });
