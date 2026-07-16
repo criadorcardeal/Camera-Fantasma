@@ -232,6 +232,22 @@ const Aligner = {
     if (h > maxH) { h = maxH; w = h * aspect; }
     stage.style.width = Math.round(w) + "px";
     stage.style.height = Math.round(h) + "px";
+    this.renderRoi();
+  },
+
+  // Contorno verde da zona de interesse (alvo fixo sobre o fantasma base).
+  renderRoi() {
+    const svg = $("#al-roi");
+    if (!svg) return;
+    const s = this.session;
+    if (s && s.roi && s.roi.points && s.roi.points.length >= 3 &&
+        typeof roiRenderSvg === "function") {
+      // <svg>: o atributo `hidden` não reflete via .hidden — usa attribute.
+      svg.removeAttribute("hidden");
+      roiRenderSvg(svg, s.roi.points, this.baseW, this.baseH, "cover");
+    } else {
+      svg.setAttribute("hidden", "");
+    }
   },
 
   apply() {

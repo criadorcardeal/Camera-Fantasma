@@ -522,7 +522,7 @@ html, body {
 }
 
 /* ---------- Camera ---------- */
-.screen.camera { background: #000; position: relative; }
+.screen.camera { background: #000; position: relative; overflow: hidden; }
 #video, .ghost {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
@@ -736,6 +736,35 @@ html, body {
 .al-slider { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 0.85rem; }
 .al-slider span { width: 72px; flex-shrink: 0; }
 .al-slider input { flex: 1; accent-color: var(--primary); }
+
+/* ---------- Zona de interesse (v7.5) ---------- */
+/* Contorno sobreposto (câmera e alinhamento). O viewBox é em pixels do
+   elemento, então a espessura do traço fica em px. */
+.roi-overlay {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 2; overflow: visible;
+}
+.roi-overlay .roi-shape {
+  fill: none; stroke: #2ecc71; stroke-width: 3;
+  stroke-linejoin: round; filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
+}
+/* Ao vivo na câmera: pisca VERDE (bom alinhamento) x AMARELO (ainda ruim). */
+.roi-overlay.roi-good .roi-shape { stroke: #2ecc71; animation: roi-blink 0.7s ease-in-out infinite; }
+.roi-overlay.roi-bad  .roi-shape { stroke: #ffd21e; animation: roi-blink 0.9s ease-in-out infinite; }
+@keyframes roi-blink { 0%,100% { opacity: 1; } 50% { opacity: 0.28; } }
+
+/* Editor da zona (tela #screen-roi) */
+.roi-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px; overflow-y: auto; }
+.roi-stage {
+  position: relative; flex: 1; min-height: 300px; max-height: 70vh;
+  background: #000; border-radius: 8px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+#roi-img { max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; }
+#roi-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.roi-hint { font-size: 0.85rem; color: var(--muted); text-align: center; margin: 0; }
+.roi-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.roi-controls .btn { margin-top: 0; flex: 1; min-width: 140px; }
 
 /* ---------- Editor de imagens (v2.0) ---------- */
 .ed-content { padding-bottom: 32px; }

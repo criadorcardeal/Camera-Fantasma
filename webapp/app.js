@@ -301,6 +301,9 @@ const Cam = {
   session: null,     // sessao em edicao (modo follow)
   target: null,      // distancia-alvo
   torchOn: false,
+  zoom: 1,           // fator de zoom atual (nativo ou digital)
+  _zoomNative: false,// true quando a camera suporta zoom por hardware
+  _zoomCaps: null,   // {min,max,step} do zoom nativo, quando houver
 
   filters() {
     return {
@@ -380,6 +383,11 @@ const Cam = {
     this.mode = mode;
     this.session = session || null;
     this.torchOn = false;
+    // Zoom sempre começa em 1x (o range é reajustado quando a câmera inicia).
+    this.zoom = 1;
+    $("#cam-zoom").value = 1;
+    this.applyZoomTransform();
+    this._stopRoiDetect();
 
     // Ghost overlay + filtros iniciais
     const ghost = $("#ghost");
@@ -398,6 +406,7 @@ const Cam = {
       // comparação existente (session preenchida).
       ghost.removeAttribute("src");
       ghost.style.display = "none";
+      $("#cam-roi").setAttribute("hidden", "");
       $("#ghost-wrap").style.display = "none";
       $("#cam-title").textContent = session ? "Refazer foto base" : "Foto base";
       const f = (session && session.filters) || { brightness: 1, contrast: 1, saturate: 1 };
@@ -429,6 +438,7 @@ const Cam = {
       video.srcObject = this.stream;
       this.track = this.stream.getVideoTracks()[0];
       this.setupTorchButton();
+      this.setupZoom();
 
       // Tenta tocar (no iOS o play() pode "rejeitar" mesmo indo tocar, entao
       // ignoramos o erro aqui e verificamos de verdade logo depois).
@@ -444,6 +454,10 @@ const Cam = {
           this.showStartButton();
         } else {
           $("#cam-start").hidden = true;
+        }
+        // Câmera pronta: liga a zona de interesse ao vivo (modo acompanhamento).
+        if (this.mode === "follow" && this.session && this.session.roi) {
+          this._startRoiDetect();
         }
       }, 1000);
     } catch (e) {
@@ -491,9 +505,145 @@ const Cam = {
     } catch (_) {}
   },
 
+  /* ---------- Zoom (nativo por hardware ou digital por recorte) ---------- */
+  setupZoom() {
+    const slider = $("#cam-zoom");
+    let caps = null;
+    try { caps = this.track && this.track.getCapabilities ? this.track.getCapabilities() : null; } catch (_) {}
+    if (caps && typeof caps.zoom === "object" && caps.zoom && caps.zoom.max > caps.zoom.min) {
+      // Zoom nativo: usa o range real da câmera.
+      this._zoomNative = true;
+      this._zoomCaps = caps.zoom;
+      slider.min = caps.zoom.min;
+      slider.max = caps.zoom.max;
+      slider.step = caps.zoom.step || (caps.zoom.max - caps.zoom.min) / 100 || 0.1;
+      const cur = (this.track.getSettings && this.track.getSettings().zoom) || caps.zoom.min;
+      this.zoom = cur;
+      slider.value = cur;
+    } else {
+      // Zoom digital (iOS Safari): recorte central de 1x a 4x.
+      this._zoomNative = false;
+      this._zoomCaps = null;
+      slider.min = 1; slider.max = 4; slider.step = 0.01;
+      this.zoom = 1; slider.value = 1;
+    }
+    this.applyZoomTransform();
+  },
+
+  async setZoom(z) {
+    const slider = $("#cam-zoom");
+    const min = parseFloat(slider.min), max = parseFloat(slider.max);
+    z = Math.min(max, Math.max(min, z));
+    this.zoom = z;
+    slider.value = z;
+    if (this._zoomNative && this.track) {
+      try { await this.track.applyConstraints({ advanced: [{ zoom: z }] }); } catch (_) {}
+    } else {
+      this.applyZoomTransform();
+    }
+  },
+
+  // No zoom digital, aplica a ampliação por CSS no vídeo e no canvas de filtro
+  // (o preview reflete o zoom). No zoom nativo o frame já vem ampliado.
+  applyZoomTransform() {
+    const scale = this._zoomNative ? 1 : (this.zoom || 1);
+    const t = `scale(${scale})`;
+    $("#video").style.transform = t;
+    $("#cam-fx").style.transform = t;
+  },
+
+  /* ---------- Zona de interesse ao vivo (piscar verde/amarelo) ---------- */
+  async _startRoiDetect() {
+    this._stopRoiDetect();
+    const s = this.session;
+    if (!s || !s.roi || !s.roi.points || s.roi.points.length < 3) return;
+    const svg = $("#cam-roi");
+    // Enquadramento de referência = proporção do vídeo (o ghost cobre a tela).
+    let baseImg;
+    try { baseImg = await loadImageEl(s.baseImage); } catch (_) { return; }
+    this._roiBaseImgW = baseImg.naturalWidth || 3;
+    this._roiBaseImgH = baseImg.naturalHeight || 4;
+    const video = $("#video");
+    const aspect = (video.videoWidth && video.videoHeight)
+      ? video.videoWidth / video.videoHeight
+      : this._roiBaseImgW / this._roiBaseImgH;
+    // Buffer pequeno p/ a visão computacional (lado maior ~140).
+    const BW = aspect >= 1 ? 140 : Math.round(140 * aspect);
+    const BH = aspect >= 1 ? Math.round(140 / aspect) : 140;
+    this._roiBW = BW; this._roiBH = BH;
+    // Pontos da ROI no enquadramento cover do buffer + máscara.
+    const boxNorm = roiPointsToBoxNorm(s.roi.points, this._roiBaseImgW, this._roiBaseImgH, BW, BH, "cover");
+    this._roiMask = roiPolygonMask(boxNorm, BW, BH);
+    // Assinatura de bordas da BASE dentro da ROI (referência fixa).
+    const bc = document.createElement("canvas");
+    bc.width = BW; bc.height = BH;
+    const bctx = bc.getContext("2d", { willReadFrequently: true });
+    drawImageCover(bctx, baseImg, BW, BH);
+    this._roiBaseSig = roiEdgeSignature(bctx.getImageData(0, 0, BW, BH).data, BW, BH, this._roiMask);
+    this._roiBuf = document.createElement("canvas");
+    this._roiBuf.width = BW; this._roiBuf.height = BH;
+    this._roiState = null;
+
+    // Mostra o overlay antes de renderizar (clientWidth precisa ser > 0).
+    // OBS.: em <svg> o atributo `hidden` NÃO reflete via propriedade .hidden,
+    // então visibilidade é controlada por set/removeAttribute.
+    svg.removeAttribute("hidden");
+    svg.classList.remove("roi-good");
+    svg.classList.add("roi-bad");
+    roiRenderSvg(svg, s.roi.points, this._roiBaseImgW, this._roiBaseImgH, "cover");
+    let last = 0, greenStreak = 0, yellowStreak = 0;
+    const loop = (t) => {
+      this._roiRAF = requestAnimationFrame(loop);
+      const vid = $("#video");
+      if (!vid.videoWidth) return;
+      // Reposiciona o contorno (caso a tela tenha mudado de tamanho).
+      roiRenderSvg(svg, s.roi.points, this._roiBaseImgW, this._roiBaseImgH, "cover");
+      if (t - last < 250) return;                 // ~4 medições por segundo
+      last = t;
+      const ctx = this._roiBuf.getContext("2d", { willReadFrequently: true });
+      // Amostra o mesmo enquadramento que será capturado: no zoom digital,
+      // recorta o centro pelo fator de zoom (o nativo já vem ampliado).
+      const dz = this._zoomNative ? 1 : (this.zoom || 1);
+      if (dz > 1.001) {
+        const sw = vid.videoWidth / dz, sh = vid.videoHeight / dz;
+        ctx.drawImage(vid, (vid.videoWidth - sw) / 2, (vid.videoHeight - sh) / 2, sw, sh, 0, 0, BW, BH);
+      } else {
+        drawImageCover(ctx, vid, BW, BH);
+      }
+      const sig = roiEdgeSignature(ctx.getImageData(0, 0, BW, BH).data, BW, BH, this._roiMask);
+      const ncc = roiNCC(this._roiBaseSig, sig);
+      // Histerese: precisa de 2 medições seguidas p/ trocar de estado (menos flicker).
+      const good = ncc >= 0.42;
+      if (good) { greenStreak++; yellowStreak = 0; } else { yellowStreak++; greenStreak = 0; }
+      let next = this._roiState;
+      if (greenStreak >= 2) next = "green";
+      else if (yellowStreak >= 2) next = "yellow";
+      if (next !== this._roiState) {
+        this._roiState = next;
+        svg.classList.toggle("roi-good", next === "green");
+        svg.classList.toggle("roi-bad", next !== "green");
+      }
+    };
+    this._roiRAF = requestAnimationFrame(loop);
+  },
+
+  _stopRoiDetect() {
+    if (this._roiRAF) { cancelAnimationFrame(this._roiRAF); this._roiRAF = null; }
+    const svg = $("#cam-roi");
+    if (svg) {
+      svg.setAttribute("hidden", "");
+      svg.classList.remove("roi-good", "roi-bad");
+    }
+    this._roiState = null;
+  },
+
   stop() {
     this.stopPreview();
+    this._stopRoiDetect();
     $("#cam-fx").hidden = true;
+    // Zera transformações de zoom para não vazar p/ a próxima abertura.
+    $("#video").style.transform = "";
+    $("#cam-fx").style.transform = "";
     if (this.stream) {
       this.stream.getTracks().forEach((t) => t.stop());
       this.stream = null;
@@ -527,7 +677,16 @@ const Cam = {
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
     const f = this.filters();
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // Zoom digital: recorta o centro do frame pelo fator de zoom (o nativo já
+    // vem ampliado do hardware, então desenha o frame inteiro).
+    const dz = this._zoomNative ? 1 : (this.zoom || 1);
+    if (dz > 1.001) {
+      const sw = video.videoWidth / dz, sh = video.videoHeight / dz;
+      const sx = (video.videoWidth - sw) / 2, sy = (video.videoHeight - sh) / 2;
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    } else {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    }
     // "Imprime" brilho/contraste/saturacao nos pixels (confiavel em todo iPhone).
     bakeCameraFilter(ctx, canvas.width, canvas.height, f);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
@@ -768,6 +927,16 @@ async function openDetail(id) {
       </div>
     </div>`;
 
+  // Zona de interesse: define/edita a região na foto base. Fica disponível mesmo
+  // com a comparação travada (só altera a ROI, não as fotos).
+  const roiCard = `
+    <div class="act-card">
+      <div class="act-title">Zona de interesse</div>
+      <div class="btn-row">
+        <button class="btn outline" id="btn-roi">${s.roi ? "🟢 Zona (definida)" : "🟢 Definir zona de interesse"}</button>
+      </div>
+    </div>`;
+
   const lockNote = locked
     ? `<p class="lock-note">🔒 Comparação concluída — as fotos não podem mais ser alteradas.</p>`
     : "";
@@ -783,7 +952,7 @@ async function openDetail(id) {
     ${locked ? "" : `<button class="btn outline" id="btn-swap" style="margin-top:8px">🔁 Trocar base ↔ acompanhamento</button>`}
     <button class="btn primary" id="btn-share">🔀 Comparar</button>` : "";
 
-  c.innerHTML = compareHtml + labelHtml + lockNote + baseCard + acCard + secondRow;
+  c.innerHTML = compareHtml + labelHtml + lockNote + baseCard + acCard + roiCard + secondRow;
 
   // Ativa a tela ANTES de montar a comparação, para o palco já ter largura
   // (a cortina depende de clientWidth para dimensionar a foto de acompanhamento).
@@ -809,6 +978,7 @@ async function openDetail(id) {
   if ($("#btn-redo")) $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
   if ($("#btn-follow-import")) $("#btn-follow-import").addEventListener("click", () =>
     pickImage().then((file) => importFollowPhoto(s, file)));
+  if ($("#btn-roi")) $("#btn-roi").addEventListener("click", () => Roi.open(s));
   if ($("#btn-base-redo")) $("#btn-base-redo").addEventListener("click", () => Cam.open("base", s));
   if ($("#btn-base-import")) $("#btn-base-import").addEventListener("click", () =>
     pickImage().then((file) => importBasePhoto(file, s)));
@@ -1192,14 +1362,54 @@ function wireEvents() {
   $("#ghost-opacity").addEventListener("input", (e) => {
     $("#ghost").style.opacity = e.target.value;
   });
+  $("#cam-zoom").addEventListener("input", (e) => Cam.setZoom(parseFloat(e.target.value)));
   ["#f-brightness", "#f-contrast", "#f-saturate"].forEach((sel) => {
     $(sel).addEventListener("input", () => Cam.applyLiveFilter());
   });
+
+  // Pinça para dar zoom direto sobre o vídeo (iOS via gesture, Android via 2 toques).
+  setupCameraPinch();
 
   $("#detail-back").addEventListener("click", async () => {
     showScreen("screen-home");
     await renderHome();
   });
+}
+
+/* ---------- Pinça de zoom na câmera (iOS via gesture, Android via 2 toques) ---------- */
+function setupCameraPinch() {
+  const stage = $("#screen-camera");
+  if (!stage) return;
+  const active = () => stage.classList.contains("active");
+  const supportsGesture = typeof window.GestureEvent !== "undefined";
+  const d2 = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) || 1;
+  let pinchBase = null, gZoom = 1, gestureOn = false;
+
+  // ----- Safari/iOS: gesture events -----
+  stage.addEventListener("gesturestart", (e) => {
+    if (!active()) return;
+    e.preventDefault(); gestureOn = true; gZoom = Cam.zoom || 1;
+  }, { passive: false });
+  stage.addEventListener("gesturechange", (e) => {
+    if (!gestureOn) return;
+    e.preventDefault(); Cam.setZoom(gZoom * e.scale);
+  }, { passive: false });
+  const gEnd = () => { gestureOn = false; };
+  stage.addEventListener("gestureend", gEnd, { passive: false });
+
+  // ----- Android: pinça por 2 toques -----
+  stage.addEventListener("touchstart", (e) => {
+    if (supportsGesture) return;
+    if (e.touches.length >= 2) pinchBase = { dist: d2(e.touches), zoom: Cam.zoom || 1 };
+  }, { passive: false });
+  stage.addEventListener("touchmove", (e) => {
+    if (supportsGesture || !pinchBase || e.touches.length < 2) return;
+    e.preventDefault();
+    Cam.setZoom(pinchBase.zoom * (d2(e.touches) / pinchBase.dist));
+  }, { passive: false });
+  const tEnd = (e) => { if (e.touches.length < 2) pinchBase = null; };
+  stage.addEventListener("touchend", tEnd);
+  stage.addEventListener("touchcancel", tEnd);
 }
 
 /* ---------- Setas flutuantes indicando rolagem em janelas/diálogos ---------- */
