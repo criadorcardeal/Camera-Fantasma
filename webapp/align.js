@@ -220,9 +220,9 @@ const Aligner = {
       this.followW = fimg.naturalWidth || 3;
       this.followH = fimg.naturalHeight || 4;
     } catch (_) { this.followW = 3; this.followH = 4; }
-    // Estado dos toggles de zona (base/acompanhamento × traço/IA).
-    this.roiWhich = "base";
-    this.roiShow = { base: { raw: false, ai: true }, follow: { raw: false, ai: true } };
+    // Estado dos toggles de zona (mostrar zona da base / do acompanhamento).
+    this.roiShowBase = true;
+    this.roiShowFollow = true;
     this._setupRoiCardUI();
     $("#al-ghost").src = session.baseImage;
     $("#al-ghost").style.opacity = 0.5;
@@ -244,9 +244,8 @@ const Aligner = {
     this.renderRois();
   },
 
-  // Card "Zonas de interesse": mostra o toggle Base/Acompanhamento só quando há
-  // zonas, habilitando "Acompanhamento" só na reposição (a followRoi pertence à
-  // foto já salva). Some se nenhuma das fotos tem zona marcada.
+  // Card "Zonas de interesse": aparece se alguma foto tem zona; o toggle do
+  // acompanhamento só vale na reposição (a followRoi pertence à foto já salva).
   _setupRoiCardUI() {
     const s = this.session, card = $("#al-roi-card");
     if (!card) return;
@@ -254,29 +253,9 @@ const Aligner = {
     const followHas = this.isReposition && !!(s.followRoi && s.followRoi.points && s.followRoi.points.length >= 3);
     if (!baseHas && !followHas) { card.setAttribute("hidden", ""); return; }
     card.removeAttribute("hidden");
-    if (!baseHas && followHas) this.roiWhich = "follow";
-    $("#al-roi-which").querySelectorAll("button").forEach((b) => {
-      b.disabled = b.dataset.img === "follow" ? !followHas : !baseHas;
-    });
-    this._syncRoiChecks();
-  },
-
-  _syncRoiChecks() {
-    const st = this.roiShow[this.roiWhich];
-    $("#al-roi-raw").checked = st.raw;
-    $("#al-roi-ai").checked = st.ai;
-    $("#al-roi-which").querySelectorAll("button").forEach((b) =>
-      b.classList.toggle("active", b.dataset.img === this.roiWhich));
-  },
-
-  _shapesFor(roi, show, stroke, fill) {
-    if (!roi) return [];
-    const out = [];
-    const ai = (roi.ai && roi.ai.length >= 3) ? roi.ai : roi.points;
-    const raw = (roi.raw && roi.raw.length >= 3) ? roi.raw : null;
-    if (show.ai && ai && ai.length >= 3) out.push({ points: ai, color: stroke, fill });
-    if (show.raw && raw) out.push({ points: raw, color: stroke, dashed: true });
-    return out;
+    const cbBase = $("#al-roi-base"), cbFol = $("#al-roi-follow");
+    cbBase.disabled = !baseHas; cbBase.checked = baseHas && this.roiShowBase;
+    cbFol.disabled = !followHas; cbFol.checked = followHas && this.roiShowFollow;
   },
 
   // Zonas das DUAS fotos: base fixa (verde) + acompanhamento (ciano) que se move
@@ -285,13 +264,13 @@ const Aligner = {
     if (typeof roiRenderSvgMulti !== "function") return;
     const s = this.session;
     const baseSvg = $("#al-roi");
-    const bShapes = this._shapesFor(s.roi, this.roiShow.base, "#2ecc71", "rgba(46,204,113,0.15)");
-    if (bShapes.length) { baseSvg.removeAttribute("hidden"); roiRenderSvgMulti(baseSvg, bShapes, this.baseW, this.baseH, "cover"); }
+    const bOk = this.roiShowBase && s.roi && s.roi.points && s.roi.points.length >= 3;
+    if (bOk) { baseSvg.removeAttribute("hidden"); roiRenderSvgMulti(baseSvg, [{ points: s.roi.points, color: "#2ecc71", fill: "rgba(46,204,113,0.15)" }], this.baseW, this.baseH, "cover"); }
     else { baseSvg.setAttribute("hidden", ""); }
 
     const folSvg = $("#al-roi-follow");
-    const fShapes = this.isReposition ? this._shapesFor(s.followRoi, this.roiShow.follow, "#22d3ee", "rgba(34,211,238,0.15)") : [];
-    if (fShapes.length) { folSvg.removeAttribute("hidden"); roiRenderSvgMulti(folSvg, fShapes, this.followW, this.followH, "cover"); }
+    const fOk = this.isReposition && this.roiShowFollow && s.followRoi && s.followRoi.points && s.followRoi.points.length >= 3;
+    if (fOk) { folSvg.removeAttribute("hidden"); roiRenderSvgMulti(folSvg, [{ points: s.followRoi.points, color: "#22d3ee", fill: "rgba(34,211,238,0.15)" }], this.followW, this.followH, "cover"); }
     else { folSvg.setAttribute("hidden", ""); }
   },
 
@@ -575,19 +554,9 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#al-confirm").addEventListener("click", () => Aligner.confirm());
   $("#al-auto").addEventListener("click", () => Aligner.autoAlign());
 
-  // Card "Zonas de interesse": Base/Acompanhamento + mostrar meu traço/IA.
-  $("#al-roi-which").querySelectorAll("button").forEach((b) =>
-    b.addEventListener("click", () => {
-      if (b.disabled) return;
-      Aligner.roiWhich = b.dataset.img;
-      Aligner._syncRoiChecks();
-    }));
-  $("#al-roi-raw").addEventListener("change", (e) => {
-    Aligner.roiShow[Aligner.roiWhich].raw = e.target.checked; Aligner.renderRois();
-  });
-  $("#al-roi-ai").addEventListener("change", (e) => {
-    Aligner.roiShow[Aligner.roiWhich].ai = e.target.checked; Aligner.renderRois();
-  });
+  // Card "Zonas de interesse": mostrar zona da base / do acompanhamento.
+  $("#al-roi-base").addEventListener("change", (e) => { Aligner.roiShowBase = e.target.checked; Aligner.renderRois(); });
+  $("#al-roi-follow").addEventListener("change", (e) => { Aligner.roiShowFollow = e.target.checked; Aligner.renderRois(); });
   window.addEventListener("resize", () => {
     if ($("#screen-align").classList.contains("active")) Aligner.layoutStage();
   });

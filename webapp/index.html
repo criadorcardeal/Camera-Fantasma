@@ -49,7 +49,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v7.5.8</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v7.6</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -88,7 +88,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v7.5.8</span>
+      <span class="version-badge">v7.6</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -180,12 +180,8 @@
       </div>
       <div class="al-roi-card" id="al-roi-card" hidden>
         <div class="al-roi-head">Zonas de interesse</div>
-        <div class="seg ed-seg" id="al-roi-which">
-          <button data-img="base" class="active">Base</button>
-          <button data-img="follow">Acompanhamento</button>
-        </div>
-        <label class="roi-tog"><input type="checkbox" id="al-roi-raw" /> <span>Mostrar meu traço</span></label>
-        <label class="roi-tog"><input type="checkbox" id="al-roi-ai" checked /> <span>Mostrar contorno de IA</span></label>
+        <label class="roi-tog"><input type="checkbox" id="al-roi-base" checked /> <span>Mostrar zona da base (verde)</span></label>
+        <label class="roi-tog"><input type="checkbox" id="al-roi-follow" checked /> <span>Mostrar zona do acompanhamento (ciano)</span></label>
       </div>
       <button id="al-confirm" class="btn primary screen-confirm">Confirmar</button>
     </div>
@@ -203,11 +199,7 @@
         <img id="roi-img" alt="" />
         <canvas id="roi-canvas"></canvas>
       </div>
-      <p id="roi-hint" class="roi-hint">Contorne a região de interesse com o dedo. A IA vai refinar o traçado.</p>
-      <div class="roi-toggles" id="roi-toggles" hidden>
-        <label class="roi-tog"><input type="checkbox" id="roi-show-raw" /> <span>Mostrar meu traço</span></label>
-        <label class="roi-tog"><input type="checkbox" id="roi-show-ai" checked /> <span>Mostrar contorno de IA</span></label>
-      </div>
+      <p id="roi-hint" class="roi-hint">Contorne a região de interesse com o dedo.</p>
       <div class="roi-controls">
         <button id="roi-redo" class="btn outline" hidden>↩︎ Refazer traço</button>
         <button id="roi-remove" class="btn outline" hidden>🗑 Remover zona</button>
@@ -543,9 +535,9 @@
   <dialog id="roi-help-dialog">
     <h3>🟢 Zona de interesse</h3>
     <p class="od-text"><b>Contorne com o dedo</b> a região que você quer acompanhar
-      (perna, braço, mão, pé, rosto…). A <b>IA refina o traçado</b> para o contorno
-      do corpo dentro da área marcada.<br><br>Depois você pode escolher mostrar o
-      <b>seu traço</b> e/ou o <b>contorno da IA</b> e tocar <b>Confirmar</b>.</p>
+      (perna, braço, mão, pé, rosto…). Esse contorno é usado para ajudar no
+      alinhamento entre a foto base e a de acompanhamento.<br><br>Toque
+      <b>Confirmar</b> para salvar, ou <b>Refazer traço</b> para desenhar de novo.</p>
     <label class="od-check"><input type="checkbox" id="roi-help-nomore" /> Não mostrar novamente</label>
     <menu><button id="roi-help-ok" class="primary">Entendi</button></menu>
   </dialog>

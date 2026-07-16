@@ -496,10 +496,7 @@ const Roi = {
   field: "roi",       // "roi" | "followRoi"
   baseImg: null,      // Image element da foto sendo marcada
   imgW: 3, imgH: 4,
-  rawPts: null,       // traco bruto do usuario (img-normalizado)
-  smartPts: null,     // contorno refinado pela IA
-  showRaw: false,     // mostrar/usar o traco bruto
-  showSmart: true,    // mostrar/usar o contorno da IA
+  pts: null,          // contorno da zona = traço manual (img-normalizado)
   drawing: false,
   _path: null,        // path em px do desenho atual
 
@@ -508,8 +505,7 @@ const Roi = {
     this.which = which === "follow" ? "follow" : "base";
     this.field = this.which === "follow" ? "followRoi" : "roi";
     const imgSrc = this.which === "follow" ? session.followImage : session.baseImage;
-    this.rawPts = null; this.smartPts = null;
-    this.showRaw = false; this.showSmart = true;
+    this.pts = null;
     this.drawing = false;
     try {
       this.baseImg = await loadImageEl(imgSrc);
@@ -519,17 +515,9 @@ const Roi = {
     $("#roi-img").src = imgSrc;
     $("#screen-roi").querySelector("h1").textContent =
       this.which === "follow" ? "Zona — Acompanhamento" : "Zona — Base";
-    // Se ja existe ROI nesta foto, carrega o traço e o contorno da IA salvos
-    // (guardados separados desde v7.5.4) para mostrar os dois toggles.
+    // Se já existe zona nesta foto, carrega o contorno salvo.
     const cur = session[this.field];
-    if (cur && cur.points && cur.points.length >= 3) {
-      this.smartPts = (cur.ai && cur.ai.length >= 3) ? cur.ai.slice() : cur.points.slice();
-      // Zonas antigas (só .points) usam o próprio contorno como "meu traço", p/ o
-      // card de toggles aparecer sempre que já houver zona definida.
-      this.rawPts = (cur.raw && cur.raw.length >= 3) ? cur.raw.slice() : cur.points.slice();
-      this.showSmart = cur.showAi != null ? !!cur.showAi : true;
-      this.showRaw = cur.showRaw != null ? !!cur.showRaw : false;
-    }
+    if (cur && cur.points && cur.points.length >= 3) this.pts = cur.points.slice();
     showScreen("screen-roi");
     requestAnimationFrame(() => { this.layout(); this.redraw(); this.updateUI(); });
     this._showHelp();
@@ -572,7 +560,7 @@ const Roi = {
     this._path = [];
     const n = this._evToNorm(e);
     this._path.push([n.nx, n.ny]);
-    this.smartPts = null;   // recomeca
+    this.pts = null;   // recomeça
     this.redraw();
   },
   moveDraw(e) {
@@ -602,31 +590,14 @@ const Roi = {
       if (!last || Math.hypot(n.nx - last[0], n.ny - last[1]) > 0.001) this._path.push([n.nx, n.ny]);
     }
     if (!this._path || this._path.length < 6) { this._path = null; this.redraw(); return; }
-    this.rawPts = this._path.slice();
+    // A zona é o próprio traço manual (só reduz pontos redundantes p/ ficar leve).
+    this.pts = roiNormalizeLoop(this._path, this.imgW, this.imgH);
     this._path = null;
-    // Refino inteligente (visao computacional).
-    if (this.baseImg) {
-      try {
-        const res = roiSmartContour(this.baseImg, this.rawPts);
-        this.smartPts = res.points;
-      } catch (_) {
-        this.smartPts = roiNormalizeLoop(this.rawPts, this.imgW, this.imgH);
-      }
-    } else {
-      this.smartPts = roiNormalizeLoop(this.rawPts, this.imgW, this.imgH);
-    }
-    // Ao desenhar de novo, mostra o contorno da IA por padrao.
-    this.showSmart = true; this.showRaw = false;
     this.redraw();
     this.updateUI();
   },
 
-  // Contorno que sera SALVO: a IA quando visivel; senao o meu traco.
-  currentPts() {
-    if (this.showSmart && this.smartPts) return this.smartPts;
-    if (this.showRaw && this.rawPts) return roiNormalizeLoop(this.rawPts, this.imgW, this.imgH);
-    return this.smartPts || (this.rawPts ? roiNormalizeLoop(this.rawPts, this.imgW, this.imgH) : null);
-  },
+  currentPts() { return this.pts; },
 
   _strokePath(ctx, pts, toBox, close) {
     ctx.beginPath();
@@ -653,18 +624,9 @@ const Roi = {
       return;
     }
 
-    // Meu traço (amarelo tracejado) quando ligado.
-    if (this.showRaw && this.rawPts && this.rawPts.length >= 3) {
-      this._strokePath(ctx, this.rawPts, toBox, true);
-      ctx.setLineDash([6, 5]);
-      ctx.strokeStyle = "#ffd21e";
-      ctx.lineWidth = 2.5; ctx.lineJoin = "round";
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-    // Contorno da IA (verde com preenchimento leve) quando ligado.
-    if (this.showSmart && this.smartPts && this.smartPts.length >= 3) {
-      this._strokePath(ctx, this.smartPts, toBox, true);
+    // Zona (verde com preenchimento leve).
+    if (this.pts && this.pts.length >= 3) {
+      this._strokePath(ctx, this.pts, toBox, true);
       ctx.fillStyle = "rgba(46,204,113,0.18)";
       ctx.fill();
       ctx.strokeStyle = "#2ecc71";
@@ -674,28 +636,16 @@ const Roi = {
   },
 
   updateUI() {
-    const has = !!(this.smartPts || this.rawPts);
+    const has = !!this.pts;
     $("#roi-redo").hidden = !has;
-    // Toggles só aparecem quando há AS DUAS opções (após desenhar nesta sessão).
-    const bothExist = !!(this.smartPts && this.rawPts);
-    $("#roi-toggles").hidden = !bothExist;
-    $("#roi-show-raw").checked = this.showRaw;
-    $("#roi-show-ai").checked = this.showSmart;
     $("#roi-remove").hidden = !(this.session && this.session[this.field]);
     $("#roi-hint").textContent = has
-      ? "Ajuste o que mostrar e toque Confirmar."
-      : "Contorne a região de interesse com o dedo. A IA vai refinar o traçado.";
+      ? "Zona marcada. Toque Confirmar (ou Refazer traço)."
+      : "Contorne a região de interesse com o dedo.";
   },
 
-  setShow(rawOn, aiOn) {
-    if (rawOn != null) this.showRaw = rawOn;
-    if (aiOn != null) this.showSmart = aiOn;
-    this.redraw();
-    this.updateUI();
-  },
   redoDraw() {
-    this.rawPts = null; this.smartPts = null; this._path = null; this.drawing = false;
-    this.showRaw = false; this.showSmart = true;
+    this.pts = null; this._path = null; this.drawing = false;
     this.redraw();
     this.updateUI();
   },
@@ -710,15 +660,7 @@ const Roi = {
   async save() {
     const s = this.session;
     const pts = this.currentPts();
-    if (pts && pts.length >= 3) {
-      s[this.field] = {
-        points: pts,
-        raw: this.rawPts ? roiNormalizeLoop(this.rawPts, this.imgW, this.imgH) : null,
-        ai: this.smartPts || null,
-        showRaw: this.showRaw,
-        showAi: this.showSmart,
-      };
-    }
+    if (pts && pts.length >= 3) s[this.field] = { points: pts };
     await DB.put(s);
     await openDetail(s.id);
   },
@@ -746,8 +688,6 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#roi-save").addEventListener("click", () => Roi.save());
   $("#roi-redo").addEventListener("click", () => Roi.redoDraw());
   $("#roi-remove").addEventListener("click", () => Roi.remove());
-  $("#roi-show-raw").addEventListener("change", (e) => Roi.setShow(e.target.checked, null));
-  $("#roi-show-ai").addEventListener("change", (e) => Roi.setShow(null, e.target.checked));
 
   // Popup de instruções: fechar (e "não mostrar novamente").
   const helpClose = () => {
