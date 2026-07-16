@@ -924,8 +924,7 @@ async function openDetail(id) {
       </div>
     </div>`;
 
-  // Card ACOMPANHAMENTO (recolhível, fechado): Tirar/Refazer/Importar +
-  // Zona de interesse + Ajustar/Reposicionar (estes continuam mesmo travado).
+  // Card ACOMPANHAMENTO (recolhível, fechado): Tirar/Refazer/Importar + Zona.
   const acCard = `
     <div class="act-card collapsible" id="ac-card">
       <div class="act-head"><span class="act-title">Acompanhamento</span><span class="chev">▾</span></div>
@@ -934,25 +933,31 @@ async function openDetail(id) {
           <button class="btn outline" id="btn-redo">${hasFollow ? "📷 Refazer" : "📷 Tirar"}</button>
           <button class="btn outline" id="btn-follow-import">🖼 Importar</button>
         </div>`}
-        ${hasFollow ? `
-        <button class="btn outline card-full" id="btn-roi-follow">${roiLabel(!!s.followRoi)}</button>
-        <div class="btn-row" style="margin-top:8px">
-          <button class="btn outline" id="btn-adjust">🎚 Ajustar imagens</button>
-          <button class="btn outline" id="btn-reposition">↔️ Reposicionar imagens</button>
-        </div>` : ""}
+        ${hasFollow ? `<button class="btn outline card-full" id="btn-roi-follow">${roiLabel(!!s.followRoi)}</button>` : ""}
       </div>
     </div>`;
+
+  // Card AJUSTES FINOS (recolhível, fechado): coloração/exposição, posicionamento
+  // e inversão. Colorações/Posicionamentos seguem disponíveis mesmo travado.
+  const fineCard = hasFollow ? `
+    <div class="act-card collapsible" id="fine-card">
+      <div class="act-head"><span class="act-title">Ajustes Finos</span><span class="chev">▾</span></div>
+      <div class="act-body">
+        <button class="btn outline card-full" id="btn-adjust">🎚 Colorações e Exposição</button>
+        <button class="btn outline card-full" id="btn-reposition">↔️ Posicionamentos</button>
+        ${locked ? "" : `<button class="btn outline card-full" id="btn-swap">🔁 Inverter base ↔ acompanhamento</button>`}
+      </div>
+    </div>` : "";
 
   const lockNote = locked
     ? `<p class="lock-note">🔒 Comparação concluída — as fotos não podem mais ser alteradas.</p>`
     : "";
 
-  // Inverter base↔acompanhamento + Comparar (largura total).
-  const secondRow = hasFollow ? `
-    ${locked ? "" : `<button class="btn outline card-full" id="btn-swap" style="margin-top:12px">🔁 Inverter base ↔ acompanhamento</button>`}
-    <button class="btn primary" id="btn-share" style="margin-top:8px">🔀 Comparar</button>` : "";
+  // Botão Comparar (largura total).
+  const secondRow = hasFollow
+    ? `<button class="btn primary" id="btn-share" style="margin-top:12px">🔀 Comparar</button>` : "";
 
-  c.innerHTML = compareHtml + labelHtml + lockNote + baseCard + acCard + secondRow;
+  c.innerHTML = compareHtml + labelHtml + lockNote + baseCard + acCard + fineCard + secondRow;
 
   // Ativa a tela ANTES de montar a comparação, para o palco já ter largura
   // (a cortina depende de clientWidth para dimensionar a foto de acompanhamento).
@@ -973,8 +978,8 @@ async function openDetail(id) {
   enableWmEdit();
   requestAnimationFrame(sizeWmNames);
 
-  // Cards recolhíveis (Base / Acompanhamento): tocar no cabeçalho abre/fecha.
-  ["#base-card", "#ac-card"].forEach((sel) => {
+  // Cards recolhíveis (Base / Acompanhamento / Ajustes Finos): cabeçalho abre/fecha.
+  ["#base-card", "#ac-card", "#fine-card"].forEach((sel) => {
     const card = $(sel);
     if (card) card.querySelector(".act-head").addEventListener("click", () => card.classList.toggle("open"));
   });

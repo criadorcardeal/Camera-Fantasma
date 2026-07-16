@@ -251,19 +251,45 @@ function roiMaskArea(mask) {
   let a = 0; for (let i = 0; i < mask.length; i++) a += mask[i]; return a;
 }
 
+const roiClamp01 = (v) => Math.min(1, Math.max(0, v));
+
+// Fecho morfologico (dilata->erode): tapa reentrancias/serrilhado da borda.
+function roiMaskClose(mask, W, H, r) { return roiErode(roiDilate(mask, W, H, r), W, H, r); }
+// Abertura (erode->dilata): remove protuberancias/ruido fino da borda.
+function roiMaskOpen(mask, W, H, r) { return roiDilate(roiErode(mask, W, H, r), W, H, r); }
+
+// Suaviza um poligono FECHADO por corte de cantos (Chaikin). Cada iteracao
+// arredonda os vertices, tirando o aspecto "escada" do contorno rasterizado.
+function roiSmoothPolygon(pts, iters) {
+  let out = pts;
+  for (let k = 0; k < iters; k++) {
+    const n = out.length; if (n < 4) break;
+    const next = [];
+    for (let i = 0; i < n; i++) {
+      const a = out[i], b = out[(i + 1) % n];
+      next.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25]);
+      next.push([a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+    }
+    out = next;
+  }
+  return out;
+}
+
 /* -------------------------------------------------------------------------
-   Refino inteligente do contorno ("IA"): segmentacao local por modelos de
-   cor (histogramas), maior componente conexa e preenchimento de buracos.
-   Recebe o Image element da base e o traco bruto (pontos img-normalizados).
-   Devolve { points, ok }.
+   Refino inteligente do contorno ("IA"): reconhece o CONTORNO DO CORPO
+   (pele — pernas, bracos, maos, pes, rosto) DENTRO da area marcada pelo
+   usuario, com margem de ate 10% para fora do traco. Reusa a deteccao de
+   pele robusta do align.js (alSkinScore) + maior componente + preenchimento,
+   suaviza a mascara e o poligono. Devolve { points, ok }.
    ------------------------------------------------------------------------- */
 function roiSmartContour(imgEl, rawPts) {
   const iw = imgEl.naturalWidth || imgEl.width;
   const ih = imgEl.naturalHeight || imgEl.height;
   const fallback = { points: roiNormalizeLoop(rawPts, iw, ih), ok: false };
   if (!iw || !ih || !rawPts || rawPts.length < 3) return fallback;
+  if (typeof alSkinScore !== "function") return fallback;
 
-  const scale = Math.min(1, 340 / Math.max(iw, ih));
+  const scale = Math.min(1, 360 / Math.max(iw, ih));
   const W = Math.max(8, Math.round(iw * scale));
   const H = Math.max(8, Math.round(ih * scale));
 
@@ -275,57 +301,39 @@ function roiSmartContour(imgEl, rawPts) {
 
   const poly = roiPolygonMask(rawPts, W, H);
   const polyArea = roiMaskArea(poly);
-  if (polyArea < 30) return fallback;
+  if (polyArea < 40) return fallback;
 
-  let band = Math.max(3, Math.round(Math.min(W, H) * 0.05));
-  let fgSeed = roiErode(poly, W, H, band);
-  // Se o laco for fino, o erode zera as sementes: reduz a banda ate ter FG.
-  while (roiMaskArea(fgSeed) < 20 && band > 1) { band--; fgSeed = roiErode(poly, W, H, band); }
-  if (roiMaskArea(fgSeed) < 12) return fallback;
-  const outside = roiDilate(poly, W, H, band);      // dentro+borda externa
-  const bgSeed = new Uint8Array(W * H);
-  for (let p = 0; p < W * H; p++) bgSeed[p] = outside[p] ? 0 : 1;
+  // Regiao de busca = zona marcada + margem de 10% (raio equivalente do laco).
+  const eqR = Math.sqrt(polyArea / Math.PI);
+  const margin = Math.max(2, Math.round(eqR * 0.10));
+  const search = roiDilate(poly, W, H, margin);
 
-  // Histogramas de cor (4 bits/canal -> 4096 bins), com suavizacao (Laplace).
-  const BINS = 4096;
-  const fgH = new Float32Array(BINS).fill(1);
-  const bgH = new Float32Array(BINS).fill(1);
-  let fgN = BINS, bgN = BINS;
-  const qidx = (i) => ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4);
+  // Corpo = PELE dentro da regiao de busca (reconhece perna/braco/mao/pe/rosto).
+  const body = new Uint8Array(W * H);
+  let skinN = 0;
   for (let p = 0, i = 0; p < W * H; p++, i += 4) {
-    if (fgSeed[p]) { fgH[qidx(i)]++; fgN++; }
-    else if (bgSeed[p]) { bgH[qidx(i)]++; bgN++; }
+    if (search[p] && alSkinScore(data[i], data[i + 1], data[i + 2])) { body[p] = 1; skinN++; }
   }
+  // Se quase nao ha pele na zona (regiao nao-corporal), usa o traco do usuario.
+  if (skinN < polyArea * 0.20) return fallback;
 
-  // Classifica os pixels DENTRO da regiao dilatada; fora = fundo.
-  const seg = new Uint8Array(W * H);
-  for (let p = 0, i = 0; p < W * H; p++, i += 4) {
-    if (fgSeed[p]) { seg[p] = 1; continue; }
-    if (!outside[p]) continue;
-    const q = qidx(i);
-    const pf = fgH[q] / fgN, pb = bgH[q] / bgN;
-    if (pf >= pb) seg[p] = 1;
-  }
+  let mask = alFillHoles(alLargestComponent(body, W, H).mask, W, H); // reusa align.js
+  mask = roiMaskClose(mask, W, H, 2);      // tira reentrancias (suaviza)
+  mask = roiMaskOpen(mask, W, H, 1);       // tira protuberancias finas
+  const area = roiMaskArea(mask);
+  // Se sumiu ou estourou p/ muito alem do traco (+ que a margem), volta ao traco.
+  if (area < polyArea * 0.25 || area > polyArea * 1.35) return fallback;
 
-  const comp = alLargestComponent(seg, W, H);        // reusa align.js
-  const filled = alFillHoles(comp.mask, W, H);       // reusa align.js
-  const area = roiMaskArea(filled);
-  // Se a segmentacao "estourou" ou sumiu, usa o traco bruto.
-  if (area < polyArea * 0.12 || area > polyArea * 3.5) return fallback;
-
-  const raw = roiTraceContour(filled, W, H);
-  if (raw.length < 6) return fallback;
+  const contour = roiTraceContour(mask, W, H);
+  if (contour.length < 8) return fallback;
   const diag = Math.hypot(W, H);
-  let simp = roiSimplify(raw, diag * 0.006);
-  // Limita a quantidade de pontos aumentando o eps se preciso.
-  let eps = diag * 0.006;
-  while (simp.length > 60 && eps < diag * 0.05) { eps *= 1.4; simp = roiSimplify(raw, eps); }
+  // Simplifica (tira os degraus do raster) e arredonda os cantos (Chaikin).
+  let eps = diag * 0.012;
+  let simp = roiSmoothPolygon(roiSimplify(contour, eps), 2);
+  while (simp.length > 90 && eps < diag * 0.06) { eps *= 1.3; simp = roiSmoothPolygon(roiSimplify(contour, eps), 2); }
   if (simp.length < 3) return fallback;
 
-  const points = simp.map(([x, y]) => [
-    Math.min(1, Math.max(0, x / W)),
-    Math.min(1, Math.max(0, y / H)),
-  ]);
+  const points = simp.map(([x, y]) => [roiClamp01(x / W), roiClamp01(y / H)]);
   return { points, ok: true };
 }
 
@@ -379,6 +387,15 @@ const Roi = {
     }
     showScreen("screen-roi");
     requestAnimationFrame(() => { this.layout(); this.redraw(); this.updateUI(); });
+    this._showHelp();
+  },
+
+  // Popup de instruções ao abrir a tela (respeita "Não mostrar novamente").
+  _showHelp() {
+    if (localStorage.getItem("cc_roi_help_ack") === "1") return;
+    const dlg = $("#roi-help-dialog");
+    if (!dlg) return;
+    try { dlg.showModal ? dlg.showModal() : dlg.setAttribute("open", ""); } catch (_) {}
   },
 
   // Dimensiona o canvas de desenho ao tamanho exibido da imagem (contain).
@@ -525,10 +542,12 @@ const Roi = {
     this.updateUI();
   },
 
+  // Remove a zona salva e LIMPA o traço, mas PERMANECE na tela (o usuário fica
+  // livre p/ desenhar de novo; sai só pelo ‹ ou Confirmar).
   async remove() {
     const s = this.session;
     if (s) { delete s[this.field]; await DB.put(s); }
-    await openDetail(s.id);
+    this.redoDraw();
   },
   async save() {
     const s = this.session;
@@ -563,6 +582,13 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#roi-remove").addEventListener("click", () => Roi.remove());
   $("#roi-show-raw").addEventListener("change", (e) => Roi.setShow(e.target.checked, null));
   $("#roi-show-ai").addEventListener("change", (e) => Roi.setShow(null, e.target.checked));
+
+  // Popup de instruções: fechar (e "não mostrar novamente").
+  const helpClose = () => {
+    if ($("#roi-help-nomore") && $("#roi-help-nomore").checked) localStorage.setItem("cc_roi_help_ack", "1");
+    try { $("#roi-help-dialog").close(); } catch (_) { $("#roi-help-dialog").removeAttribute("open"); }
+  };
+  if ($("#roi-help-ok")) $("#roi-help-ok").addEventListener("click", helpClose);
 
   window.addEventListener("resize", () => {
     if ($("#screen-roi").classList.contains("active")) { Roi.layout(); Roi.redraw(); }
