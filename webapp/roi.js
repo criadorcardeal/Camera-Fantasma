@@ -253,13 +253,7 @@ function roiMaskArea(mask) {
 
 const roiClamp01 = (v) => Math.min(1, Math.max(0, v));
 
-// Fecho morfologico (dilata->erode): tapa reentrancias/serrilhado da borda.
-function roiMaskClose(mask, W, H, r) { return roiErode(roiDilate(mask, W, H, r), W, H, r); }
-// Abertura (erode->dilata): remove protuberancias/ruido fino da borda.
-function roiMaskOpen(mask, W, H, r) { return roiDilate(roiErode(mask, W, H, r), W, H, r); }
-
-// Suaviza um poligono FECHADO por corte de cantos (Chaikin). Cada iteracao
-// arredonda os vertices, tirando o aspecto "escada" do contorno rasterizado.
+// Suaviza um poligono FECHADO por corte de cantos (Chaikin) — arredonda cantos.
 function roiSmoothPolygon(pts, iters) {
   let out = pts;
   for (let k = 0; k < iters; k++) {
@@ -275,66 +269,133 @@ function roiSmoothPolygon(pts, iters) {
   return out;
 }
 
+// Media movel sobre poligono FECHADO (mantem a quantidade de pontos): tira o
+// tremor do traco/snap sem inflar o numero de vertices.
+function roiSmoothMA(pts, iters) {
+  let out = pts;
+  for (let k = 0; k < iters; k++) {
+    const n = out.length; if (n < 3) break;
+    const nx = [];
+    for (let i = 0; i < n; i++) {
+      const a = out[(i - 1 + n) % n], b = out[i], c = out[(i + 1) % n];
+      nx.push([(a[0] + 2 * b[0] + c[0]) / 4, (a[1] + 2 * b[1] + c[1]) / 4]);
+    }
+    out = nx;
+  }
+  return out;
+}
+
+// Reamostra um poligono FECHADO por comprimento de arco (passo em px).
+function roiResampleClosed(pts, step) {
+  const n = pts.length;
+  if (n < 2) return pts.slice();
+  const out = [pts[0].slice()];
+  let prev = pts[0], acc = 0;
+  for (let i = 1; i <= n; i++) {
+    let cur = pts[i % n];
+    let seg = Math.hypot(cur[0] - prev[0], cur[1] - prev[1]);
+    while (acc + seg >= step && seg > 1e-6) {
+      const t = (step - acc) / seg;
+      const np = [prev[0] + (cur[0] - prev[0]) * t, prev[1] + (cur[1] - prev[1]) * t];
+      out.push(np);
+      prev = np; seg = Math.hypot(cur[0] - prev[0], cur[1] - prev[1]); acc = 0;
+    }
+    acc += seg; prev = cur;
+  }
+  return out;
+}
+
+// Traço do usuario apenas SUAVIZADO e fiel (nao muda o tamanho). Usado como
+// fallback e como base quando a borda nao e clara. rawPts = img-normalizado.
+function roiSmoothNorm(rawPts) {
+  const px = rawPts.map(([nx, ny]) => [roiClamp01(nx) * 1000, roiClamp01(ny) * 1000]);
+  const sm = roiSmoothMA(px, 2);
+  const diag = Math.hypot(1000, 1000);
+  let simp = roiSmoothPolygon(roiSimplify(sm, diag * 0.006), 1);
+  if (simp.length < 3) simp = sm;
+  return simp.map(([x, y]) => [roiClamp01(x / 1000), roiClamp01(y / 1000)]);
+}
+
 /* -------------------------------------------------------------------------
-   Refino inteligente do contorno ("IA"): reconhece o CONTORNO DO CORPO
-   (pele — pernas, bracos, maos, pes, rosto) DENTRO da area marcada pelo
-   usuario, com margem de ate 10% para fora do traco. Reusa a deteccao de
-   pele robusta do align.js (alSkinScore) + maior componente + preenchimento,
-   suaviza a mascara e o poligono. Devolve { points, ok }.
+   Refino inteligente do contorno ("IA") — v7.5.3: em vez de segmentar por cor
+   (falha com brilho/sombra/fundo real), PARTE DO TRACO do usuario e "puxa" cada
+   ponto para a BORDA FORTE (gradiente) mais proxima ao longo da NORMAL, numa
+   faixa estreita (ate ~10% para fora / ~14% para dentro). Fiel ao traco, segue
+   o contorno do corpo onde ha borda clara e nunca esculpe o interior. Devolve
+   { points, ok }.
    ------------------------------------------------------------------------- */
 function roiSmartContour(imgEl, rawPts) {
   const iw = imgEl.naturalWidth || imgEl.width;
   const ih = imgEl.naturalHeight || imgEl.height;
-  const fallback = { points: roiNormalizeLoop(rawPts, iw, ih), ok: false };
+  const fallback = { points: roiSmoothNorm(rawPts), ok: false };
   if (!iw || !ih || !rawPts || rawPts.length < 3) return fallback;
-  if (typeof alSkinScore !== "function") return fallback;
 
   const scale = Math.min(1, 360 / Math.max(iw, ih));
   const W = Math.max(8, Math.round(iw * scale));
   const H = Math.max(8, Math.round(ih * scale));
-
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const ctx = c.getContext("2d", { willReadFrequently: true });
   ctx.drawImage(imgEl, 0, 0, W, H);
   const data = ctx.getImageData(0, 0, W, H).data;
 
-  const poly = roiPolygonMask(rawPts, W, H);
-  const polyArea = roiMaskArea(poly);
-  if (polyArea < 40) return fallback;
-
-  // Regiao de busca = zona marcada + margem de 10% (raio equivalente do laco).
-  const eqR = Math.sqrt(polyArea / Math.PI);
-  const margin = Math.max(2, Math.round(eqR * 0.10));
-  const search = roiDilate(poly, W, H, margin);
-
-  // Corpo = PELE dentro da regiao de busca (reconhece perna/braco/mao/pe/rosto).
-  const body = new Uint8Array(W * H);
-  let skinN = 0;
-  for (let p = 0, i = 0; p < W * H; p++, i += 4) {
-    if (search[p] && alSkinScore(data[i], data[i + 1], data[i + 2])) { body[p] = 1; skinN++; }
+  // Mapa de bordas (magnitude do gradiente) + limiar adaptativo.
+  const gray = new Float32Array(W * H);
+  for (let p = 0, i = 0; p < W * H; p++, i += 4) gray[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+  const grad = new Float32Array(W * H);
+  let gs = 0, gs2 = 0;
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const p = y * W + x;
+    const g = Math.hypot(gray[p + 1] - gray[p - 1], gray[p + W] - gray[p - W]);
+    grad[p] = g; gs += g; gs2 += g * g;
   }
-  // Se quase nao ha pele na zona (regiao nao-corporal), usa o traco do usuario.
-  if (skinN < polyArea * 0.20) return fallback;
+  const gn = Math.max(1, (W - 2) * (H - 2));
+  const gmean = gs / gn, gstd = Math.sqrt(Math.max(0, gs2 / gn - gmean * gmean));
+  const gThresh = Math.max(18, gmean + 1.0 * gstd);   // "borda forte"
 
-  let mask = alFillHoles(alLargestComponent(body, W, H).mask, W, H); // reusa align.js
-  mask = roiMaskClose(mask, W, H, 2);      // tira reentrancias (suaviza)
-  mask = roiMaskOpen(mask, W, H, 1);       // tira protuberancias finas
-  const area = roiMaskArea(mask);
-  // Se sumiu ou estourou p/ muito alem do traco (+ que a margem), volta ao traco.
-  if (area < polyArea * 0.25 || area > polyArea * 1.35) return fallback;
+  // Traço em px + centróide + área.
+  const px = rawPts.map(([nx, ny]) => [nx * W, ny * H]);
+  let cx = 0, cy = 0; for (const q of px) { cx += q[0]; cy += q[1]; } cx /= px.length; cy /= px.length;
+  let areaPx = 0; for (let i = 0; i < px.length; i++) { const a = px[i], b = px[(i + 1) % px.length]; areaPx += a[0] * b[1] - b[0] * a[1]; }
+  areaPx = Math.abs(areaPx) / 2;
+  if (areaPx < 40) return fallback;
+  const eqR = Math.sqrt(areaPx / Math.PI);
+  const bandOut = Math.min(14, Math.max(3, eqR * 0.10));   // até 10% p/ fora
+  const bandIn = Math.min(34, Math.max(6, eqR * 0.22));    // até ~22% p/ dentro
+  const maxRange = Math.max(bandOut, bandIn);
 
-  const contour = roiTraceContour(mask, W, H);
-  if (contour.length < 8) return fallback;
+  // Reamostra denso e puxa cada ponto p/ a borda forte na direção da normal.
+  // Pontua gradiente × preferência por bordas PRÓXIMAS do traço (evita pular
+  // para linhas do fundo/piso; mantém o resultado fiel ao que foi desenhado).
+  const dense = roiResampleClosed(px, Math.max(1.5, (2 * Math.PI * eqR) / 200));
+  const n = dense.length;
+  if (n < 6) return fallback;
+  let snapCount = 0;
+  const snapped = dense.map((pt, idx) => {
+    const a = dense[(idx - 1 + n) % n], b = dense[(idx + 1) % n];
+    let tx = b[0] - a[0], ty = b[1] - a[1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+    let nx = ty, ny = -tx;                         // normal ao contorno
+    if ((pt[0] - cx) * nx + (pt[1] - cy) * ny < 0) { nx = -nx; ny = -ny; }  // aponta p/ fora
+    let bestScore = 0, bestG = 0, best = null;
+    for (let d = bandOut; d >= -bandIn; d -= 1) {
+      const sx = Math.round(pt[0] + nx * d), sy = Math.round(pt[1] + ny * d);
+      if (sx < 1 || sy < 1 || sx >= W - 1 || sy >= H - 1) continue;
+      const g = grad[sy * W + sx];
+      const score = g * (1 - 0.45 * Math.abs(d) / maxRange);   // penaliza pular longe
+      if (score > bestScore) { bestScore = score; bestG = g; best = [pt[0] + nx * d, pt[1] + ny * d]; }
+    }
+    if (best && bestG >= gThresh) { snapCount++; return best; }
+    return pt;
+  });
+
+  // Suaviza o tremor do snap; simplifica; arredonda os cantos.
+  let out = roiSmoothMA(snapped, 2);
   const diag = Math.hypot(W, H);
-  // Simplifica (tira os degraus do raster) e arredonda os cantos (Chaikin).
-  let eps = diag * 0.012;
-  let simp = roiSmoothPolygon(roiSimplify(contour, eps), 2);
-  while (simp.length > 90 && eps < diag * 0.06) { eps *= 1.3; simp = roiSmoothPolygon(roiSimplify(contour, eps), 2); }
+  let simp = roiSmoothPolygon(roiSimplify(out, diag * 0.006), 1);
   if (simp.length < 3) return fallback;
-
   const points = simp.map(([x, y]) => [roiClamp01(x / W), roiClamp01(y / H)]);
-  return { points, ok: true };
+  // ok=true só se de fato encaixou em bordas numa boa parte do contorno.
+  return { points, ok: snapCount > n * 0.25 };
 }
 
 // Normaliza/limita um laco bruto (fallback quando a IA nao ajuda).
@@ -440,9 +501,15 @@ const Roi = {
       this.redraw();
     }
   },
-  endDraw() {
+  endDraw(e) {
     if (!this.drawing) return;
     this.drawing = false;
+    // Inclui o ponto exato onde o dedo levantou (evita o traço fechar "menor").
+    if (e && this._path) {
+      const n = this._evToNorm(e);
+      const last = this._path[this._path.length - 1];
+      if (!last || Math.hypot(n.nx - last[0], n.ny - last[1]) > 0.001) this._path.push([n.nx, n.ny]);
+    }
     if (!this._path || this._path.length < 6) { this._path = null; this.redraw(); return; }
     this.rawPts = this._path.slice();
     this._path = null;
@@ -568,7 +635,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const down = (e) => { e.preventDefault(); Roi.startDraw(e); };
   const move = (e) => { if (Roi.drawing) { e.preventDefault(); Roi.moveDraw(e); } };
-  const up = (e) => { if (Roi.drawing) { e.preventDefault(); Roi.endDraw(); } };
+  const up = (e) => { if (Roi.drawing) { e.preventDefault(); Roi.endDraw(e); } };
 
   // Ponteiro (mouse + touch unificados). touch-action:none no CSS evita scroll.
   cv.addEventListener("pointerdown", (e) => { try { cv.setPointerCapture(e.pointerId); } catch (_) {} down(e); });
