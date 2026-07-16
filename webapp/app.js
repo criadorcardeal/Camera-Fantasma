@@ -865,10 +865,15 @@ function openLabelDialog(labelValue, requireConsent) {
 
 /* ---------------- Tela de detalhe / comparação ---------------- */
 let _detailSession = null;
+// Lembra quais cards de rolagem estão abertos, para reabrir a Montagem no mesmo
+// estado depois de entrar num botão do card (ex.: Ajustes Finos → Colorações).
+let _detailOpenCards = {};
 
 async function openDetail(id) {
   const s = await DB.get(id);
   if (!s) { showScreen("screen-home"); await renderHome(); return; }
+  // Ao trocar de comparação, esquece o estado dos cards da anterior.
+  if (!_detailSession || _detailSession.id !== id) _detailOpenCards = {};
   _detailSession = s;
   const c = $("#detail-content");
 
@@ -909,11 +914,12 @@ async function openDetail(id) {
     </div>`;
 
   const roiLabel = (has) => has ? "🟢 Zona (definida)" : "🟢 Definir zona de interesse";
+  const openCls = (id) => _detailOpenCards[id] ? " open" : "";
 
   // Card BASE (recolhível, fechado por padrão): Refazer/Importar + Zona de interesse.
   // A definição de zona fica disponível mesmo travado (só edita a ROI, não as fotos).
   const baseCard = `
-    <div class="act-card collapsible" id="base-card">
+    <div class="act-card collapsible${openCls("base-card")}" id="base-card">
       <div class="act-head"><span class="act-title">Base</span><span class="chev">▾</span></div>
       <div class="act-body">
         ${locked ? "" : `<div class="btn-row">
@@ -926,7 +932,7 @@ async function openDetail(id) {
 
   // Card ACOMPANHAMENTO (recolhível, fechado): Tirar/Refazer/Importar + Zona.
   const acCard = `
-    <div class="act-card collapsible" id="ac-card">
+    <div class="act-card collapsible${openCls("ac-card")}" id="ac-card">
       <div class="act-head"><span class="act-title">Acompanhamento</span><span class="chev">▾</span></div>
       <div class="act-body">
         ${locked ? "" : `<div class="btn-row">
@@ -940,7 +946,7 @@ async function openDetail(id) {
   // Card AJUSTES FINOS (recolhível, fechado): coloração/exposição, posicionamento
   // e inversão. Colorações/Posicionamentos seguem disponíveis mesmo travado.
   const fineCard = hasFollow ? `
-    <div class="act-card collapsible" id="fine-card">
+    <div class="act-card collapsible${openCls("fine-card")}" id="fine-card">
       <div class="act-head"><span class="act-title">Ajustes Finos</span><span class="chev">▾</span></div>
       <div class="act-body">
         <button class="btn outline card-full" id="btn-adjust">🎚 Colorações e Exposição</button>
@@ -978,10 +984,14 @@ async function openDetail(id) {
   enableWmEdit();
   requestAnimationFrame(sizeWmNames);
 
-  // Cards recolhíveis (Base / Acompanhamento / Ajustes Finos): cabeçalho abre/fecha.
+  // Cards recolhíveis (Base / Acompanhamento / Ajustes Finos): cabeçalho abre/fecha
+  // e lembra o estado (p/ reabrir a Montagem no mesmo estado).
   ["#base-card", "#ac-card", "#fine-card"].forEach((sel) => {
     const card = $(sel);
-    if (card) card.querySelector(".act-head").addEventListener("click", () => card.classList.toggle("open"));
+    if (card) card.querySelector(".act-head").addEventListener("click", () => {
+      card.classList.toggle("open");
+      _detailOpenCards[card.id] = card.classList.contains("open");
+    });
   });
 
   if ($("#btn-adjust")) $("#btn-adjust").addEventListener("click", () => Editor.open(s));

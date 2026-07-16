@@ -764,6 +764,16 @@ html, body {
 .roi-overlay.roi-good .roi-shape { stroke: #2ecc71; animation: roi-blink 0.7s ease-in-out infinite; }
 .roi-overlay.roi-bad  .roi-shape { stroke: #ffd21e; animation: roi-blink 0.9s ease-in-out infinite; }
 @keyframes roi-blink { 0%,100% { opacity: 1; } 50% { opacity: 0.28; } }
+/* Overlays do alinhamento: a zona do acompanhamento acompanha a transformação
+   da foto (mesmo transform-origin do #al-follow). */
+#al-roi, #al-roi-follow { transform-origin: center center; }
+
+/* Card "Zonas de interesse" na tela Posicionamentos (v7.5.4). */
+.al-roi-card { background: var(--card); border-radius: 12px; padding: 10px 14px; }
+.al-roi-head { font-size: 0.8rem; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+.al-roi-card .seg { margin-bottom: 8px; }
+.al-roi-card .roi-tog { margin-top: 6px; }
+.ed-seg button:disabled { opacity: 0.4; cursor: default; }
 
 /* Editor da zona (tela #screen-roi) */
 .roi-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px; overflow-y: auto; }

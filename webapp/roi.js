@@ -153,6 +153,36 @@ function roiNCC(a, b) {
   return s;
 }
 
+// Desenha VÁRIAS formas num overlay SVG (traço + contorno de IA, base/acomp.).
+// shapes = [{points, color, dashed, fill}] em coords normalizadas da imagem.
+function roiRenderSvgMulti(svg, shapes, imgW, imgH, fit) {
+  if (!svg) return false;
+  const W = svg.clientWidth, H = svg.clientHeight;
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  if (!W || !H) return false;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  let drew = false;
+  for (const sh of (shapes || [])) {
+    if (!sh || !sh.points || sh.points.length < 3) continue;
+    const pts = sh.points.map(([nx, ny]) => {
+      const p = roiImgNormToBox(nx, ny, imgW, imgH, W, H, fit);
+      return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+    }).join(" ");
+    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+    poly.setAttribute("points", pts);
+    poly.setAttribute("fill", sh.fill || "none");
+    poly.setAttribute("stroke", sh.color || "#2ecc71");
+    poly.setAttribute("stroke-width", "3");
+    poly.setAttribute("stroke-linejoin", "round");
+    if (sh.dashed) poly.setAttribute("stroke-dasharray", "6 5");
+    poly.style.filter = "drop-shadow(0 0 2px rgba(0,0,0,0.65))";
+    svg.appendChild(poly);
+    drew = true;
+  }
+  return drew;
+}
+
 /* -------------------------------------------------------------------------
    Morfologia e contorno (locais deste modulo).
    ------------------------------------------------------------------------- */
@@ -364,32 +394,44 @@ function roiSmartContour(imgEl, rawPts) {
   const bandIn = Math.min(34, Math.max(6, eqR * 0.22));    // até ~22% p/ dentro
   const maxRange = Math.max(bandOut, bandIn);
 
-  // Reamostra denso e puxa cada ponto p/ a borda forte na direção da normal.
-  // Pontua gradiente × preferência por bordas PRÓXIMAS do traço (evita pular
-  // para linhas do fundo/piso; mantém o resultado fiel ao que foi desenhado).
-  const dense = roiResampleClosed(px, Math.max(1.5, (2 * Math.PI * eqR) / 200));
+  // Reamostra denso. Para cada ponto acha o DESLOCAMENTO (na normal) até a borda
+  // forte mais próxima; depois SUAVIZA os deslocamentos ao longo do contorno e só
+  // então aplica. Isso regulariza o traçado (tira o serrilhado do snap ponto-a-
+  // ponto) e preenche trechos sem borda puxando junto com os vizinhos.
+  const dense = roiResampleClosed(px, Math.max(1.5, (2 * Math.PI * eqR) / 220));
   const n = dense.length;
   if (n < 6) return fallback;
+  const normals = new Array(n);
+  const offs = new Float32Array(n);      // deslocamento na normal
+  const hasEdge = new Uint8Array(n);
   let snapCount = 0;
-  const snapped = dense.map((pt, idx) => {
-    const a = dense[(idx - 1 + n) % n], b = dense[(idx + 1) % n];
+  for (let idx = 0; idx < n; idx++) {
+    const pt = dense[idx], a = dense[(idx - 1 + n) % n], b = dense[(idx + 1) % n];
     let tx = b[0] - a[0], ty = b[1] - a[1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
     let nx = ty, ny = -tx;                         // normal ao contorno
     if ((pt[0] - cx) * nx + (pt[1] - cy) * ny < 0) { nx = -nx; ny = -ny; }  // aponta p/ fora
-    let bestScore = 0, bestG = 0, best = null;
+    normals[idx] = [nx, ny];
+    let bestScore = 0, bestG = 0, bestD = 0, found = false;
     for (let d = bandOut; d >= -bandIn; d -= 1) {
       const sx = Math.round(pt[0] + nx * d), sy = Math.round(pt[1] + ny * d);
       if (sx < 1 || sy < 1 || sx >= W - 1 || sy >= H - 1) continue;
       const g = grad[sy * W + sx];
-      const score = g * (1 - 0.45 * Math.abs(d) / maxRange);   // penaliza pular longe
-      if (score > bestScore) { bestScore = score; bestG = g; best = [pt[0] + nx * d, pt[1] + ny * d]; }
+      const score = g * (1 - 0.45 * Math.abs(d) / maxRange);   // prefere borda próxima
+      if (score > bestScore) { bestScore = score; bestG = g; bestD = d; found = true; }
     }
-    if (best && bestG >= gThresh) { snapCount++; return best; }
-    return pt;
-  });
+    if (found && bestG >= gThresh) { offs[idx] = bestD; hasEdge[idx] = 1; snapCount++; }
+  }
+  // Suaviza os deslocamentos (média móvel circular) — várias passadas.
+  let so = offs;
+  for (let k = 0; k < 5; k++) {
+    const nn = new Float32Array(n);
+    for (let i = 0; i < n; i++) nn[i] = (so[(i - 1 + n) % n] + 2 * so[i] + so[(i + 1) % n]) / 4;
+    so = nn;
+  }
+  const snapped = dense.map((pt, idx) => [pt[0] + normals[idx][0] * so[idx], pt[1] + normals[idx][1] * so[idx]]);
 
-  // Suaviza o tremor do snap; simplifica; arredonda os cantos.
-  let out = roiSmoothMA(snapped, 2);
+  // Suaviza o traçado; simplifica; arredonda os cantos.
+  let out = roiSmoothMA(snapped, 1);
   const diag = Math.hypot(W, H);
   let simp = roiSmoothPolygon(roiSimplify(out, diag * 0.006), 1);
   if (simp.length < 3) return fallback;
@@ -441,10 +483,14 @@ const Roi = {
     $("#roi-img").src = imgSrc;
     $("#screen-roi").querySelector("h1").textContent =
       this.which === "follow" ? "Zona — Acompanhamento" : "Zona — Base";
-    // Se ja existe ROI nesta foto, mostra como ponto de partida (contorno atual).
+    // Se ja existe ROI nesta foto, carrega o traço e o contorno da IA salvos
+    // (guardados separados desde v7.5.4) para mostrar os dois toggles.
     const cur = session[this.field];
     if (cur && cur.points && cur.points.length >= 3) {
-      this.smartPts = cur.points.slice();
+      this.smartPts = (cur.ai && cur.ai.length >= 3) ? cur.ai.slice() : cur.points.slice();
+      this.rawPts = (cur.raw && cur.raw.length >= 3) ? cur.raw.slice() : null;
+      this.showSmart = cur.showAi != null ? !!cur.showAi : true;
+      this.showRaw = cur.showRaw != null ? !!cur.showRaw : false;
     }
     showScreen("screen-roi");
     requestAnimationFrame(() => { this.layout(); this.redraw(); this.updateUI(); });
@@ -493,13 +539,20 @@ const Roi = {
   },
   moveDraw(e) {
     if (!this.drawing) return;
-    const n = this._evToNorm(e);
-    const last = this._path[this._path.length - 1];
-    // Evita pontos redundantes (economiza processamento).
-    if (!last || Math.hypot(n.nx - last[0], n.ny - last[1]) > 0.004) {
-      this._path.push([n.nx, n.ny]);
-      this.redraw();
+    // Captura os eventos INTERMEDIÁRIOS (coalesced) — em desenho rápido o iOS
+    // junta vários movimentos num só evento; sem isso o traço "corta os cantos"
+    // e fica menor do que o dedo desenhou.
+    let evs = [e];
+    try { const co = e.getCoalescedEvents && e.getCoalescedEvents(); if (co && co.length) evs = co; } catch (_) {}
+    let changed = false;
+    for (const ev of evs) {
+      const n = this._evToNorm(ev);
+      const last = this._path[this._path.length - 1];
+      if (!last || Math.hypot(n.nx - last[0], n.ny - last[1]) > 0.0025) {
+        this._path.push([n.nx, n.ny]); changed = true;
+      }
     }
+    if (changed) this.redraw();
   },
   endDraw(e) {
     if (!this.drawing) return;
@@ -619,7 +672,15 @@ const Roi = {
   async save() {
     const s = this.session;
     const pts = this.currentPts();
-    if (pts && pts.length >= 3) s[this.field] = { points: pts };
+    if (pts && pts.length >= 3) {
+      s[this.field] = {
+        points: pts,
+        raw: this.rawPts ? roiNormalizeLoop(this.rawPts, this.imgW, this.imgH) : null,
+        ai: this.smartPts || null,
+        showRaw: this.showRaw,
+        showAi: this.showSmart,
+      };
+    }
     await DB.put(s);
     await openDetail(s.id);
   },
