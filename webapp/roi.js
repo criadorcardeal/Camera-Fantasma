@@ -465,6 +465,13 @@ function roiSmartContour(imgEl, rawPts) {
   const diag = Math.hypot(W, H);
   let simp = roiSmoothPolygon(roiSimplify(roiSmoothMA(P, 2), diag * 0.008), 1);
   if (simp.length < 3) return fallback;
+
+  // Anti-lixo: se o contorno ficou emaranhado/fininho (a cinta se enroscou em
+  // bordas internas), a razão perímetro²/área dispara — nesse caso usa o traço.
+  let per = 0; for (let i = 0; i < simp.length; i++) { const a = simp[i], b = simp[(i + 1) % simp.length]; per += Math.hypot(b[0] - a[0], b[1] - a[1]); }
+  const iso = (per * per) / (4 * Math.PI * Math.max(1, area(simp)));
+  if (iso > 2.6) return fallback;
+
   const points = simp.map(([x, y]) => [roiClamp01(x / W), roiClamp01(y / H)]);
   return { points, ok: true };
 }
@@ -752,4 +759,14 @@ window.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("resize", () => {
     if ($("#screen-roi").classList.contains("active")) { Roi.layout(); Roi.redraw(); }
   });
+
+  // O palco muda de altura quando os controles (toggles/botões) aparecem/somem —
+  // sem re-mapear o canvas, o traço/IA saíam DESLOCADOS da imagem (bug: 1ª foto
+  // certa, demais tortas). O ResizeObserver re-dimensiona e redesenha na hora.
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => {
+      if ($("#screen-roi").classList.contains("active") && Roi.baseImg) { Roi.layout(); Roi.redraw(); }
+    });
+    ro.observe($("#roi-stage"));
+  }
 });
