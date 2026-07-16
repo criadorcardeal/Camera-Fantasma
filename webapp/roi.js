@@ -346,13 +346,21 @@ function roiSmoothNorm(rawPts) {
   return simp.map(([x, y]) => [roiClamp01(x / 1000), roiClamp01(y / 1000)]);
 }
 
+// Fecho morfologico (dilata->erode): tapa reentrancias/vãos finos.
+function roiMaskClose(mask, W, H, r) { return roiErode(roiDilate(mask, W, H, r), W, H, r); }
+// Abertura (erode->dilata): remove protuberancias/ruido fino.
+function roiMaskOpen(mask, W, H, r) { return roiDilate(roiErode(mask, W, H, r), W, H, r); }
+
 /* -------------------------------------------------------------------------
-   Refino inteligente do contorno ("IA") — v7.5.3: em vez de segmentar por cor
-   (falha com brilho/sombra/fundo real), PARTE DO TRACO do usuario e "puxa" cada
-   ponto para a BORDA FORTE (gradiente) mais proxima ao longo da NORMAL, numa
-   faixa estreita (ate ~10% para fora / ~14% para dentro). Fiel ao traco, segue
-   o contorno do corpo onde ha borda clara e nunca esculpe o interior. Devolve
-   { points, ok }.
+   Refino inteligente do contorno ("IA") — v7.5.5: SEGMENTA o objeto (parte do
+   corpo) DENTRO da area marcada, tipo GrabCut. NÃO segue o traço do usuario —
+   encontra o contorno real da perna/braço/etc.
+   Como: modela as cores por HISTOGRAMA (aprende as cores DESTA foto, inclusive
+   brilho e sombra da pele — por isso não falha como a regra fixa de pele):
+   FG = dentro do laço; BG = fora do laço. Itera reclassificando os pixels da
+   zona (o fundo que ficou dentro do laço vira BG; a pele com brilho continua
+   FG). Depois: maior componente + preenche buracos (veias/brilho/sombra) +
+   suaviza. Margem de até ~10% para fora do laço. Devolve { points, ok }.
    ------------------------------------------------------------------------- */
 function roiSmartContour(imgEl, rawPts) {
   const iw = imgEl.naturalWidth || imgEl.width;
@@ -363,81 +371,66 @@ function roiSmartContour(imgEl, rawPts) {
   const scale = Math.min(1, 360 / Math.max(iw, ih));
   const W = Math.max(8, Math.round(iw * scale));
   const H = Math.max(8, Math.round(ih * scale));
+  const N = W * H;
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const ctx = c.getContext("2d", { willReadFrequently: true });
   ctx.drawImage(imgEl, 0, 0, W, H);
   const data = ctx.getImageData(0, 0, W, H).data;
 
-  // Mapa de bordas (magnitude do gradiente) + limiar adaptativo.
-  const gray = new Float32Array(W * H);
-  for (let p = 0, i = 0; p < W * H; p++, i += 4) gray[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-  const grad = new Float32Array(W * H);
-  let gs = 0, gs2 = 0;
-  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
-    const p = y * W + x;
-    const g = Math.hypot(gray[p + 1] - gray[p - 1], gray[p + W] - gray[p - W]);
-    grad[p] = g; gs += g; gs2 += g * g;
-  }
-  const gn = Math.max(1, (W - 2) * (H - 2));
-  const gmean = gs / gn, gstd = Math.sqrt(Math.max(0, gs2 / gn - gmean * gmean));
-  const gThresh = Math.max(18, gmean + 1.0 * gstd);   // "borda forte"
+  const poly = roiPolygonMask(rawPts, W, H);
+  const polyArea = roiMaskArea(poly);
+  if (polyArea < 60) return fallback;
 
-  // Traço em px + centróide + área.
-  const px = rawPts.map(([nx, ny]) => [nx * W, ny * H]);
-  let cx = 0, cy = 0; for (const q of px) { cx += q[0]; cy += q[1]; } cx /= px.length; cy /= px.length;
-  let areaPx = 0; for (let i = 0; i < px.length; i++) { const a = px[i], b = px[(i + 1) % px.length]; areaPx += a[0] * b[1] - b[0] * a[1]; }
-  areaPx = Math.abs(areaPx) / 2;
-  if (areaPx < 40) return fallback;
-  const eqR = Math.sqrt(areaPx / Math.PI);
-  const bandOut = Math.min(14, Math.max(3, eqR * 0.10));   // até 10% p/ fora
-  const bandIn = Math.min(34, Math.max(6, eqR * 0.22));    // até ~22% p/ dentro
-  const maxRange = Math.max(bandOut, bandIn);
+  const eqR = Math.sqrt(polyArea / Math.PI);
+  const marginOut = Math.max(2, Math.round(eqR * 0.10));   // até ~10% p/ fora
+  const search = roiDilate(poly, W, H, marginOut);         // zona a classificar
 
-  // Reamostra denso. Para cada ponto acha o DESLOCAMENTO (na normal) até a borda
-  // forte mais próxima; depois SUAVIZA os deslocamentos ao longo do contorno e só
-  // então aplica. Isso regulariza o traçado (tira o serrilhado do snap ponto-a-
-  // ponto) e preenche trechos sem borda puxando junto com os vizinhos.
-  const dense = roiResampleClosed(px, Math.max(1.5, (2 * Math.PI * eqR) / 220));
-  const n = dense.length;
-  if (n < 6) return fallback;
-  const normals = new Array(n);
-  const offs = new Float32Array(n);      // deslocamento na normal
-  const hasEdge = new Uint8Array(n);
-  let snapCount = 0;
-  for (let idx = 0; idx < n; idx++) {
-    const pt = dense[idx], a = dense[(idx - 1 + n) % n], b = dense[(idx + 1) % n];
-    let tx = b[0] - a[0], ty = b[1] - a[1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
-    let nx = ty, ny = -tx;                         // normal ao contorno
-    if ((pt[0] - cx) * nx + (pt[1] - cy) * ny < 0) { nx = -nx; ny = -ny; }  // aponta p/ fora
-    normals[idx] = [nx, ny];
-    let bestScore = 0, bestG = 0, bestD = 0, found = false;
-    for (let d = bandOut; d >= -bandIn; d -= 1) {
-      const sx = Math.round(pt[0] + nx * d), sy = Math.round(pt[1] + ny * d);
-      if (sx < 1 || sy < 1 || sx >= W - 1 || sy >= H - 1) continue;
-      const g = grad[sy * W + sx];
-      const score = g * (1 - 0.45 * Math.abs(d) / maxRange);   // prefere borda próxima
-      if (score > bestScore) { bestScore = score; bestG = g; bestD = d; found = true; }
+  // Índice de cor quantizada (4 bits/canal → 4096 bins).
+  const qidx = (i) => ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4);
+  const BINS = 4096;
+
+  // GrabCut-lite: FG começa = dentro do laço; itera refinando os modelos de cor.
+  let fg = poly.slice();
+  for (let iter = 0; iter < 4; iter++) {
+    const fgH = new Float32Array(BINS).fill(0.5);
+    const bgH = new Float32Array(BINS).fill(0.5);
+    let fgN = BINS * 0.5, bgN = BINS * 0.5;
+    for (let p = 0, i = 0; p < N; p++, i += 4) {
+      if (fg[p]) { fgH[qidx(i)]++; fgN++; }
+      else if (!search[p]) { bgH[qidx(i)]++; bgN++; }   // BG certo = fora da zona
     }
-    if (found && bestG >= gThresh) { offs[idx] = bestD; hasEdge[idx] = 1; snapCount++; }
+    const nf = new Uint8Array(N);
+    for (let p = 0, i = 0; p < N; p++, i += 4) {
+      if (!search[p]) continue;                          // fora da zona = fundo
+      const q = qidx(i);
+      const pf = fgH[q] / fgN, pb = bgH[q] / bgN;
+      // Viés p/ manter o corpo: só vira fundo se o fundo for bem mais provável
+      // (evita "esculpir" o brilho/sombra da pele, que são ambíguos).
+      nf[p] = (pf * 1.25 >= pb) ? 1 : 0;
+    }
+    fg = nf;
   }
-  // Suaviza os deslocamentos (média móvel circular) — várias passadas.
-  let so = offs;
-  for (let k = 0; k < 5; k++) {
-    const nn = new Float32Array(n);
-    for (let i = 0; i < n; i++) nn[i] = (so[(i - 1 + n) % n] + 2 * so[i] + so[(i + 1) % n]) / 4;
-    so = nn;
-  }
-  const snapped = dense.map((pt, idx) => [pt[0] + normals[idx][0] * so[idx], pt[1] + normals[idx][1] * so[idx]]);
 
-  // Suaviza o traçado; simplifica; arredonda os cantos.
-  let out = roiSmoothMA(snapped, 1);
+  // Fecha vãos finos (veias, fios de sombra), pega a maior mancha (o membro) e
+  // preenche buracos internos (brilho/sombra/veia mal classificados).
+  let mask = roiMaskClose(fg, W, H, Math.max(2, Math.round(eqR * 0.05)));
+  mask = alFillHoles(alLargestComponent(mask, W, H).mask, W, H);   // reusa align.js
+  mask = roiMaskOpen(mask, W, H, 1);
+  const area = roiMaskArea(mask);
+  // Se a segmentação sumiu ou virou quase o laço todo (sem separar fundo), volta
+  // ao traço suavizado (aí a IA não ajudou).
+  if (area < polyArea * 0.15 || area > polyArea * 1.12) return fallback;
+
+  const contour = roiTraceContour(mask, W, H);
+  if (contour.length < 8) return fallback;
   const diag = Math.hypot(W, H);
-  let simp = roiSmoothPolygon(roiSimplify(out, diag * 0.006), 1);
+  let eps = diag * 0.010;
+  let simp = roiSmoothPolygon(roiSimplify(contour, eps), 2);
+  while (simp.length > 90 && eps < diag * 0.06) { eps *= 1.3; simp = roiSmoothPolygon(roiSimplify(contour, eps), 2); }
   if (simp.length < 3) return fallback;
   const points = simp.map(([x, y]) => [roiClamp01(x / W), roiClamp01(y / H)]);
-  // ok=true só se de fato encaixou em bordas numa boa parte do contorno.
-  return { points, ok: snapCount > n * 0.25 };
+  return { points, ok: true };
 }
 
 // Normaliza/limita um laco bruto (fallback quando a IA nao ajuda).
@@ -488,7 +481,9 @@ const Roi = {
     const cur = session[this.field];
     if (cur && cur.points && cur.points.length >= 3) {
       this.smartPts = (cur.ai && cur.ai.length >= 3) ? cur.ai.slice() : cur.points.slice();
-      this.rawPts = (cur.raw && cur.raw.length >= 3) ? cur.raw.slice() : null;
+      // Zonas antigas (só .points) usam o próprio contorno como "meu traço", p/ o
+      // card de toggles aparecer sempre que já houver zona definida.
+      this.rawPts = (cur.raw && cur.raw.length >= 3) ? cur.raw.slice() : cur.points.slice();
       this.showSmart = cur.showAi != null ? !!cur.showAi : true;
       this.showRaw = cur.showRaw != null ? !!cur.showRaw : false;
     }
