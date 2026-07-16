@@ -49,7 +49,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v7.5</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v7.5.1</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -88,7 +88,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v7.5</span>
+      <span class="version-badge">v7.5.1</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -159,7 +159,7 @@
     <header class="topbar">
       <button id="al-cancel" class="icon-btn dark">‹</button>
       <h1>Alinhar acompanhamento</h1>
-      <button id="al-confirm" class="icon-btn dark">✓</button>
+      <span class="topbar-spacer"></span>
     </header>
     <div class="al-body">
       <div class="al-stage" id="al-stage">
@@ -177,6 +177,7 @@
         <label class="al-slider"><span>Fantasma</span>
           <input type="range" id="al-opacity" min="0" max="1" step="0.01" value="0.5" /></label>
       </div>
+      <button id="al-confirm" class="btn primary screen-confirm">Confirmar</button>
     </div>
   </section>
 
@@ -185,7 +186,7 @@
     <header class="topbar">
       <button id="roi-cancel" class="icon-btn dark">‹</button>
       <h1>Zona de interesse</h1>
-      <button id="roi-save" class="icon-btn dark">✓</button>
+      <span class="topbar-spacer"></span>
     </header>
     <div class="roi-body">
       <div class="roi-stage" id="roi-stage">
@@ -193,11 +194,15 @@
         <canvas id="roi-canvas"></canvas>
       </div>
       <p id="roi-hint" class="roi-hint">Contorne a região de interesse com o dedo. A IA vai refinar o traçado.</p>
+      <div class="roi-toggles" id="roi-toggles" hidden>
+        <label class="roi-tog"><input type="checkbox" id="roi-show-raw" /> <span>Mostrar meu traço</span></label>
+        <label class="roi-tog"><input type="checkbox" id="roi-show-ai" checked /> <span>Mostrar contorno de IA</span></label>
+      </div>
       <div class="roi-controls">
         <button id="roi-redo" class="btn outline" hidden>↩︎ Refazer traço</button>
-        <button id="roi-toggle" class="btn outline" hidden>Usar meu traço</button>
         <button id="roi-remove" class="btn outline" hidden>🗑 Remover zona</button>
       </div>
+      <button id="roi-save" class="btn primary screen-confirm">Confirmar</button>
     </div>
   </section>
 
@@ -206,7 +211,7 @@
     <header class="topbar">
       <button id="ed-cancel" class="icon-btn dark">‹</button>
       <h1>Ajuste de imagens</h1>
-      <button id="ed-save" class="icon-btn dark">✓</button>
+      <span class="topbar-spacer"></span>
     </header>
     <div class="content ed-content">
       <div class="ed-previews">
@@ -233,6 +238,7 @@
         </div>
       </div>
       <div id="ed-sliders"></div>
+      <button id="ed-save" class="btn primary screen-confirm">Confirmar</button>
     </div>
   </section>
 

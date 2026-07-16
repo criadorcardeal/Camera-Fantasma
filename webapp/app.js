@@ -908,32 +908,38 @@ async function openDetail(id) {
       </div>
     </div>`;
 
-  // Card da foto base (Refazer/Importar agem sobre a foto base).
-  const baseCard = locked ? "" : `
-    <div class="act-card">
-      <div class="act-title">Base</div>
-      <div class="btn-row">
-        <button class="btn outline" id="btn-base-redo">📷 Refazer</button>
-        <button class="btn outline" id="btn-base-import">🖼 Importar</button>
+  const roiLabel = (has) => has ? "🟢 Zona (definida)" : "🟢 Definir zona de interesse";
+
+  // Card BASE (recolhível, fechado por padrão): Refazer/Importar + Zona de interesse.
+  // A definição de zona fica disponível mesmo travado (só edita a ROI, não as fotos).
+  const baseCard = `
+    <div class="act-card collapsible" id="base-card">
+      <div class="act-head"><span class="act-title">Base</span><span class="chev">▾</span></div>
+      <div class="act-body">
+        ${locked ? "" : `<div class="btn-row">
+          <button class="btn outline" id="btn-base-redo">📷 Refazer</button>
+          <button class="btn outline" id="btn-base-import">🖼 Importar</button>
+        </div>`}
+        <button class="btn outline card-full" id="btn-roi">${roiLabel(!!s.roi)}</button>
       </div>
     </div>`;
 
-  const acCard = locked ? "" : `
-    <div class="act-card">
-      <div class="act-title">Acompanhamento</div>
-      <div class="btn-row">
-        <button class="btn outline" id="btn-redo">${hasFollow ? "📷 Refazer" : "📷 Tirar"}</button>
-        <button class="btn outline" id="btn-follow-import">🖼 Importar</button>
-      </div>
-    </div>`;
-
-  // Zona de interesse: define/edita a região na foto base. Fica disponível mesmo
-  // com a comparação travada (só altera a ROI, não as fotos).
-  const roiCard = `
-    <div class="act-card">
-      <div class="act-title">Zona de interesse</div>
-      <div class="btn-row">
-        <button class="btn outline" id="btn-roi">${s.roi ? "🟢 Zona (definida)" : "🟢 Definir zona de interesse"}</button>
+  // Card ACOMPANHAMENTO (recolhível, fechado): Tirar/Refazer/Importar +
+  // Zona de interesse + Ajustar/Reposicionar (estes continuam mesmo travado).
+  const acCard = `
+    <div class="act-card collapsible" id="ac-card">
+      <div class="act-head"><span class="act-title">Acompanhamento</span><span class="chev">▾</span></div>
+      <div class="act-body">
+        ${locked ? "" : `<div class="btn-row">
+          <button class="btn outline" id="btn-redo">${hasFollow ? "📷 Refazer" : "📷 Tirar"}</button>
+          <button class="btn outline" id="btn-follow-import">🖼 Importar</button>
+        </div>`}
+        ${hasFollow ? `
+        <button class="btn outline card-full" id="btn-roi-follow">${roiLabel(!!s.followRoi)}</button>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn outline" id="btn-adjust">🎚 Ajustar imagens</button>
+          <button class="btn outline" id="btn-reposition">↔️ Reposicionar imagens</button>
+        </div>` : ""}
       </div>
     </div>`;
 
@@ -941,18 +947,12 @@ async function openDetail(id) {
     ? `<p class="lock-note">🔒 Comparação concluída — as fotos não podem mais ser alteradas.</p>`
     : "";
 
-  // Ajustar e Reposicionar continuam disponíveis mesmo depois de "Comparar"
-  // (o travamento só esconde os cards de TROCA de foto — base/acompanhamento).
-  // O botão Comparar fica embaixo, com largura total.
+  // Inverter base↔acompanhamento + Comparar (largura total).
   const secondRow = hasFollow ? `
-    <div class="btn-row" style="margin-top:12px">
-      <button class="btn outline" id="btn-adjust">🎚 Ajustar imagens</button>
-      <button class="btn outline" id="btn-reposition">↔️ Reposicionar imagens</button>
-    </div>
-    ${locked ? "" : `<button class="btn outline" id="btn-swap" style="margin-top:8px">🔁 Trocar base ↔ acompanhamento</button>`}
-    <button class="btn primary" id="btn-share">🔀 Comparar</button>` : "";
+    ${locked ? "" : `<button class="btn outline card-full" id="btn-swap" style="margin-top:12px">🔁 Inverter base ↔ acompanhamento</button>`}
+    <button class="btn primary" id="btn-share" style="margin-top:8px">🔀 Comparar</button>` : "";
 
-  c.innerHTML = compareHtml + labelHtml + lockNote + baseCard + acCard + roiCard + secondRow;
+  c.innerHTML = compareHtml + labelHtml + lockNote + baseCard + acCard + secondRow;
 
   // Ativa a tela ANTES de montar a comparação, para o palco já ter largura
   // (a cortina depende de clientWidth para dimensionar a foto de acompanhamento).
@@ -973,12 +973,19 @@ async function openDetail(id) {
   enableWmEdit();
   requestAnimationFrame(sizeWmNames);
 
+  // Cards recolhíveis (Base / Acompanhamento): tocar no cabeçalho abre/fecha.
+  ["#base-card", "#ac-card"].forEach((sel) => {
+    const card = $(sel);
+    if (card) card.querySelector(".act-head").addEventListener("click", () => card.classList.toggle("open"));
+  });
+
   if ($("#btn-adjust")) $("#btn-adjust").addEventListener("click", () => Editor.open(s));
   if ($("#btn-reposition")) $("#btn-reposition").addEventListener("click", () => Aligner.open(s, s.followImage, true));
   if ($("#btn-redo")) $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
   if ($("#btn-follow-import")) $("#btn-follow-import").addEventListener("click", () =>
     pickImage().then((file) => importFollowPhoto(s, file)));
-  if ($("#btn-roi")) $("#btn-roi").addEventListener("click", () => Roi.open(s));
+  if ($("#btn-roi")) $("#btn-roi").addEventListener("click", () => Roi.open(s, "base"));
+  if ($("#btn-roi-follow")) $("#btn-roi-follow").addEventListener("click", () => Roi.open(s, "follow"));
   if ($("#btn-base-redo")) $("#btn-base-redo").addEventListener("click", () => Cam.open("base", s));
   if ($("#btn-base-import")) $("#btn-base-import").addEventListener("click", () =>
     pickImage().then((file) => importBasePhoto(file, s)));
@@ -1007,6 +1014,7 @@ async function swapPhotos(s) {
   swap("baseImageView", "followImageView");
   swap("baseAdj", "followAdj");
   swap("baseTarget", "followTarget");
+  swap("roi", "followRoi");
   await DB.put(s);
   await openDetail(s.id);
 }

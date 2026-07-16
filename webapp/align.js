@@ -319,11 +319,32 @@ const Aligner = {
       const followImg = await loadImageEl(this.followUrl);
       const aspect = (this.baseW / this.baseH) || 0.75;
       const W0 = 240, H0 = Math.max(1, Math.round(W0 / aspect));
-      const bMask = alForegroundMask(alCoverRender(baseImg, W0, H0));
-      const fMask = alForegroundMask(alCoverRender(followImg, W0, H0));
+
+      // Se AS DUAS fotos têm zona de interesse marcada (e estamos reposicionando
+      // a foto já salva, à qual a followRoi pertence), alinha pelas ZONAS —
+      // o médico marca a mesma região nas duas e o encaixe usa exatamente ela.
+      // Caso contrário, cai no método por silhueta (pele/primeiro plano).
+      const s = this.session;
+      const roiPts = s.roi && s.roi.points, froiPts = s.followRoi && s.followRoi.points;
+      const useRoi = this.isReposition && roiPts && roiPts.length >= 3 &&
+                     froiPts && froiPts.length >= 3 && typeof roiPolygonMask === "function";
+      let bMask, fMask;
+      if (useRoi) {
+        const fW = followImg.naturalWidth || this.baseW, fH = followImg.naturalHeight || this.baseH;
+        const bm = roiPolygonMask(roiPointsToBoxNorm(roiPts, this.baseW, this.baseH, W0, H0, "cover"), W0, H0);
+        const fm = roiPolygonMask(roiPointsToBoxNorm(froiPts, fW, fH, W0, H0, "cover"), W0, H0);
+        const sum = (m) => { let a = 0; for (let i = 0; i < m.length; i++) a += m[i]; return a; };
+        bMask = { mask: bm, area: sum(bm) };
+        fMask = { mask: fm, area: sum(fm) };
+      } else {
+        bMask = alForegroundMask(alCoverRender(baseImg, W0, H0));
+        fMask = alForegroundMask(alCoverRender(followImg, W0, H0));
+      }
       const minArea = W0 * H0 * 0.01;
       if (bMask.area < minArea || fMask.area < minArea) {
-        alert("Não foi possível detectar a silhueta nas fotos. Ajuste manualmente.");
+        alert(useRoi
+          ? "As zonas de interesse são pequenas demais para alinhar. Ajuste manualmente."
+          : "Não foi possível detectar a silhueta nas fotos. Ajuste manualmente.");
         return;
       }
       const B = alMoments(bMask.mask, W0, H0);
