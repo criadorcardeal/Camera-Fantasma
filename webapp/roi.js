@@ -392,23 +392,30 @@ function roiSmartContour(imgEl, rawPts) {
   ctx.drawImage(imgEl, 0, 0, W, H);
   const data = ctx.getImageData(0, 0, W, H).data;
 
-  // Mapa de bordas em COR (RGB) — pega a borda perna↔fundo mesmo quando a
-  // luminância é parecida mas a cor (croma) difere (ex.: pele x piso bege).
-  const grad = new Float32Array(W * H);
+  // BORRA a imagem (canais RGB) ANTES de achar a borda — suprime a TEXTURA/ruído
+  // (pelos, azulejos, grão da pele) e preserva a borda COERENTE da perna. Sem
+  // isso, o ruído por pixel afoga o contorno do membro (como no Canny). O
+  // gradiente é em COR, p/ pegar a borda mesmo quando a luma é parecida (pele x
+  // piso bege) mas a croma difere.
+  const NN = W * H;
+  const R = new Float32Array(NN), G = new Float32Array(NN), B = new Float32Array(NN);
+  for (let p = 0; p < NN; p++) { R[p] = data[p * 4]; G[p] = data[p * 4 + 1]; B[p] = data[p * 4 + 2]; }
+  const Rb = roiBoxBlur(R, W, H, 3), Gb = roiBoxBlur(G, W, H, 3), Bb = roiBoxBlur(B, W, H, 3);
+  const grad = new Float32Array(NN);
   let gs = 0, gs2 = 0;
   for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
-    const i = (y * W + x) * 4;
-    const gx = Math.hypot(data[i + 4] - data[i - 4], data[i + 5] - data[i - 3], data[i + 6] - data[i - 2]);
-    const gy = Math.hypot(data[i + W * 4] - data[i - W * 4], data[i + W * 4 + 1] - data[i - W * 4 + 1], data[i + W * 4 + 2] - data[i - W * 4 + 2]);
+    const p = y * W + x;
+    const gx = Math.hypot(Rb[p + 1] - Rb[p - 1], Gb[p + 1] - Gb[p - 1], Bb[p + 1] - Bb[p - 1]);
+    const gy = Math.hypot(Rb[p + W] - Rb[p - W], Gb[p + W] - Gb[p - W], Bb[p + W] - Bb[p - W]);
     const g = Math.hypot(gx, gy);
-    grad[y * W + x] = g; gs += g; gs2 += g * g;
+    grad[p] = g; gs += g; gs2 += g * g;
   }
   const gn = Math.max(1, (W - 2) * (H - 2));
   const gmean = gs / gn, gstd = Math.sqrt(Math.max(0, gs2 / gn - gmean * gmean));
   const gScale = gmean + 2.5 * gstd || 1;
   let gnorm = new Float32Array(W * H);
   for (let p = 0; p < W * H; p++) gnorm[p] = Math.min(1, grad[p] / gScale);
-  gnorm = roiBoxBlur(gnorm, W, H, 2);
+  gnorm = roiBoxBlur(gnorm, W, H, 1);   // leve, p/ alargar a bacia da borda
   const gAt = (x, y) => { x = Math.round(x); y = Math.round(y); return (x < 0 || y < 0 || x >= W || y >= H) ? 0 : gnorm[y * W + x]; };
 
   // Traço em px + centróide + área.
@@ -426,10 +433,11 @@ function roiSmartContour(imgEl, rawPts) {
 
   // Cinta que encolhe: cada ponto procura, na NORMAL, entre encolher (pressão) e
   // travar na borda; a suavidade impede serrilhado e trechos sem borda seguem os
-  // vizinhos. gamma=atração p/ borda, alpha=suavidade, beta=pressão p/ dentro.
-  const gamma = 1.0, alpha = 0.35, beta = 0.16;
+  // vizinhos. gamma=atração p/ borda (ao QUADRADO — só bordas FORTES/coerentes do
+  // corpo prendem; textura fraca é ignorada), alpha=suavidade, beta=pressão.
+  const gamma = 1.2, alpha = 0.30, beta = 0.24;
   const area = (Q) => { let A = 0; for (let i = 0; i < Q.length; i++) { const a = Q[i], b = Q[(i + 1) % Q.length]; A += a[0] * b[1] - b[0] * a[1]; } return Math.abs(A) / 2; };
-  for (let iter = 0; iter < 90; iter++) {
+  for (let iter = 0; iter < 110; iter++) {
     const cen = { x: 0, y: 0 }; for (const q of P) { cen.x += q[0]; cen.y += q[1]; } cen.x /= P.length; cen.y /= P.length;
     for (let i = 0; i < n; i++) {
       const p = P[i], a = P[(i - 1 + n) % n], b = P[(i + 1) % n];
@@ -440,8 +448,9 @@ function roiSmartContour(imgEl, rawPts) {
       let best = p, bestE = Infinity;
       for (let d = -2; d <= 2; d++) {                            // move só na normal
         const qx = p[0] + nox * d, qy = p[1] + noy * d;
+        const ge = gAt(qx, qy);
         const smooth = (Math.hypot(qx - midx, qy - midy)) / eqR;
-        const E = -gamma * gAt(qx, qy) + alpha * smooth + beta * (d / 2); // d<0 = encolher
+        const E = -gamma * ge * ge + alpha * smooth + beta * (d / 2); // d<0 = encolher
         if (E < bestE) { bestE = E; best = [qx, qy]; }
       }
       P[i] = best;
