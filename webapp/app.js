@@ -475,6 +475,7 @@ const Cam = {
     $("#cam-error").hidden = true;
 
     showScreen("screen-camera");
+    maybeShowBgTip();
     await this.start();
   },
 
@@ -806,6 +807,15 @@ async function importBasePhoto(file, session) {
 
 /* ---------------- Diálogo de rótulo (rodapé da foto) ----------------
    Resolve { label } ou null (usuário escolheu refazer). */
+// Dica de fundo ao abrir a câmera (some quando o usuário marca "não mostrar mais").
+function maybeShowBgTip() {
+  if (localStorage.getItem("ff_no_bg_tip") === "1") return;
+  const dlg = $("#bg-tip-dialog");
+  if (!dlg) return;
+  $("#bg-tip-nomore").checked = false;
+  try { dlg.showModal(); } catch (_) {}
+}
+
 // Diálogo de confirmação genérico. Resolve true (Continuar) ou false (Cancelar).
 function confirmDialog(title, message, okText) {
   return new Promise((resolve) => {
@@ -1367,6 +1377,12 @@ function wireEvents() {
     $("#browser-block-dialog").close();
     proceedNewComparison();
   });
+  // Dica de fundo (câmera): fecha e lembra a opção "não mostrar novamente".
+  $("#bg-tip-ok").addEventListener("click", () => {
+    if ($("#bg-tip-nomore").checked) localStorage.setItem("ff_no_bg_tip", "1");
+    $("#bg-tip-dialog").close();
+  });
+
   // Avisos em sequência (cada um só reaparece se não marcou "não mostrar").
   $("#ondevice-ok").addEventListener("click", () => {
     if ($("#ondevice-dontshow").checked) localStorage.setItem("cc_ondevice_ack", "1");

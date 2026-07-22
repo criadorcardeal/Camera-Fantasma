@@ -233,6 +233,34 @@ function alEdgeMask(imgd) {
   return { mask, area };
 }
 
+// Dilata uma máscara binária em 1px (vizinhança 3x3).
+function alDilate1(mask, W, H) {
+  const out = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (!mask[y * W + x]) continue;
+    for (let dy = -1; dy <= 1; dy++) { const yy = y + dy; if (yy < 0 || yy >= H) continue;
+      for (let dx = -1; dx <= 1; dx++) { const xx = x + dx; if (xx < 0 || xx >= W) continue; out[yy * W + xx] = 1; } }
+  }
+  return out;
+}
+
+// Contorno (borda) da SILHUETA: pixel de pele que faz fronteira com o FUNDO
+// (ignora o corte da moldura). É o traço ESTÁVEL do membro — não muda com veias
+// ou marcas novas nem com a iluminação — logo, a melhor referência de encaixe.
+// Dilatado ~3px: uma faixa tolerante dá um "terreno" suave para o otimizador
+// (evita o ótimo ruidoso de um traço de 1px que quase nunca se sobrepõe).
+function alOutlineMask(sil, W, H, rad) {
+  const out = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const p = y * W + x; if (!sil[p]) continue;
+    if ((x > 0 && !sil[p - 1]) || (x < W - 1 && !sil[p + 1]) ||
+        (y > 0 && !sil[p - W]) || (y < H - 1 && !sil[p + W])) out[p] = 1;
+  }
+  let m = out; const n = rad == null ? 3 : rad;
+  for (let i = 0; i < n; i++) m = alDilate1(m, W, H);
+  return m;
+}
+
 // Ajusta a transformação de semelhança (zoom, giro, translação) que empilha o
 // acompanhamento (fMask) sobre a base (bMask): estimativa por momentos + refino
 // que sobe o "morro" da sobreposição (IoU). Devolve {z,rot,tx,ty,iou} no quadro
@@ -412,32 +440,30 @@ function alRoiCongruence(Hinv, bEdge, fEdge, W, H, roi) {
   return uni ? inter / uni : 0;
 }
 
-// Congruência das bordas na ROI para um conjunto de parâmetros (usado p/ pontuar
-// as sementes do otimizador). P segue a mesma regra do resto (2.2×maior lado).
-function alScoreParams(p, bEdge, fEdge, W, H, roi) {
-  const P = 2.2 * Math.max(W, H);
+// Matriz inversa (canvas→quadro) da homografia gerada pelos parâmetros. null se
+// degenerada. Centraliza a lógica compartilhada entre pontuar e otimizar.
+function alParamsToHinv(p, W, H, P) {
   const corners = [[-W / 2, -H / 2], [W / 2, -H / 2], [W / 2, H / 2], [-W / 2, H / 2]];
   const q = Object.assign({ z: 1, txp: 0, typ: 0, rot: 0, rotX: 0, rotY: 0, fx: 0.5, fy: 0.5 }, p);
   const proj = alMakeProject(q, W, H, P);
   const dst = corners.map((c) => { const r = proj(c); return [r[0] - W / 2, r[1] - H / 2]; });
-  const Hm = alHomography4(corners, dst); if (!Hm) return -1;
-  const Hi = alMat3Inv(Hm); if (!Hi) return -1;
-  return alRoiCongruence(Hi, bEdge, fEdge, W, H, roi);
+  const Hm = alHomography4(corners, dst); if (!Hm) return null;
+  return alMat3Inv(Hm);
+}
+
+// Pontua um conjunto de parâmetros por uma função de congruência qualquer
+// congruenceFn(Hinv) → [0..1] (usado p/ escolher a melhor semente do otimizador).
+function alScoreParams(p, W, H, congruenceFn) {
+  const Hi = alParamsToHinv(p, W, H, 2.2 * Math.max(W, H));
+  return Hi ? congruenceFn(Hi) : -1;
 }
 
 // Alinhamento automático COMPLETO: busca em padrão (coordinate pattern search)
 // sobre TODAS as ferramentas — zoom, translação, giro no plano (Z), tombamentos
-// 3D (X, Y) e o FULCRO — para maximizar a congruência das bordas na ROI.
-function alAutoRegister(bEdge, fEdge, W, H, roi, init) {
+// 3D (X, Y) e o FULCRO — maximizando a congruência dada por congruenceFn(Hinv).
+function alAutoRegister(W, H, congruenceFn, init) {
   const P = 2.2 * Math.max(W, H);
-  const corners = [[-W / 2, -H / 2], [W / 2, -H / 2], [W / 2, H / 2], [-W / 2, H / 2]];
-  const scoreOf = (p) => {
-    const proj = alMakeProject(p, W, H, P);
-    const dst = corners.map((c) => { const q = proj(c); return [q[0] - W / 2, q[1] - H / 2]; });
-    const Hm = alHomography4(corners, dst); if (!Hm) return -1;
-    const Hi = alMat3Inv(Hm); if (!Hi) return -1;
-    return alRoiCongruence(Hi, bEdge, fEdge, W, H, roi);
-  };
+  const scoreOf = (p) => { const Hi = alParamsToHinv(p, W, H, P); return Hi ? congruenceFn(Hi) : -1; };
   let best = Object.assign({ z: 1, txp: 0, typ: 0, rot: 0, rotX: 0, rotY: 0, fx: 0.5, fy: 0.5 }, init || {});
   best.score = scoreOf(best);
   const steps = { txp: W * 0.06, typ: H * 0.06, z: 0.08, rot: 6, rotX: 8, rotY: 8, fx: 0.06, fy: 0.06 };
@@ -601,6 +627,18 @@ const Aligner = {
     if (m) m.classList.toggle("editing", this.fulcrumMode);
     const hint = $("#al-fulcrum-hint");
     if (hint) hint.hidden = !this.fulcrumMode;
+    this._refreshAdjustLock();
+  },
+
+  // Enquanto posiciona o fulcro OU desenha a zona de interesse, os outros
+  // ajustes (zoom e giros) ficam DESLIGADOS para não atrapalhar (v7.6.4).
+  _refreshAdjustLock() {
+    const lock = this.fulcrumMode || this.roiDrawing;
+    ["#al-zoom", "#al-rotate", "#al-rotate-x", "#al-rotate-y"].forEach((sel) => {
+      const el = $(sel); if (el) el.disabled = lock;
+    });
+    const auto = $("#al-auto"); if (auto) auto.disabled = this.fulcrumMode;
+    const fb = $("#al-fulcrum-btn"); if (fb) fb.disabled = this.roiDrawing;
   },
 
   toggleFulcrumMode() { this._setFulcrumMode(!this.fulcrumMode); },
@@ -719,11 +757,13 @@ const Aligner = {
     const dr = $("#al-roidraw"); if (dr) dr.hidden = false;
     const rc = $("#al-roirect"); if (rc) rc.hidden = true;
     const hint = $("#al-roi-hint"); if (hint) hint.hidden = false;
+    this._refreshAdjustLock();
   },
   _cancelRoi() {
     this.roiDrawing = false;
     const dr = $("#al-roidraw"); if (dr) dr.hidden = true;
     const hint = $("#al-roi-hint"); if (hint) hint.hidden = true;
+    this._refreshAdjustLock();
   },
 
   // Passo 2: recebe a ROI (normalizada) e roda o otimizador 3D.
@@ -739,8 +779,11 @@ const Aligner = {
       const Wg = 200, Hg = Math.max(1, Math.round(Wg / aspect));
       const bImgd = alCoverRender(baseImg, Wg, Hg);
       const fImgd = alCoverRender(followImg, Wg, Hg);
-      const bEdge = alEdgeMask(bImgd), fEdge = alEdgeMask(fImgd);
+      // Silhueta (membro vs fundo liso) — estável entre visitas; dela sai o
+      // CONTORNO do membro (traço que não muda com veias/marcas/iluminação).
       const bSil = alForegroundMask(bImgd), fSil = alForegroundMask(fImgd);
+      const bOut = alOutlineMask(bSil.mask, Wg, Hg), fOut = alOutlineMask(fSil.mask, Wg, Hg);
+      const bEdge = alEdgeMask(bImgd), fEdge = alEdgeMask(fImgd);
 
       // ROI (px) no quadro Wg×Hg; margem mínima p/ não degenerar.
       const clampi = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(v)));
@@ -750,29 +793,48 @@ const Aligner = {
       };
       if (roi.x1 - roi.x0 < 4 || roi.y1 - roi.y0 < 4) { roi.x0 = 0; roi.y0 = 0; roi.x1 = Wg - 1; roi.y1 = Hg - 1; }
 
-      // Sementes: encaixe 2D por contorno e por silhueta (dão um bom ponto de
-      // partida para o refino 3D). A melhor (maior congruência na ROI) inicia.
+      // Congruência COMBINADA na ROI (v7.6.4, calibrada em fotos clínicas reais):
+      // a SILHUETA (área do membro) domina por ser suave e robusta; o CONTORNO
+      // dilatado refina a forma; as bordas cruas entram só como leve reforço.
+      // Assim o encaixe não é enganado por veias/marcas novas nem pela iluminação,
+      // e não "encolhe" a foto atrás de um contorno fino ruidoso.
+      const iou = (Hi, b, f) => alRoiCongruence(Hi, b, f, Wg, Hg, roi);
+      const congruenceFn = (Hi) =>
+        0.45 * iou(Hi, bSil.mask, fSil.mask) +
+        0.40 * iou(Hi, bOut, fOut) +
+        0.15 * iou(Hi, bEdge.mask, fEdge.mask);
+
+      // Sementes por MOMENTOS a partir da SILHUETA (posição/escala/orientação do
+      // membro) e do seu contorno — ambas ESTÁVEIS. Não semeamos pelas bordas
+      // cruas (podem começar num "vale" errado por causa de veias/marcas).
       const toParam = (tr) => tr ? { z: tr.z, txp: tr.tx, typ: tr.ty, rot: tr.rot, rotX: 0, rotY: 0, fx: 0.5, fy: 0.5 } : null;
       const seeds = [{ z: 1, txp: 0, typ: 0, rot: 0, rotX: 0, rotY: 0, fx: 0.5, fy: 0.5 }];
-      const trE = alFitTransform(bEdge.mask, fEdge.mask, Wg, Hg); if (trE) seeds.push(toParam(trE));
       const trS = alFitTransform(bSil.mask, fSil.mask, Wg, Hg); if (trS) seeds.push(toParam(trS));
-      let seed = seeds[0], seedScore = alScoreParams(seed, bEdge.mask, fEdge.mask, Wg, Hg, roi);
+      const trO = alFitTransform(bOut, fOut, Wg, Hg); if (trO) seeds.push(toParam(trO));
+      let seed = seeds[0], seedScore = alScoreParams(seed, Wg, Hg, congruenceFn);
       for (const s of seeds) {
-        const sc = alScoreParams(s, bEdge.mask, fEdge.mask, Wg, Hg, roi);
+        const sc = alScoreParams(s, Wg, Hg, congruenceFn);
         if (sc > seedScore) { seed = s; seedScore = sc; }
       }
 
-      const best = alAutoRegister(bEdge.mask, fEdge.mask, Wg, Hg, roi, seed);
+      let best = alAutoRegister(Wg, Hg, congruenceFn, seed);
+
+      // Salvaguarda: o refino NUNCA deve piorar a sobreposição global do membro
+      // em relação à melhor semente (silhueta). Se piorar (caso patológico com
+      // ROI pequena), volta para a semente — encaixe mais seguro.
+      const full = { x0: 0, y0: 0, x1: Wg - 1, y1: Hg - 1 };
+      const silFull = (p) => { const Hi = alParamsToHinv(p, Wg, Hg, 2.2 * Math.max(Wg, Hg)); return Hi ? alRoiCongruence(Hi, bSil.mask, fSil.mask, Wg, Hg, full) : -1; };
+      if (silFull(best) < silFull(seed) - 0.03) best = Object.assign({ rotX: 0, rotY: 0, fx: 0.5, fy: 0.5 }, seed);
 
       // Converte para o palco. tx/ty do quadro Wg → px do palco.
       const stage = $("#al-stage");
       const fx0 = (stage.clientWidth || Wg) / Wg, fy0 = (stage.clientHeight || Hg) / Hg;
       this.z = Math.max(0.5, Math.min(4, best.z));
       this.rot = ((best.rot + 180) % 360 + 360) % 360 - 180;
-      this.rotX = Math.max(-60, Math.min(60, best.rotX));
-      this.rotY = Math.max(-60, Math.min(60, best.rotY));
-      this.fx = Math.max(0, Math.min(1, best.fx));
-      this.fy = Math.max(0, Math.min(1, best.fy));
+      this.rotX = Math.max(-60, Math.min(60, best.rotX || 0));
+      this.rotY = Math.max(-60, Math.min(60, best.rotY || 0));
+      this.fx = Math.max(0, Math.min(1, best.fx == null ? 0.5 : best.fx));
+      this.fy = Math.max(0, Math.min(1, best.fy == null ? 0.5 : best.fy));
       this.tx = best.txp * fx0; this.ty = best.typ * fy0;
       $("#al-zoom").value = this.z;
       $("#al-rotate").value = Math.round(this.rot);

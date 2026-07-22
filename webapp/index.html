@@ -49,7 +49,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v7.6.3</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v7.7</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -88,7 +88,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v7.6.3</span>
+      <span class="version-badge">v7.7</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -171,7 +171,7 @@
         <div id="al-fulcrum" class="al-fulcrum" hidden></div>
         <div id="al-roidraw" class="al-roidraw" hidden><div id="al-roirect" class="al-roirect" hidden></div></div>
         <div id="al-fulcrum-hint" class="al-modehint" hidden>Toque para posicionar o eixo de giro (fulcro)</div>
-        <div id="al-roi-hint" class="al-modehint" hidden>Arraste para marcar a zona de interesse</div>
+        <div id="al-roi-hint" class="al-modehint" hidden>Arraste sobre a região a comparar — inclua a <b>borda do membro</b> e um ponto fixo (ex.: o joelho)</div>
         <div class="al-hint">Arraste para posicionar • pince para dar zoom</div>
       </div>
       <button id="al-auto" class="btn primary al-auto">✨ Alinhamento automático</button>
@@ -542,6 +542,18 @@
       desconectar a conta ou limpar o aplicativo, elas <b>não poderão ser recuperadas</b>.</p>
     <label class="od-check"><input type="checkbox" id="ondevice-dontshow" /> Não mostrar novamente</label>
     <menu><button id="ondevice-ok" class="primary">Entendi</button></menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: DICA DE FUNDO (fotos) ============ -->
+  <dialog id="bg-tip-dialog">
+    <h3>📸 Dica para a foto</h3>
+    <p class="od-text">Use um <b>fundo de cor única e liso</b> (ex.: uma parede clara,
+      um lençol ou cortina sem estampa) atrás do membro.<br><br>
+      ⚠️ Fundos com <b>muita informação</b> (móveis, quadros, estampas, objetos)
+      podem <b>confundir o alinhamento automático</b> entre a foto base e a de
+      acompanhamento.</p>
+    <label class="od-check"><input type="checkbox" id="bg-tip-nomore" /> Não mostrar novamente</label>
+    <menu><button id="bg-tip-ok" class="primary">Entendi</button></menu>
   </dialog>
 
   <!-- ============ DIÁLOGO: BLOQUEIO NO NAVEGADOR ============ -->

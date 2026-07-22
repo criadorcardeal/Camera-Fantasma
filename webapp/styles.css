@@ -779,6 +779,9 @@ html, body {
 .al-slider { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 0.85rem; }
 .al-slider span { width: 88px; flex-shrink: 0; }
 .al-slider input { flex: 1; accent-color: var(--primary); }
+/* Ajustes desligados enquanto posiciona fulcro / desenha ROI (v7.6.4). */
+.al-slider input:disabled { opacity: 0.35; }
+.al-reset:disabled { opacity: 0.4; cursor: default; }
 .al-btn-row { display: flex; gap: 8px; margin-top: 8px; }
 .al-reset {
   flex: 1; padding: 7px 10px;

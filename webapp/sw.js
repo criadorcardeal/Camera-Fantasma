@@ -6,7 +6,7 @@
    voucher em "Adquirir creditos", seguido de video obrigatorio do patrocinador.
    Bibliotecas externas (supabase-js) sao cacheadas pelo fetch handler apos o 1o
    acesso, para funcionar offline com sessao ja salva. */
-const CACHE = "fotos-fantasma-v763";
+const CACHE = "fotos-fantasma-v77";
 const ASSETS = [
   "./",
   "./index.html",
