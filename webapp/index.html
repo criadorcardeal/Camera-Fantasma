@@ -49,7 +49,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v7.6.2</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v7.6.3</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -88,7 +88,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v7.6.2</span>
+      <span class="version-badge">v7.6.3</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -107,7 +107,10 @@
     <div class="cam-top">
       <button id="cam-close" class="icon-btn">✕</button>
       <span id="cam-title">Foto base</span>
-      <button id="cam-contour" class="cam-contour-btn" title="Fantasma: contorno neon ou foto" hidden>📷 Foto</button>
+      <button id="cam-contour" class="cam-switch" type="button" role="switch" aria-checked="false" title="Fantasma: foto ou contorno neon" hidden>
+        <span class="cam-sw-opt sw-foto">Foto</span>
+        <span class="cam-sw-opt sw-contorno">Contorno</span>
+      </button>
       <button id="cam-torch" class="icon-btn" title="Lanterna">🔦</button>
     </div>
 
@@ -165,6 +168,10 @@
       <div class="al-stage" id="al-stage">
         <img id="al-follow" alt="" />
         <img id="al-ghost" class="al-ghost" alt="" />
+        <div id="al-fulcrum" class="al-fulcrum" hidden></div>
+        <div id="al-roidraw" class="al-roidraw" hidden><div id="al-roirect" class="al-roirect" hidden></div></div>
+        <div id="al-fulcrum-hint" class="al-modehint" hidden>Toque para posicionar o eixo de giro (fulcro)</div>
+        <div id="al-roi-hint" class="al-modehint" hidden>Arraste para marcar a zona de interesse</div>
         <div class="al-hint">Arraste para posicionar • pince para dar zoom</div>
       </div>
       <button id="al-auto" class="btn primary al-auto">✨ Alinhamento automático</button>
@@ -179,7 +186,10 @@
           <input type="range" id="al-rotate-y" min="-60" max="60" step="1" value="0" /></label>
         <label class="al-slider"><span>Fantasma</span>
           <input type="range" id="al-opacity" min="0" max="1" step="0.01" value="0.5" /></label>
-        <button id="al-rotate-reset" class="al-reset">↺ Zerar giros</button>
+        <div class="al-btn-row">
+          <button id="al-rotate-reset" class="al-reset">↺ Zerar giros</button>
+          <button id="al-fulcrum-btn" class="al-reset">✜ Reposicionar fulcro</button>
+        </div>
       </div>
       <div class="al-roi-card" id="al-contour-card">
         <div class="al-roi-head">Contorno neon</div>
@@ -491,6 +501,18 @@
       <button id="dup-cancel">Cancelar</button>
       <button id="dup-ok" class="primary">Duplicar (1 crédito)</button>
     </menu>
+  </dialog>
+
+  <!-- ============ DIÁLOGO: CONFIRMAÇÃO GENÉRICA (reutilizável) ============ -->
+  <dialog id="confirm-dialog">
+    <form method="dialog">
+      <h3 id="confirm-title">Confirmar</h3>
+      <p class="od-text" id="confirm-msg"></p>
+      <menu>
+        <button value="cancel" id="confirm-cancel">Cancelar</button>
+        <button value="ok" id="confirm-ok" class="primary">Continuar</button>
+      </menu>
+    </form>
   </dialog>
 
   <!-- ============ VÍDEO OBRIGATÓRIO (após resgate de voucher) ============ -->

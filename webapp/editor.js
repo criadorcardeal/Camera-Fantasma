@@ -544,7 +544,15 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#ed-save").addEventListener("click", () => Editor.save());
   $("#ed-auto-rel").addEventListener("click", () => Editor.runAuto("relative"));
   $("#ed-auto-abs").addEventListener("click", () => Editor.runAuto("absolute"));
-  $("#ed-reset").addEventListener("click", () => Editor.resetActive());
+  $("#ed-reset").addEventListener("click", async () => {
+    const ok = await confirmDialog(
+      "Zerar ajustes",
+      "Isto descarta os ajustes desta imagem e volta à <b>imagem original</b> " +
+      "(não à última salva). Para <b>cancelar os ajustes atuais</b> sem zerar, " +
+      "toque na seta <b>‹</b> para voltar.<br><br>Deseja zerar?",
+      "Zerar");
+    if (ok) Editor.resetActive();
+  });
   $("#ed-lock-toggle").addEventListener("change", (e) => Editor.setLocked(e.target.checked));
   $("#ed-which").querySelectorAll("button").forEach((b) =>
     b.addEventListener("click", () => Editor.setWhich(b.dataset.img)));

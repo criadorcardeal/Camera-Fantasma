@@ -412,15 +412,13 @@ const Cam = {
     const btn = $("#cam-contour");
     const ghost = $("#ghost");
     if (!s || this.mode !== "follow") { if (btn) btn.hidden = true; return; }
-    if (btn) { btn.hidden = false; btn.classList.toggle("on", !!on); }
+    if (btn) { btn.hidden = false; btn.classList.toggle("on", !!on); btn.setAttribute("aria-checked", on ? "true" : "false"); }
     if (on) {
-      if (btn) btn.textContent = "🟢 Contorno";
       let sk = null;
       try { sk = await ensureSketch(s, "base"); } catch (_) {}
       // Só troca se a câmera ainda está no modo follow desta sessão.
       if (sk && this.session === s && this.mode === "follow") ghost.src = sk;
     } else {
-      if (btn) btn.textContent = "📷 Foto";
       ghost.src = s.baseImage;
     }
     this._ghostContourOn = !!on;
@@ -698,6 +696,8 @@ const Cam = {
     } else {
       const s = this.session;
       s.followImage = dataUrl;
+      s.followOriginal = dataUrl;   // captura = imagem original (sem alinhamento)
+      s.followAlign = null;
       s.followLabel = label;
       s.followAt = new Date().toISOString();
       clearSketch(s, "follow");
@@ -806,6 +806,22 @@ async function importBasePhoto(file, session) {
 
 /* ---------------- Diálogo de rótulo (rodapé da foto) ----------------
    Resolve { label } ou null (usuário escolheu refazer). */
+// Diálogo de confirmação genérico. Resolve true (Continuar) ou false (Cancelar).
+function confirmDialog(title, message, okText) {
+  return new Promise((resolve) => {
+    const dlg = $("#confirm-dialog");
+    $("#confirm-title").textContent = title || "Confirmar";
+    $("#confirm-msg").innerHTML = message || "";
+    $("#confirm-ok").textContent = okText || "Continuar";
+    const onClose = () => {
+      dlg.removeEventListener("close", onClose);
+      resolve(dlg.returnValue === "ok");
+    };
+    dlg.addEventListener("close", onClose);
+    dlg.showModal();
+  });
+}
+
 function openLabelDialog(labelValue, requireConsent) {
   return new Promise((resolve) => {
     const dlg = $("#dist-dialog");
@@ -969,7 +985,7 @@ async function openDetail(id) {
   });
 
   if ($("#btn-adjust")) $("#btn-adjust").addEventListener("click", () => Editor.open(s));
-  if ($("#btn-reposition")) $("#btn-reposition").addEventListener("click", () => Aligner.open(s, s.followImage, true));
+  if ($("#btn-reposition")) $("#btn-reposition").addEventListener("click", () => Aligner.open(s, s.followOriginal || s.followImage, true));
   if ($("#btn-redo")) $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
   if ($("#btn-follow-import")) $("#btn-follow-import").addEventListener("click", () =>
     pickImage().then((file) => importFollowPhoto(s, file)));
@@ -1026,6 +1042,10 @@ async function swapPhotos(s) {
   swap("baseImageView", "followImageView");
   swap("baseAdj", "followAdj");
   swap("baseTarget", "followTarget");
+  // O acompanhamento passa a ser outra foto: seu "original" vira a própria foto
+  // atual e o alinhamento salvo perde sentido (descartado).
+  s.followOriginal = s.followImage;
+  s.followAlign = null;
   // Ao inverter as fotos, os contornos guardados usam a cor errada (base=verde,
   // acomp.=ciano): descarta p/ serem regerados na cor certa quando reativados.
   clearSketch(s, "all");

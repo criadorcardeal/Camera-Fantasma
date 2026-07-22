@@ -541,14 +541,20 @@ html, body {
 #cam-torch.on { background: var(--accent); }
 #cam-torch.disabled { opacity: 0.35; }
 
-/* Botão fantasma: contorno neon ↔ foto (câmera de acompanhamento) */
-.cam-contour-btn {
-  flex: 0 0 auto; border: 1.5px solid rgba(255,255,255,0.6);
-  background: rgba(0,0,0,0.35); color: #fff;
-  padding: 6px 12px; border-radius: 16px; font-size: 0.8rem;
-  font-weight: 600; cursor: pointer; white-space: nowrap;
+/* Switch fantasma: Foto ↔ Contorno neon (câmera de acompanhamento) */
+.cam-switch {
+  flex: 0 0 auto; display: inline-flex; gap: 0; padding: 3px;
+  border: 1.5px solid rgba(255,255,255,0.55);
+  background: rgba(0,0,0,0.4); border-radius: 18px; cursor: pointer;
 }
-.cam-contour-btn.on { background: #19ff6a; color: #072; border-color: #19ff6a; }
+.cam-sw-opt {
+  padding: 4px 12px; border-radius: 14px; font-size: 0.8rem; font-weight: 700;
+  color: rgba(255,255,255,0.8); transition: background 0.15s, color 0.15s;
+  white-space: nowrap; line-height: 1.1;
+}
+/* OFF = Foto ativa; ON (.on) = Contorno ativo (verde neon). */
+.cam-switch:not(.on) .sw-foto { background: #fff; color: #111; }
+.cam-switch.on .sw-contorno { background: #19ff6a; color: #063; }
 
 .cam-side {
   position: absolute; right: 10px; top: 64px; bottom: 150px;
@@ -773,14 +779,49 @@ html, body {
 .al-slider { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 0.85rem; }
 .al-slider span { width: 88px; flex-shrink: 0; }
 .al-slider input { flex: 1; accent-color: var(--primary); }
+.al-btn-row { display: flex; gap: 8px; margin-top: 8px; }
 .al-reset {
-  display: block; margin: 8px 0 2px auto; padding: 6px 12px;
+  flex: 1; padding: 7px 10px;
   border: 1.5px solid var(--primary); border-radius: 16px;
   background: #fff; color: var(--primary); font-size: 0.8rem;
-  font-weight: 600; cursor: pointer;
+  font-weight: 600; cursor: pointer; white-space: nowrap;
 }
+.al-reset.active { background: var(--primary); color: #fff; }
 /* Palco do posicionamento: dá profundidade ao giro 3D e evita "piscar" o verso. */
 #al-follow { backface-visibility: hidden; }
+
+/* Marca do fulcro (eixo de giro) */
+.al-fulcrum {
+  position: absolute; width: 26px; height: 26px; z-index: 5;
+  transform: translate(-50%, -50%); pointer-events: none;
+  border-radius: 50%; border: 2px solid #ffd21e;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.4);
+}
+.al-fulcrum::before, .al-fulcrum::after {
+  content: ""; position: absolute; background: #ffd21e;
+  box-shadow: 0 0 1px #000;
+}
+.al-fulcrum::before { left: 50%; top: 3px; bottom: 3px; width: 2px; transform: translateX(-50%); }
+.al-fulcrum::after { top: 50%; left: 3px; right: 3px; height: 2px; transform: translateY(-50%); }
+.al-fulcrum.editing { border-color: #ff7ae0; animation: al-fulc-blink 0.8s infinite; }
+.al-fulcrum.editing::before, .al-fulcrum.editing::after { background: #ff7ae0; }
+@keyframes al-fulc-blink { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* Overlay de desenho da zona de interesse (alinhamento automático) */
+.al-roidraw {
+  position: absolute; inset: 0; z-index: 6;
+  background: rgba(0,0,0,0.35); touch-action: none;
+}
+.al-roirect {
+  position: absolute; border: 2px dashed #22d3ee;
+  background: rgba(34,211,238,0.15); pointer-events: none;
+}
+.al-modehint {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.7); color: #fff; padding: 5px 12px;
+  border-radius: 12px; font-size: 0.8rem; z-index: 7; pointer-events: none;
+  text-align: center; max-width: 92%;
+}
 
 /* ---------- Zona de interesse (v7.5) ---------- */
 /* Contorno sobreposto (câmera e alinhamento). O viewBox é em pixels do
