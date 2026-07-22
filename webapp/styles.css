@@ -771,8 +771,16 @@ html, body {
 }
 .al-controls { background: var(--card); border-radius: 12px; padding: 10px 14px; }
 .al-slider { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 0.85rem; }
-.al-slider span { width: 72px; flex-shrink: 0; }
+.al-slider span { width: 88px; flex-shrink: 0; }
 .al-slider input { flex: 1; accent-color: var(--primary); }
+.al-reset {
+  display: block; margin: 8px 0 2px auto; padding: 6px 12px;
+  border: 1.5px solid var(--primary); border-radius: 16px;
+  background: #fff; color: var(--primary); font-size: 0.8rem;
+  font-weight: 600; cursor: pointer;
+}
+/* Palco do posicionamento: dá profundidade ao giro 3D e evita "piscar" o verso. */
+#al-follow { backface-visibility: hidden; }
 
 /* ---------- Zona de interesse (v7.5) ---------- */
 /* Contorno sobreposto (câmera e alinhamento). O viewBox é em pixels do

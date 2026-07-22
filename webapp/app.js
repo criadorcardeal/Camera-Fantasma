@@ -87,11 +87,11 @@ function autoDateLabel() {
   return mode === "datetime" ? fmtDate(iso) : fmtDateOnly(iso);
 }
 
-// Rótulo padrão do rodapé: "Antes"/"Depois" + a data (conforme a configuração).
+// Rótulo padrão do rodapé: a data + "Antes"/"Depois" (v7.6.2: data primeiro).
 function defaultLabel(kind) {
   const prefix = kind === "base" ? "Antes" : "Depois";
   const d = autoDateLabel();
-  return d ? (prefix + " • " + d) : prefix;
+  return d ? (d + " • " + prefix) : prefix;
 }
 
 // Usa a versao com ajustes aplicados (se existir) ou a original.
@@ -442,7 +442,6 @@ const Cam = {
     this.zoom = 1;
     $("#cam-zoom").value = 1;
     this.applyZoomTransform();
-    this._stopRoiDetect();
 
     // Ghost overlay + filtros iniciais
     const ghost = $("#ghost");
@@ -464,7 +463,6 @@ const Cam = {
       // comparação existente (session preenchida).
       ghost.removeAttribute("src");
       ghost.style.display = "none";
-      $("#cam-roi").setAttribute("hidden", "");
       $("#ghost-wrap").style.display = "none";
       if ($("#cam-contour")) $("#cam-contour").hidden = true;   // sem fantasma no modo base
       $("#cam-title").textContent = session ? "Refazer foto base" : "Foto base";
@@ -513,10 +511,6 @@ const Cam = {
           this.showStartButton();
         } else {
           $("#cam-start").hidden = true;
-        }
-        // Câmera pronta: liga a zona de interesse ao vivo (modo acompanhamento).
-        if (this.mode === "follow" && this.session && this.session.roi) {
-          this._startRoiDetect();
         }
       }, 1000);
     } catch (e) {
@@ -611,94 +605,8 @@ const Cam = {
     $("#cam-fx").style.transform = t;
   },
 
-  /* ---------- Zona de interesse ao vivo (piscar verde/amarelo) ---------- */
-  async _startRoiDetect() {
-    this._stopRoiDetect();
-    const s = this.session;
-    if (!s || !s.roi || !s.roi.points || s.roi.points.length < 3) return;
-    const svg = $("#cam-roi");
-    // Enquadramento de referência = proporção do vídeo (o ghost cobre a tela).
-    let baseImg;
-    try { baseImg = await loadImageEl(s.baseImage); } catch (_) { return; }
-    this._roiBaseImgW = baseImg.naturalWidth || 3;
-    this._roiBaseImgH = baseImg.naturalHeight || 4;
-    const video = $("#video");
-    const aspect = (video.videoWidth && video.videoHeight)
-      ? video.videoWidth / video.videoHeight
-      : this._roiBaseImgW / this._roiBaseImgH;
-    // Buffer pequeno p/ a visão computacional (lado maior ~140).
-    const BW = aspect >= 1 ? 140 : Math.round(140 * aspect);
-    const BH = aspect >= 1 ? Math.round(140 / aspect) : 140;
-    this._roiBW = BW; this._roiBH = BH;
-    // Pontos da ROI no enquadramento cover do buffer + máscara.
-    const boxNorm = roiPointsToBoxNorm(s.roi.points, this._roiBaseImgW, this._roiBaseImgH, BW, BH, "cover");
-    this._roiMask = roiPolygonMask(boxNorm, BW, BH);
-    // Assinatura de bordas da BASE dentro da ROI (referência fixa).
-    const bc = document.createElement("canvas");
-    bc.width = BW; bc.height = BH;
-    const bctx = bc.getContext("2d", { willReadFrequently: true });
-    drawImageCover(bctx, baseImg, BW, BH);
-    this._roiBaseSig = roiEdgeSignature(bctx.getImageData(0, 0, BW, BH).data, BW, BH, this._roiMask);
-    this._roiBuf = document.createElement("canvas");
-    this._roiBuf.width = BW; this._roiBuf.height = BH;
-    this._roiState = null;
-
-    // Mostra o overlay antes de renderizar (clientWidth precisa ser > 0).
-    // OBS.: em <svg> o atributo `hidden` NÃO reflete via propriedade .hidden,
-    // então visibilidade é controlada por set/removeAttribute.
-    svg.removeAttribute("hidden");
-    svg.classList.remove("roi-good");
-    svg.classList.add("roi-bad");
-    roiRenderSvg(svg, s.roi.points, this._roiBaseImgW, this._roiBaseImgH, "cover");
-    let last = 0, greenStreak = 0, yellowStreak = 0;
-    const loop = (t) => {
-      this._roiRAF = requestAnimationFrame(loop);
-      const vid = $("#video");
-      if (!vid.videoWidth) return;
-      // Reposiciona o contorno (caso a tela tenha mudado de tamanho).
-      roiRenderSvg(svg, s.roi.points, this._roiBaseImgW, this._roiBaseImgH, "cover");
-      if (t - last < 250) return;                 // ~4 medições por segundo
-      last = t;
-      const ctx = this._roiBuf.getContext("2d", { willReadFrequently: true });
-      // Amostra o mesmo enquadramento que será capturado: no zoom digital,
-      // recorta o centro pelo fator de zoom (o nativo já vem ampliado).
-      const dz = this._zoomNative ? 1 : (this.zoom || 1);
-      if (dz > 1.001) {
-        const sw = vid.videoWidth / dz, sh = vid.videoHeight / dz;
-        ctx.drawImage(vid, (vid.videoWidth - sw) / 2, (vid.videoHeight - sh) / 2, sw, sh, 0, 0, BW, BH);
-      } else {
-        drawImageCover(ctx, vid, BW, BH);
-      }
-      const sig = roiEdgeSignature(ctx.getImageData(0, 0, BW, BH).data, BW, BH, this._roiMask);
-      const ncc = roiNCC(this._roiBaseSig, sig);
-      // Histerese: precisa de 2 medições seguidas p/ trocar de estado (menos flicker).
-      const good = ncc >= 0.42;
-      if (good) { greenStreak++; yellowStreak = 0; } else { yellowStreak++; greenStreak = 0; }
-      let next = this._roiState;
-      if (greenStreak >= 2) next = "green";
-      else if (yellowStreak >= 2) next = "yellow";
-      if (next !== this._roiState) {
-        this._roiState = next;
-        svg.classList.toggle("roi-good", next === "green");
-        svg.classList.toggle("roi-bad", next !== "green");
-      }
-    };
-    this._roiRAF = requestAnimationFrame(loop);
-  },
-
-  _stopRoiDetect() {
-    if (this._roiRAF) { cancelAnimationFrame(this._roiRAF); this._roiRAF = null; }
-    const svg = $("#cam-roi");
-    if (svg) {
-      svg.setAttribute("hidden", "");
-      svg.classList.remove("roi-good", "roi-bad");
-    }
-    this._roiState = null;
-  },
-
   stop() {
     this.stopPreview();
-    this._stopRoiDetect();
     $("#cam-fx").hidden = true;
     // Zera transformações de zoom para não vazar p/ a próxima abertura.
     $("#video").style.transform = "";
@@ -975,7 +883,6 @@ async function openDetail(id) {
       </div>
     </div>`;
 
-  const roiLabel = (has) => has ? "🟢 Zona (definida)" : "🟢 Definir zona de interesse";
   const openCls = (id) => _detailOpenCards[id] ? " open" : "";
 
   // Botão + prévia do contorno neon (fantasma). `on` = ligado.
@@ -984,8 +891,7 @@ async function openDetail(id) {
     <button class="btn outline card-full contour-btn${on ? " active" : ""}" id="btn-${kind}-contour">${contourLabel(on)}</button>
     ${on && sketch ? `<div class="contour-preview"><img src="${sketch}" alt="Prévia do contorno" /></div>` : ""}`;
 
-  // Card BASE (recolhível, fechado por padrão): Refazer/Importar + Zona de interesse.
-  // A definição de zona fica disponível mesmo travado (só edita a ROI, não as fotos).
+  // Card BASE (recolhível, fechado por padrão): Refazer/Importar + Contorno neon.
   const baseCard = `
     <div class="act-card collapsible${openCls("base-card")}" id="base-card">
       <div class="act-head"><span class="act-title">Base</span><span class="chev">▾</span></div>
@@ -994,12 +900,11 @@ async function openDetail(id) {
           <button class="btn outline" id="btn-base-redo">📷 Refazer</button>
           <button class="btn outline" id="btn-base-import">🖼 Importar</button>
         </div>`}
-        <button class="btn outline card-full" id="btn-roi">${roiLabel(!!s.roi)}</button>
         ${contourBlock("base", !!s.baseSketchOn, s.baseSketch)}
       </div>
     </div>`;
 
-  // Card ACOMPANHAMENTO (recolhível, fechado): Tirar/Refazer/Importar + Zona.
+  // Card ACOMPANHAMENTO (recolhível, fechado): Tirar/Refazer/Importar + Contorno.
   const acCard = `
     <div class="act-card collapsible${openCls("ac-card")}" id="ac-card">
       <div class="act-head"><span class="act-title">Acompanhamento</span><span class="chev">▾</span></div>
@@ -1008,7 +913,6 @@ async function openDetail(id) {
           <button class="btn outline" id="btn-redo">${hasFollow ? "📷 Refazer" : "📷 Tirar"}</button>
           <button class="btn outline" id="btn-follow-import">🖼 Importar</button>
         </div>`}
-        ${hasFollow ? `<button class="btn outline card-full" id="btn-roi-follow">${roiLabel(!!s.followRoi)}</button>` : ""}
         ${hasFollow ? contourBlock("follow", !!s.followSketchOn, s.followSketch) : ""}
       </div>
     </div>`;
@@ -1069,8 +973,6 @@ async function openDetail(id) {
   if ($("#btn-redo")) $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
   if ($("#btn-follow-import")) $("#btn-follow-import").addEventListener("click", () =>
     pickImage().then((file) => importFollowPhoto(s, file)));
-  if ($("#btn-roi")) $("#btn-roi").addEventListener("click", () => Roi.open(s, "base"));
-  if ($("#btn-roi-follow")) $("#btn-roi-follow").addEventListener("click", () => Roi.open(s, "follow"));
   if ($("#btn-base-contour")) $("#btn-base-contour").addEventListener("click", () => toggleContour(s, "base"));
   if ($("#btn-follow-contour")) $("#btn-follow-contour").addEventListener("click", () => toggleContour(s, "follow"));
   if ($("#btn-base-redo")) $("#btn-base-redo").addEventListener("click", () => Cam.open("base", s));
@@ -1124,7 +1026,6 @@ async function swapPhotos(s) {
   swap("baseImageView", "followImageView");
   swap("baseAdj", "followAdj");
   swap("baseTarget", "followTarget");
-  swap("roi", "followRoi");
   // Ao inverter as fotos, os contornos guardados usam a cor errada (base=verde,
   // acomp.=ciano): descarta p/ serem regerados na cor certa quando reativados.
   clearSketch(s, "all");

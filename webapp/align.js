@@ -194,10 +194,136 @@ function alMaskIoU(fmask, bmask, W, H, z, rotDeg, tx, ty, cx, cy) {
   return uni ? inter / uni : 0;
 }
 
+// Máscara de CONTORNO (bordas): Sobel sobre a luminância borrada, limiar por
+// percentil (bordas mais fortes) e dilatação de 1px. É a versão "em máscara" do
+// filtro de contorno neon, usada como 2º método de alinhamento automático.
+function alEdgeMask(imgd) {
+  const W = imgd.width, H = imgd.height, d = imgd.data, N = W * H;
+  const g = new Float32Array(N);
+  for (let p = 0, i = 0; p < N; p++, i += 4) g[p] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+  // borra 3x3
+  const b = new Float32Array(N);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let s = 0, n = 0;
+    for (let dy = -1; dy <= 1; dy++) { const yy = y + dy; if (yy < 0 || yy >= H) continue;
+      for (let dx = -1; dx <= 1; dx++) { const xx = x + dx; if (xx < 0 || xx >= W) continue; s += g[yy * W + xx]; n++; } }
+    b[y * W + x] = s / n;
+  }
+  const mag = new Float32Array(N); let mx = 0;
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const p = y * W + x;
+    const gx = (b[p - W + 1] + 2 * b[p + 1] + b[p + W + 1]) - (b[p - W - 1] + 2 * b[p - 1] + b[p + W - 1]);
+    const gy = (b[p + W - 1] + 2 * b[p + W] + b[p + W + 1]) - (b[p - W - 1] + 2 * b[p - W] + b[p - W + 1]);
+    const m = Math.sqrt(gx * gx + gy * gy); mag[p] = m; if (m > mx) mx = m;
+  }
+  const hist = new Int32Array(256), norm = mx > 0 ? 255 / mx : 0, q = new Uint8Array(N);
+  for (let p = 0; p < N; p++) { const v = Math.min(255, Math.round(mag[p] * norm)); q[p] = v; hist[v]++; }
+  let acc = 0, th = 255; const target = N * 0.12;
+  for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= target) { th = v; break; } }
+  th = Math.max(th, 16);
+  const m0 = new Uint8Array(N);
+  for (let p = 0; p < N; p++) m0[p] = q[p] >= th ? 1 : 0;
+  const mask = new Uint8Array(N);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (!m0[y * W + x]) continue;
+    for (let dy = -1; dy <= 1; dy++) { const yy = y + dy; if (yy < 0 || yy >= H) continue;
+      for (let dx = -1; dx <= 1; dx++) { const xx = x + dx; if (xx < 0 || xx >= W) continue; mask[yy * W + xx] = 1; } }
+  }
+  let area = 0; for (let p = 0; p < N; p++) area += mask[p];
+  return { mask, area };
+}
+
+// Ajusta a transformação de semelhança (zoom, giro, translação) que empilha o
+// acompanhamento (fMask) sobre a base (bMask): estimativa por momentos + refino
+// que sobe o "morro" da sobreposição (IoU). Devolve {z,rot,tx,ty,iou} no quadro
+// W0×H0. Fatorado para servir tanto à silhueta quanto ao contorno.
+function alFitTransform(bMask, fMask, W0, H0) {
+  const B = alMoments(bMask, W0, H0);
+  const F = alMoments(fMask, W0, H0);
+  if (!B || !F) return null;
+  const cx = W0 / 2, cy = H0 / 2;
+  const z0 = Math.max(0.5, Math.min(4, B.S / F.S));
+  let rot0 = (B.theta - F.theta) * 180 / Math.PI;
+  rot0 = ((rot0 % 180) + 180) % 180; if (rot0 > 90) rot0 -= 180;
+  const iouAt = (z, rot, tx, ty) => alMaskIoU(fMask, bMask, W0, H0, z, rot, tx, ty, cx, cy);
+  let best = null;
+  for (const zm of [0.8, 0.9, 1, 1.1, 1.22]) {
+    const z = Math.max(0.4, Math.min(5, z0 * zm));
+    const t = alSolveT(B, F, z, rot0, cx, cy);
+    const iou = iouAt(z, rot0, t.tx, t.ty);
+    if (!best || iou > best.iou) best = { z, rot: rot0, tx: t.tx, ty: t.ty, iou };
+  }
+  const step = { z: 0.06, rot: 5, tx: W0 * 0.04, ty: H0 * 0.04 };
+  for (let pass = 0; pass < 60; pass++) {
+    let improved = false;
+    for (const key of ["tx", "ty", "z", "rot"]) {
+      for (const dir of [1, -1]) {
+        const cand = { z: best.z, rot: best.rot, tx: best.tx, ty: best.ty };
+        cand[key] += dir * step[key];
+        if (cand.z < 0.4 || cand.z > 5) continue;
+        if (cand.rot < -90 || cand.rot > 90) continue;
+        const iou = iouAt(cand.z, cand.rot, cand.tx, cand.ty);
+        if (iou > best.iou + 1e-4) { best = { ...cand, iou }; improved = true; }
+      }
+    }
+    if (!improved) {
+      step.z *= 0.5; step.rot *= 0.5; step.tx *= 0.5; step.ty *= 0.5;
+      if (step.rot < 0.25) break;
+    }
+  }
+  return best;
+}
+
+// Perspectiva (em px do palco) usada pela preview CSS e pelo warp ao confirmar.
+// Quanto maior, mais suave é a distorção de "tombar" a foto em 3D.
+function alPerspPx() {
+  const r = $("#al-stage").getBoundingClientRect();
+  return Math.max(r.width || 300, r.height || 400) * 2.2;
+}
+
+// Desenha um triângulo do canvas de origem no destino (mapeamento afim +
+// recorte no triângulo destino). Usado pelo warp projetivo (giro 3D).
+function alTexTri(ctx, img, s0, s1, s2, d0, d1, d2) {
+  const [x0, y0] = s0, [x1, y1] = s1, [x2, y2] = s2;
+  const [u0, v0] = d0, [u1, v1] = d1, [u2, v2] = d2;
+  const den = x0 * (y1 - y2) - x1 * (y0 - y2) + x2 * (y0 - y1);
+  if (Math.abs(den) < 1e-6) return;
+  const A = (u0 * (y1 - y2) - u1 * (y0 - y2) + u2 * (y0 - y1)) / den;
+  const Bc = (x0 * (u1 - u2) - x1 * (u0 - u2) + x2 * (u0 - u1)) / den;
+  const C = (x0 * (y1 * u2 - y2 * u1) - x1 * (y0 * u2 - y2 * u0) + x2 * (y0 * u1 - y1 * u0)) / den;
+  const D = (v0 * (y1 - y2) - v1 * (y0 - y2) + v2 * (y0 - y1)) / den;
+  const E = (x0 * (v1 - v2) - x1 * (v0 - v2) + x2 * (v0 - v1)) / den;
+  const F = (x0 * (y1 * v2 - y2 * v1) - x1 * (y0 * v2 - y2 * v0) + x2 * (y0 * v1 - y1 * v0)) / den;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(u0, v0); ctx.lineTo(u1, v1); ctx.lineTo(u2, v2); ctx.closePath();
+  ctx.clip();
+  ctx.transform(A, D, Bc, E, C, F);   // (srcX,srcY) -> (destX,destY)
+  ctx.drawImage(img, 0, 0);
+  ctx.restore();
+}
+
+// Warp de um canvas plano (srcW×srcH) para o quad projetado, por uma grade
+// de GRID×GRID células (afim por célula ≈ perspectiva com erro mínimo).
+function alDrawWarp(ctx, src, srcW, srcH, project, GRID) {
+  const local = (x, y) => [x - srcW / 2, y - srcH / 2];
+  for (let i = 0; i < GRID; i++) {
+    for (let j = 0; j < GRID; j++) {
+      const ax = i / GRID * srcW, bx = (i + 1) / GRID * srcW;
+      const ay = j / GRID * srcH, by = (j + 1) / GRID * srcH;
+      const s00 = [ax, ay], s10 = [bx, ay], s11 = [bx, by], s01 = [ax, by];
+      const d00 = project(local(ax, ay)), d10 = project(local(bx, ay));
+      const d11 = project(local(bx, by)), d01 = project(local(ax, by));
+      alTexTri(ctx, src, s00, s10, s11, d00, d10, d11);
+      alTexTri(ctx, src, s00, s11, s01, d00, d11, d01);
+    }
+  }
+}
+
 const Aligner = {
   session: null,
   followUrl: null,
-  z: 1, tx: 0, ty: 0, rot: 0,
+  z: 1, tx: 0, ty: 0, rot: 0, rotX: 0, rotY: 0,
   baseW: 1, baseH: 1,
 
   // isReposition=true quando é só reajuste/reposicionamento de uma foto já
@@ -206,9 +332,11 @@ const Aligner = {
     this.session = session;
     this.followUrl = followUrl;
     this.isReposition = !!isReposition;
-    this.z = 1; this.tx = 0; this.ty = 0; this.rot = 0;
+    this.z = 1; this.tx = 0; this.ty = 0; this.rot = 0; this.rotX = 0; this.rotY = 0;
     $("#al-zoom").value = 1;
     $("#al-rotate").value = 0;
+    $("#al-rotate-x").value = 0;
+    $("#al-rotate-y").value = 0;
     $("#al-opacity").value = 0.5;
     try {
       const baseImg = await loadImageEl(session.baseImage);
@@ -220,10 +348,6 @@ const Aligner = {
       this.followW = fimg.naturalWidth || 3;
       this.followH = fimg.naturalHeight || 4;
     } catch (_) { this.followW = 3; this.followH = 4; }
-    // Estado dos toggles de zona (mostrar zona da base / do acompanhamento).
-    this.roiShowBase = true;
-    this.roiShowFollow = true;
-    this._setupRoiCardUI();
     $("#al-ghost").src = session.baseImage;
     $("#al-ghost").style.opacity = 0.5;
     $("#al-follow").src = followUrl;
@@ -245,21 +369,6 @@ const Aligner = {
     if (h > maxH) { h = maxH; w = h * aspect; }
     stage.style.width = Math.round(w) + "px";
     stage.style.height = Math.round(h) + "px";
-    this.renderRois();
-  },
-
-  // Card "Zonas de interesse": aparece se alguma foto tem zona; o toggle do
-  // acompanhamento só vale na reposição (a followRoi pertence à foto já salva).
-  _setupRoiCardUI() {
-    const s = this.session, card = $("#al-roi-card");
-    if (!card) return;
-    const baseHas = !!(s.roi && s.roi.points && s.roi.points.length >= 3);
-    const followHas = this.isReposition && !!(s.followRoi && s.followRoi.points && s.followRoi.points.length >= 3);
-    if (!baseHas && !followHas) { card.setAttribute("hidden", ""); return; }
-    card.removeAttribute("hidden");
-    const cbBase = $("#al-roi-base"), cbFol = $("#al-roi-follow");
-    cbBase.disabled = !baseHas; cbBase.checked = baseHas && this.roiShowBase;
-    cbFol.disabled = !followHas; cbFol.checked = followHas && this.roiShowFollow;
   },
 
   // Card "Contorno neon": alterna base (fantasma) e acompanhamento entre a FOTO
@@ -301,27 +410,13 @@ const Aligner = {
     }
   },
 
-  // Zonas das DUAS fotos: base fixa (verde) + acompanhamento (ciano) que se move
-  // junto com a foto (mesma transformação), p/ o médico encaixar uma na outra.
-  renderRois() {
-    if (typeof roiRenderSvgMulti !== "function") return;
-    const s = this.session;
-    const baseSvg = $("#al-roi");
-    const bOk = this.roiShowBase && s.roi && s.roi.points && s.roi.points.length >= 3;
-    if (bOk) { baseSvg.removeAttribute("hidden"); roiRenderSvgMulti(baseSvg, [{ points: s.roi.points, color: "#2ecc71", fill: "rgba(46,204,113,0.15)" }], this.baseW, this.baseH, "cover"); }
-    else { baseSvg.setAttribute("hidden", ""); }
-
-    const folSvg = $("#al-roi-follow");
-    const fOk = this.isReposition && this.roiShowFollow && s.followRoi && s.followRoi.points && s.followRoi.points.length >= 3;
-    if (fOk) { folSvg.removeAttribute("hidden"); roiRenderSvgMulti(folSvg, [{ points: s.followRoi.points, color: "#22d3ee", fill: "rgba(34,211,238,0.15)" }], this.followW, this.followH, "cover"); }
-    else { folSvg.setAttribute("hidden", ""); }
-  },
-
   apply() {
-    const t = `translate(${this.tx}px, ${this.ty}px) scale(${this.z}) rotate(${this.rot}deg)`;
+    // Giro 3D: perspectiva + rotateX/Y/Z. Ordem casada com o warp do confirm()
+    // (translate → scale → perspective → rotateX → rotateY → rotateZ).
+    const P = Math.round(alPerspPx());
+    const t = `translate(${this.tx}px, ${this.ty}px) scale(${this.z}) ` +
+              `perspective(${P}px) rotateX(${this.rotX}deg) rotateY(${this.rotY}deg) rotateZ(${this.rot}deg)`;
     $("#al-follow").style.transform = t;
-    const fol = $("#al-roi-follow");
-    if (fol) fol.style.transform = t;   // zona do acompanhamento acompanha a foto
   },
 
   async confirm() {
@@ -334,23 +429,60 @@ const Aligner = {
 
     const followImg = await loadImageEl(this.followUrl);
     const Wi = followImg.naturalWidth, Hi = followImg.naturalHeight;
-    const coverScale = Math.max(Wc / Wi, Hc / Hi);
-    const dw = Wi * coverScale * this.z * f;
-    const dh = Hi * coverScale * this.z * f;
 
     const c = document.createElement("canvas");
     c.width = OUTW; c.height = OUTH;
     const ctx = c.getContext("2d");
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, OUTW, OUTH);
-    // Aplica a rotação em torno do centro da imagem (igual ao preview CSS).
-    const cxp = OUTW / 2 + this.tx * f;
-    const cyp = OUTH / 2 + this.ty * f;
-    ctx.save();
-    ctx.translate(cxp, cyp);
-    ctx.rotate(this.rot * Math.PI / 180);
-    ctx.drawImage(followImg, -dw / 2, -dh / 2, dw, dh);
-    ctx.restore();
+
+    // Enquadramento COBRINDO (cover) o quadro OUTW×OUTH, num canvas plano — é o
+    // "conteúdo da caixa" antes de qualquer giro (mesmo que a preview CSS pinta
+    // no #al-follow). Depois esse plano é girado/tombado igual à preview.
+    const flat = document.createElement("canvas");
+    flat.width = OUTW; flat.height = OUTH;
+    const fctx = flat.getContext("2d");
+    const cover = Math.max(OUTW / Wi, OUTH / Hi);
+    const iw = Wi * cover, ih = Hi * cover;
+    fctx.drawImage(followImg, (OUTW - iw) / 2, (OUTH - ih) / 2, iw, ih);
+
+    const OCX = OUTW / 2 + this.tx * f;
+    const OCY = OUTH / 2 + this.ty * f;
+    const rz = this.rot * Math.PI / 180;
+    const rx = this.rotX * Math.PI / 180;
+    const ry = this.rotY * Math.PI / 180;
+
+    if (Math.abs(this.rotX) < 0.01 && Math.abs(this.rotY) < 0.01) {
+      // Sem tombamento: caminho 2D simples (nítido) — gira/escala/translada.
+      ctx.save();
+      ctx.translate(OCX, OCY);
+      ctx.rotate(rz);
+      ctx.scale(this.z, this.z);
+      ctx.drawImage(flat, -OUTW / 2, -OUTH / 2);
+      ctx.restore();
+    } else {
+      // Giro 3D: projeta os cantos da "caixa" (rotateZ→Y→X + perspectiva),
+      // escala e translada; depois faz o warp projetivo do plano.
+      const P = alPerspPx() * f;   // perspectiva em px de saída
+      const cz = Math.cos(rz), sz = Math.sin(rz);
+      const cyv = Math.cos(ry), syv = Math.sin(ry);
+      const cxv = Math.cos(rx), sxv = Math.sin(rx);
+      const zz = this.z;
+      const project = (p) => {
+        const lx = p[0], ly = p[1];
+        // rotateZ
+        const X1 = lx * cz - ly * sz, Y1 = lx * sz + ly * cz;
+        // rotateY (em torno de Y): usa Z1=0
+        const X2 = X1 * cyv, Z2 = -X1 * syv, Y2 = Y1;
+        // rotateX (em torno de X)
+        const Y3 = Y2 * cxv - Z2 * sxv, Z3 = Y2 * sxv + Z2 * cxv, X3 = X2;
+        // perspectiva
+        let denom = P - Z3; if (denom < P * 0.1) denom = P * 0.1;
+        const fac = P / denom;
+        return [OCX + X3 * fac * zz, OCY + Y3 * fac * zz];
+      };
+      alDrawWarp(ctx, flat, OUTW, OUTH, project, 16);
+    }
     const aligned = c.toDataURL("image/jpeg", 0.9);
 
     const s = this.session;
@@ -376,8 +508,9 @@ const Aligner = {
     await openDetail(this.session.id);
   },
 
-  // Alinhamento automático: detecta as silhuetas e empilha o acompanhamento
-  // sobre a base (gira/escala/move), fazendo o que o usuário faz manualmente.
+  // Alinhamento automático (v7.6.2): calcula DUAS transformações — por SILHUETA
+  // (primeiro plano/pele) e por CONTORNO (bordas, o mesmo do filtro neon) — e
+  // escolhe a que tem MAIS CONGRUÊNCIAS, i.e. maior sobreposição dos contornos.
   async autoAlign() {
     const btn = $("#al-auto");
     const label = btn.textContent;
@@ -389,90 +522,50 @@ const Aligner = {
       const followImg = await loadImageEl(this.followUrl);
       const aspect = (this.baseW / this.baseH) || 0.75;
       const W0 = 240, H0 = Math.max(1, Math.round(W0 / aspect));
-
-      // Se AS DUAS fotos têm zona de interesse marcada (e estamos reposicionando
-      // a foto já salva, à qual a followRoi pertence), alinha pelas ZONAS —
-      // o médico marca a mesma região nas duas e o encaixe usa exatamente ela.
-      // Caso contrário, cai no método por silhueta (pele/primeiro plano).
-      const s = this.session;
-      const roiPts = s.roi && s.roi.points, froiPts = s.followRoi && s.followRoi.points;
-      const useRoi = this.isReposition && roiPts && roiPts.length >= 3 &&
-                     froiPts && froiPts.length >= 3 && typeof roiPolygonMask === "function";
-      let bMask, fMask;
-      if (useRoi) {
-        const fW = followImg.naturalWidth || this.baseW, fH = followImg.naturalHeight || this.baseH;
-        const bm = roiPolygonMask(roiPointsToBoxNorm(roiPts, this.baseW, this.baseH, W0, H0, "cover"), W0, H0);
-        const fm = roiPolygonMask(roiPointsToBoxNorm(froiPts, fW, fH, W0, H0, "cover"), W0, H0);
-        const sum = (m) => { let a = 0; for (let i = 0; i < m.length; i++) a += m[i]; return a; };
-        bMask = { mask: bm, area: sum(bm) };
-        fMask = { mask: fm, area: sum(fm) };
-      } else {
-        bMask = alForegroundMask(alCoverRender(baseImg, W0, H0));
-        fMask = alForegroundMask(alCoverRender(followImg, W0, H0));
-      }
+      const bImgd = alCoverRender(baseImg, W0, H0);
+      const fImgd = alCoverRender(followImg, W0, H0);
       const minArea = W0 * H0 * 0.01;
-      if (bMask.area < minArea || fMask.area < minArea) {
-        alert(useRoi
-          ? "As zonas de interesse são pequenas demais para alinhar. Ajuste manualmente."
-          : "Não foi possível detectar a silhueta nas fotos. Ajuste manualmente.");
+      const cx = W0 / 2, cy = H0 / 2;
+
+      // Método A: silhueta.  Método B: contorno (bordas).
+      const bSil = alForegroundMask(bImgd), fSil = alForegroundMask(fImgd);
+      const bEdge = alEdgeMask(bImgd), fEdge = alEdgeMask(fImgd);
+
+      // Congruência COMUM p/ comparar os dois: sobreposição dos CONTORNOS
+      // (bordas dilatadas) sob a transformação. Quem tiver mais, vence.
+      const congr = (tr) => tr ? alMaskIoU(fEdge.mask, bEdge.mask, W0, H0, tr.z, tr.rot, tr.tx, tr.ty, cx, cy) : -1;
+
+      const cands = [];
+      if (bSil.area >= minArea && fSil.area >= minArea) {
+        const tr = alFitTransform(bSil.mask, fSil.mask, W0, H0);
+        if (tr) cands.push({ tr, via: "silhueta", score: congr(tr) });
+      }
+      if (bEdge.area >= minArea && fEdge.area >= minArea) {
+        const tr = alFitTransform(bEdge.mask, fEdge.mask, W0, H0);
+        if (tr) cands.push({ tr, via: "contorno", score: congr(tr) });
+      }
+      if (!cands.length) {
+        alert("Não foi possível detectar a silhueta nem o contorno nas fotos. Ajuste manualmente.");
         return;
       }
-      const B = alMoments(bMask.mask, W0, H0);
-      const F = alMoments(fMask.mask, W0, H0);
-      const cx = W0 / 2, cy = H0 / 2;
-      const z0 = Math.max(0.5, Math.min(4, B.S / F.S));
-      // Diferença de orientação dos eixos principais, normalizada p/ [-90,90].
-      // Uma foto de acompanhamento nunca está de cabeça p/ baixo em relação à
-      // base, então NÃO tentamos a inversão de 180° (que, num membro alongado e
-      // quase simétrico, teria sobreposição parecida e viraria a perna).
-      let rot0 = (B.theta - F.theta) * 180 / Math.PI;
-      rot0 = ((rot0 % 180) + 180) % 180; if (rot0 > 90) rot0 -= 180;
-      const iouAt = (z, rot, tx, ty) => alMaskIoU(fMask.mask, bMask.mask, W0, H0, z, rot, tx, ty, cx, cy);
+      cands.sort((a, b) => b.score - a.score);
+      const win = cands[0], best = win.tr;
 
-      // Estimativa inicial por momentos + varredura grossa de escala (a diferença
-      // de silhueta entre as fotos pode enviesar z0).
-      let best = null;
-      for (const zm of [0.8, 0.9, 1, 1.1, 1.22]) {
-        const z = Math.max(0.4, Math.min(5, z0 * zm));
-        const t = alSolveT(B, F, z, rot0, cx, cy);
-        const iou = iouAt(z, rot0, t.tx, t.ty);
-        if (!best || iou > best.iou) best = { z, rot: rot0, tx: t.tx, ty: t.ty, iou };
-      }
-
-      // Refino FINO: sobe o "morro" da sobreposição (IoU) ajustando as 4
-      // variáveis — zoom, rotação e as duas translações — com passos que
-      // encolhem até o encaixe travar. É o que aproxima de verdade os contornos.
-      // A rotação fica limitada a ±90° (evita a solução invertida).
-      const step = { z: 0.06, rot: 5, tx: W0 * 0.04, ty: H0 * 0.04 };
-      for (let pass = 0; pass < 60; pass++) {
-        let improved = false;
-        for (const key of ["tx", "ty", "z", "rot"]) {
-          for (const dir of [1, -1]) {
-            const cand = { z: best.z, rot: best.rot, tx: best.tx, ty: best.ty };
-            cand[key] += dir * step[key];
-            if (cand.z < 0.4 || cand.z > 5) continue;
-            if (cand.rot < -90 || cand.rot > 90) continue;
-            const iou = iouAt(cand.z, cand.rot, cand.tx, cand.ty);
-            if (iou > best.iou + 1e-4) { best = { ...cand, iou }; improved = true; }
-          }
-        }
-        if (!improved) {
-          step.z *= 0.5; step.rot *= 0.5; step.tx *= 0.5; step.ty *= 0.5;
-          if (step.rot < 0.25) break;   // passos minúsculos: convergiu
-        }
-      }
-
-      // Converte do quadro W0×H0 para os pixels do palco.
+      // Converte do quadro W0×H0 para os pixels do palco. O giro 3D fica zerado
+      // (o automático só resolve giro no plano); o médico completa em 3D se quiser.
       const rect = $("#al-stage").getBoundingClientRect();
       const fac = (rect.width || W0) / W0;
       this.z = Math.max(0.5, Math.min(4, best.z));
       this.rot = ((best.rot + 180) % 360 + 360) % 360 - 180;   // normaliza -180..180
+      this.rotX = 0; this.rotY = 0;
       this.tx = best.tx * fac;
       this.ty = best.ty * fac;
       $("#al-zoom").value = this.z;
       $("#al-rotate").value = Math.round(this.rot);
+      $("#al-rotate-x").value = 0;
+      $("#al-rotate-y").value = 0;
       this.apply();
-      if (best.iou < 0.12) {
+      if (win.score < 0.10) {
         alert("Alinhamento automático com baixa confiança — confira e ajuste se precisar.");
       }
     } catch (e) {
@@ -587,8 +680,22 @@ window.addEventListener("DOMContentLoaded", () => {
     Aligner.z = parseFloat(e.target.value);
     Aligner.apply();
   });
+  // Giro no plano (Z) e giro 3D (tombar em X e Y).
   $("#al-rotate").addEventListener("input", (e) => {
     Aligner.rot = parseFloat(e.target.value);
+    Aligner.apply();
+  });
+  $("#al-rotate-x").addEventListener("input", (e) => {
+    Aligner.rotX = parseFloat(e.target.value);
+    Aligner.apply();
+  });
+  $("#al-rotate-y").addEventListener("input", (e) => {
+    Aligner.rotY = parseFloat(e.target.value);
+    Aligner.apply();
+  });
+  $("#al-rotate-reset").addEventListener("click", () => {
+    Aligner.rot = 0; Aligner.rotX = 0; Aligner.rotY = 0;
+    $("#al-rotate").value = 0; $("#al-rotate-x").value = 0; $("#al-rotate-y").value = 0;
     Aligner.apply();
   });
   $("#al-opacity").addEventListener("input", (e) => {
@@ -602,9 +709,6 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#al-contour-base").addEventListener("change", (e) => Aligner.setBaseContour(e.target.checked));
   $("#al-contour-follow").addEventListener("change", (e) => Aligner.setFollowContour(e.target.checked));
 
-  // Card "Zonas de interesse": mostrar zona da base / do acompanhamento.
-  $("#al-roi-base").addEventListener("change", (e) => { Aligner.roiShowBase = e.target.checked; Aligner.renderRois(); });
-  $("#al-roi-follow").addEventListener("change", (e) => { Aligner.roiShowFollow = e.target.checked; Aligner.renderRois(); });
   window.addEventListener("resize", () => {
     if ($("#screen-align").classList.contains("active")) Aligner.layoutStage();
   });

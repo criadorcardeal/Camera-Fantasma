@@ -49,7 +49,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v7.6.1</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v7.6.2</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -88,7 +88,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v7.6.1</span>
+      <span class="version-badge">v7.6.2</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -102,7 +102,6 @@
     <video id="video" playsinline autoplay muted></video>
     <canvas id="cam-fx" hidden></canvas>
     <img id="ghost" class="ghost" alt="" />
-    <svg id="cam-roi" class="roi-overlay" hidden></svg>
     <canvas id="canvas" hidden></canvas>
 
     <div class="cam-top">
@@ -166,51 +165,28 @@
       <div class="al-stage" id="al-stage">
         <img id="al-follow" alt="" />
         <img id="al-ghost" class="al-ghost" alt="" />
-        <svg id="al-roi-follow" class="roi-overlay" hidden></svg>
-        <svg id="al-roi" class="roi-overlay" hidden></svg>
         <div class="al-hint">Arraste para posicionar • pince para dar zoom</div>
       </div>
       <button id="al-auto" class="btn primary al-auto">✨ Alinhamento automático</button>
       <div class="al-controls">
         <label class="al-slider"><span>Zoom</span>
           <input type="range" id="al-zoom" min="0.5" max="4" step="0.01" value="1" /></label>
-        <label class="al-slider"><span>Girar</span>
+        <label class="al-slider"><span>Girar ⟳ (Z)</span>
           <input type="range" id="al-rotate" min="-180" max="180" step="1" value="0" /></label>
+        <label class="al-slider"><span>Girar ↕ (X)</span>
+          <input type="range" id="al-rotate-x" min="-60" max="60" step="1" value="0" /></label>
+        <label class="al-slider"><span>Girar ↔ (Y)</span>
+          <input type="range" id="al-rotate-y" min="-60" max="60" step="1" value="0" /></label>
         <label class="al-slider"><span>Fantasma</span>
           <input type="range" id="al-opacity" min="0" max="1" step="0.01" value="0.5" /></label>
+        <button id="al-rotate-reset" class="al-reset">↺ Zerar giros</button>
       </div>
       <div class="al-roi-card" id="al-contour-card">
         <div class="al-roi-head">Contorno neon</div>
         <label class="roi-tog"><input type="checkbox" id="al-contour-base" /> <span>Base como contorno (verde)</span></label>
         <label class="roi-tog"><input type="checkbox" id="al-contour-follow" /> <span>Acompanhamento como contorno (ciano)</span></label>
       </div>
-      <div class="al-roi-card" id="al-roi-card" hidden>
-        <div class="al-roi-head">Zonas de interesse</div>
-        <label class="roi-tog"><input type="checkbox" id="al-roi-base" checked /> <span>Mostrar zona da base (verde)</span></label>
-        <label class="roi-tog"><input type="checkbox" id="al-roi-follow" checked /> <span>Mostrar zona do acompanhamento (ciano)</span></label>
-      </div>
       <button id="al-confirm" class="btn primary screen-confirm">Confirmar</button>
-    </div>
-  </section>
-
-  <!-- ============ TELA: ZONA DE INTERESSE (v7.5) ============ -->
-  <section id="screen-roi" class="screen">
-    <header class="topbar">
-      <button id="roi-cancel" class="icon-btn dark">‹</button>
-      <h1>Zona de interesse</h1>
-      <span class="topbar-spacer"></span>
-    </header>
-    <div class="roi-body">
-      <div class="roi-stage" id="roi-stage">
-        <img id="roi-img" alt="" />
-        <canvas id="roi-canvas"></canvas>
-      </div>
-      <p id="roi-hint" class="roi-hint">Contorne a região de interesse com o dedo.</p>
-      <div class="roi-controls">
-        <button id="roi-redo" class="btn outline" hidden>↩︎ Refazer traço</button>
-        <button id="roi-remove" class="btn outline" hidden>🗑 Remover zona</button>
-      </div>
-      <button id="roi-save" class="btn primary screen-confirm">Confirmar</button>
     </div>
   </section>
 
@@ -537,17 +513,6 @@
   </dialog>
 
   <!-- ============ DIÁLOGO: AVISO "SÓ NESTE APARELHO" ============ -->
-  <!-- ============ DIÁLOGO: INSTRUÇÕES DA ZONA DE INTERESSE (v7.5.2) ============ -->
-  <dialog id="roi-help-dialog">
-    <h3>🟢 Zona de interesse</h3>
-    <p class="od-text"><b>Contorne com o dedo</b> a região que você quer acompanhar
-      (perna, braço, mão, pé, rosto…). Esse contorno é usado para ajudar no
-      alinhamento entre a foto base e a de acompanhamento.<br><br>Toque
-      <b>Confirmar</b> para salvar, ou <b>Refazer traço</b> para desenhar de novo.</p>
-    <label class="od-check"><input type="checkbox" id="roi-help-nomore" /> Não mostrar novamente</label>
-    <menu><button id="roi-help-ok" class="primary">Entendi</button></menu>
-  </dialog>
-
   <dialog id="ondevice-dialog">
     <h3>Suas comparações ficam só neste aparelho</h3>
     <p class="od-text">As fotos e comparações são salvas <b>apenas neste dispositivo</b>. Elas
@@ -802,7 +767,6 @@
   <script src="./app.js"></script>
   <script src="./editor.js"></script>
   <script src="./align.js"></script>
-  <script src="./roi.js"></script>
   <script src="./profile.js"></script>
   <script src="./share.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
