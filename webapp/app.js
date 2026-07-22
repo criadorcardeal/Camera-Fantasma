@@ -98,6 +98,34 @@ function defaultLabel(kind) {
 const baseSrc = (s) => s.baseImageView || s.baseImage;
 const followSrc = (s) => s.followImageView || s.followImage;
 
+/* ---------------- Contorno neon (imagem fantasma) ----------------
+   Gera (uma vez) e guarda o contorno neon de cada foto, para usar como
+   fantasma na câmera de acompanhamento e na janela de posicionamento.
+   O contorno é derivado da foto atual; quando a foto muda, é descartado
+   (clearSketch) para ser regerado na próxima vez. */
+const SKETCH_META = {
+  base:   { img: "baseImage",   sk: "baseSketch",   on: "baseSketchOn",   color: () => window.NEON.base },
+  follow: { img: "followImage", sk: "followSketch", on: "followSketchOn", color: () => window.NEON.follow },
+};
+
+// Garante que o contorno neon da foto (kind) existe e o devolve (dataURL PNG).
+async function ensureSketch(s, kind) {
+  const m = SKETCH_META[kind];
+  if (!s || !s[m.img]) return null;
+  if (!s[m.sk]) {
+    s[m.sk] = await makeNeonSketch(s[m.img], { color: m.color() });
+    await DB.put(s);
+  }
+  return s[m.sk];
+}
+
+// Descarta o contorno guardado (chamado quando a foto correspondente muda).
+function clearSketch(s, kind) {
+  if (!s) return;
+  if (kind === "base" || kind === "all") delete s.baseSketch;
+  if (kind === "follow" || kind === "all") delete s.followSketch;
+}
+
 // Título do card: nome personalizado (se o usuário definiu) ou o padrão com a data.
 const defaultTitle = (s) => "Comparação de " + fmtDate(s.createdAt);
 const sessionTitle = (s) => (s.name && s.name.trim()) ? s.name.trim() : defaultTitle(s);
@@ -377,6 +405,33 @@ const Cam = {
     }
   },
 
+  // Fantasma: alterna entre a FOTO base e o CONTORNO neon (verde). Guarda a
+  // preferência na sessão para valer também na janela de posicionamento.
+  async _setGhostContour(on) {
+    const s = this.session;
+    const btn = $("#cam-contour");
+    const ghost = $("#ghost");
+    if (!s || this.mode !== "follow") { if (btn) btn.hidden = true; return; }
+    if (btn) { btn.hidden = false; btn.classList.toggle("on", !!on); }
+    if (on) {
+      if (btn) btn.textContent = "🟢 Contorno";
+      let sk = null;
+      try { sk = await ensureSketch(s, "base"); } catch (_) {}
+      // Só troca se a câmera ainda está no modo follow desta sessão.
+      if (sk && this.session === s && this.mode === "follow") ghost.src = sk;
+    } else {
+      if (btn) btn.textContent = "📷 Foto";
+      ghost.src = s.baseImage;
+    }
+    this._ghostContourOn = !!on;
+    s.baseSketchOn = !!on;
+    try { await DB.put(s); } catch (_) {}
+  },
+
+  toggleGhostContour() {
+    this._setGhostContour(!this._ghostContourOn);
+  },
+
   async open(mode, session) {
     // Tela para onde voltar se a câmera não for autorizada (ou falhar).
     this._returnScreen = (document.querySelector(".screen.active") || {}).id || "screen-home";
@@ -395,6 +450,9 @@ const Cam = {
       ghost.src = session.baseImage;
       ghost.style.display = "block";
       $("#ghost-wrap").style.display = "flex";
+      // Contorno neon como fantasma: se ligado na base, mostra o contorno (verde)
+      // por cima do vídeo. O botão 🟢 permite alternar contorno ↔ foto ao vivo.
+      this._setGhostContour(!!session.baseSketchOn);
       $("#cam-title").textContent = "Foto de acompanhamento";
       const f = session.filters || { brightness: 1, contrast: 1, saturate: 1 };
       $("#f-brightness").value = f.brightness;
@@ -408,6 +466,7 @@ const Cam = {
       ghost.style.display = "none";
       $("#cam-roi").setAttribute("hidden", "");
       $("#ghost-wrap").style.display = "none";
+      if ($("#cam-contour")) $("#cam-contour").hidden = true;   // sem fantasma no modo base
       $("#cam-title").textContent = session ? "Refazer foto base" : "Foto base";
       const f = (session && session.filters) || { brightness: 1, contrast: 1, saturate: 1 };
       $("#f-brightness").value = f.brightness;
@@ -706,6 +765,7 @@ const Cam = {
       s.baseLabel = label;
       s.filters = f;
       delete s.baseImageView;   // descarta ajuste anterior da base
+      clearSketch(s, "base");   // contorno neon será regerado da nova foto
       await DB.put(s);
       this.stop();
       await openDetail(s.id);
@@ -732,6 +792,7 @@ const Cam = {
       s.followImage = dataUrl;
       s.followLabel = label;
       s.followAt = new Date().toISOString();
+      clearSketch(s, "follow");
       await DB.put(s);
       this.stop();
       await openDetail(s.id);
@@ -810,6 +871,7 @@ async function importBasePhoto(file, session) {
     session.baseImage = dataUrl;
     session.baseLabel = res.label;
     delete session.baseImageView;
+    clearSketch(session, "base");
     await DB.put(session);
     await openDetail(session.id);
     return;
@@ -916,6 +978,12 @@ async function openDetail(id) {
   const roiLabel = (has) => has ? "🟢 Zona (definida)" : "🟢 Definir zona de interesse";
   const openCls = (id) => _detailOpenCards[id] ? " open" : "";
 
+  // Botão + prévia do contorno neon (fantasma). `on` = ligado.
+  const contourLabel = (on) => on ? "✨ Contorno neon: ligado" : "✨ Contorno neon";
+  const contourBlock = (kind, on, sketch) => `
+    <button class="btn outline card-full contour-btn${on ? " active" : ""}" id="btn-${kind}-contour">${contourLabel(on)}</button>
+    ${on && sketch ? `<div class="contour-preview"><img src="${sketch}" alt="Prévia do contorno" /></div>` : ""}`;
+
   // Card BASE (recolhível, fechado por padrão): Refazer/Importar + Zona de interesse.
   // A definição de zona fica disponível mesmo travado (só edita a ROI, não as fotos).
   const baseCard = `
@@ -927,6 +995,7 @@ async function openDetail(id) {
           <button class="btn outline" id="btn-base-import">🖼 Importar</button>
         </div>`}
         <button class="btn outline card-full" id="btn-roi">${roiLabel(!!s.roi)}</button>
+        ${contourBlock("base", !!s.baseSketchOn, s.baseSketch)}
       </div>
     </div>`;
 
@@ -940,6 +1009,7 @@ async function openDetail(id) {
           <button class="btn outline" id="btn-follow-import">🖼 Importar</button>
         </div>`}
         ${hasFollow ? `<button class="btn outline card-full" id="btn-roi-follow">${roiLabel(!!s.followRoi)}</button>` : ""}
+        ${hasFollow ? contourBlock("follow", !!s.followSketchOn, s.followSketch) : ""}
       </div>
     </div>`;
 
@@ -1001,6 +1071,8 @@ async function openDetail(id) {
     pickImage().then((file) => importFollowPhoto(s, file)));
   if ($("#btn-roi")) $("#btn-roi").addEventListener("click", () => Roi.open(s, "base"));
   if ($("#btn-roi-follow")) $("#btn-roi-follow").addEventListener("click", () => Roi.open(s, "follow"));
+  if ($("#btn-base-contour")) $("#btn-base-contour").addEventListener("click", () => toggleContour(s, "base"));
+  if ($("#btn-follow-contour")) $("#btn-follow-contour").addEventListener("click", () => toggleContour(s, "follow"));
   if ($("#btn-base-redo")) $("#btn-base-redo").addEventListener("click", () => Cam.open("base", s));
   if ($("#btn-base-import")) $("#btn-base-import").addEventListener("click", () =>
     pickImage().then((file) => importBasePhoto(file, s)));
@@ -1021,6 +1093,29 @@ async function openDetail(id) {
   if (hasFollow) $("#lbl-follow").addEventListener("input", (e) => onLabelInput("followLabel", e.target.value));
 }
 
+// Liga/desliga o contorno neon (fantasma) da foto base/acompanhamento.
+// Ao ligar, gera o contorno (se ainda não existir) e mostra a prévia no card.
+async function toggleContour(s, kind) {
+  const m = SKETCH_META[kind];
+  const btn = $("#btn-" + kind + "-contour");
+  if (!s[m.on]) {
+    // Ligar: gera o contorno (pode levar um instante).
+    if (btn) { btn.disabled = true; btn.textContent = "✨ Gerando contorno…"; }
+    try {
+      await ensureSketch(s, kind);
+    } catch (_) {
+      if (btn) { btn.disabled = false; btn.textContent = "✨ Contorno neon"; }
+      alert("Não foi possível gerar o contorno desta foto.");
+      return;
+    }
+    s[m.on] = true;
+  } else {
+    s[m.on] = false;
+  }
+  await DB.put(s);
+  await openDetail(s.id);
+}
+
 // Troca base ↔ acompanhamento (só as fotos/ajustes; rótulos e datas do rodapé ficam).
 async function swapPhotos(s) {
   if (!s || !s.followImage) return;
@@ -1030,6 +1125,9 @@ async function swapPhotos(s) {
   swap("baseAdj", "followAdj");
   swap("baseTarget", "followTarget");
   swap("roi", "followRoi");
+  // Ao inverter as fotos, os contornos guardados usam a cor errada (base=verde,
+  // acomp.=ciano): descarta p/ serem regerados na cor certa quando reativados.
+  clearSketch(s, "all");
   await DB.put(s);
   await openDetail(s.id);
 }
@@ -1378,6 +1476,7 @@ function wireEvents() {
   });
   $("#cam-shoot").addEventListener("click", () => Cam.shoot());
   $("#cam-torch").addEventListener("click", () => Cam.toggleTorch());
+  if ($("#cam-contour")) $("#cam-contour").addEventListener("click", () => Cam.toggleGhostContour());
   $("#cam-start").querySelector("button").addEventListener("click", async () => {
     $("#cam-start").hidden = true;
     try { await $("#video").play(); } catch (_) {}

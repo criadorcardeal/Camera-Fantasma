@@ -49,7 +49,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v7.6</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v7.6.1</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -88,7 +88,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v7.6</span>
+      <span class="version-badge">v7.6.1</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -108,6 +108,7 @@
     <div class="cam-top">
       <button id="cam-close" class="icon-btn">✕</button>
       <span id="cam-title">Foto base</span>
+      <button id="cam-contour" class="cam-contour-btn" title="Fantasma: contorno neon ou foto" hidden>📷 Foto</button>
       <button id="cam-torch" class="icon-btn" title="Lanterna">🔦</button>
     </div>
 
@@ -177,6 +178,11 @@
           <input type="range" id="al-rotate" min="-180" max="180" step="1" value="0" /></label>
         <label class="al-slider"><span>Fantasma</span>
           <input type="range" id="al-opacity" min="0" max="1" step="0.01" value="0.5" /></label>
+      </div>
+      <div class="al-roi-card" id="al-contour-card">
+        <div class="al-roi-head">Contorno neon</div>
+        <label class="roi-tog"><input type="checkbox" id="al-contour-base" /> <span>Base como contorno (verde)</span></label>
+        <label class="roi-tog"><input type="checkbox" id="al-contour-follow" /> <span>Acompanhamento como contorno (ciano)</span></label>
       </div>
       <div class="al-roi-card" id="al-roi-card" hidden>
         <div class="al-roi-head">Zonas de interesse</div>
@@ -792,6 +798,7 @@
   </dialog>
 
   <script src="./credits.js"></script>
+  <script src="./sketch.js"></script>
   <script src="./app.js"></script>
   <script src="./editor.js"></script>
   <script src="./align.js"></script>

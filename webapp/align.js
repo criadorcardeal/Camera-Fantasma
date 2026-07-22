@@ -227,6 +227,10 @@ const Aligner = {
     $("#al-ghost").src = session.baseImage;
     $("#al-ghost").style.opacity = 0.5;
     $("#al-follow").src = followUrl;
+    // Contornos neon (gerados sob demanda) para o fantasma da base e do acomp.
+    this._baseSketch = null;
+    this._followSketch = null;
+    this._setupContourUI();
     showScreen("screen-align");
     requestAnimationFrame(() => this.layoutStage());
     this.apply();
@@ -256,6 +260,45 @@ const Aligner = {
     const cbBase = $("#al-roi-base"), cbFol = $("#al-roi-follow");
     cbBase.disabled = !baseHas; cbBase.checked = baseHas && this.roiShowBase;
     cbFol.disabled = !followHas; cbFol.checked = followHas && this.roiShowFollow;
+  },
+
+  // Card "Contorno neon": alterna base (fantasma) e acompanhamento entre a FOTO
+  // e o CONTORNO neon. Vale só para a exibição; ao confirmar, o acompanhamento
+  // é sempre recortado da foto real (this.followUrl).
+  _setupContourUI() {
+    const cbBase = $("#al-contour-base"), cbFol = $("#al-contour-follow");
+    if (!cbBase || !cbFol) return;
+    // Defaults: herda a preferência marcada na tela de detalhe.
+    cbBase.checked = !!(this.session && this.session.baseSketchOn);
+    cbFol.checked = !!(this.session && this.session.followSketchOn);
+    if (cbBase.checked) this.setBaseContour(true);
+    if (cbFol.checked) this.setFollowContour(true);
+  },
+
+  async setBaseContour(on) {
+    const ghost = $("#al-ghost");
+    if (on) {
+      if (!this._baseSketch) {
+        try { this._baseSketch = await makeNeonSketch(this.session.baseImage, { color: window.NEON.base }); }
+        catch (_) { return; }
+      }
+      ghost.src = this._baseSketch;
+    } else {
+      ghost.src = this.session.baseImage;
+    }
+  },
+
+  async setFollowContour(on) {
+    const fol = $("#al-follow");
+    if (on) {
+      if (!this._followSketch) {
+        try { this._followSketch = await makeNeonSketch(this.followUrl, { color: window.NEON.follow }); }
+        catch (_) { return; }
+      }
+      fol.src = this._followSketch;
+    } else {
+      fol.src = this.followUrl;
+    }
   },
 
   // Zonas das DUAS fotos: base fixa (verde) + acompanhamento (ciano) que se move
@@ -324,6 +367,7 @@ const Aligner = {
     s.followImageView = null;
     s.followAdj = null;
     s.followTarget = null;
+    if (typeof clearSketch === "function") clearSketch(s, "follow");
     await DB.put(s);
     await openDetail(s.id);
   },
@@ -553,6 +597,10 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#al-cancel").addEventListener("click", () => Aligner.cancel());
   $("#al-confirm").addEventListener("click", () => Aligner.confirm());
   $("#al-auto").addEventListener("click", () => Aligner.autoAlign());
+
+  // Card "Contorno neon": base/acompanhamento como contorno neon (só exibição).
+  $("#al-contour-base").addEventListener("change", (e) => Aligner.setBaseContour(e.target.checked));
+  $("#al-contour-follow").addEventListener("change", (e) => Aligner.setFollowContour(e.target.checked));
 
   // Card "Zonas de interesse": mostrar zona da base / do acompanhamento.
   $("#al-roi-base").addEventListener("change", (e) => { Aligner.roiShowBase = e.target.checked; Aligner.renderRois(); });
