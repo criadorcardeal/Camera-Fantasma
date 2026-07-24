@@ -755,11 +755,13 @@ html, body {
 }
 
 /* ---------- Alinhar acompanhamento (v2.0) ---------- */
-.al-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px; overflow-y: auto; }
+.al-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px; overflow-y: auto; overflow-x: hidden; }
 .al-auto { margin-top: 0; }
+/* Palco full-bleed: largura/altura e margens horizontais são definidas pelo JS
+   (layoutStage) — a base ocupa toda a largura da tela (v7.10). */
 .al-stage {
-  position: relative; margin: 0 auto; overflow: hidden;
-  background: #000; border-radius: 8px; touch-action: none; user-select: none;
+  position: relative; align-self: flex-start; flex-shrink: 0; overflow: hidden;
+  background: #000; touch-action: none; user-select: none;
 }
 .al-stage img { touch-action: none; }
 #al-follow {

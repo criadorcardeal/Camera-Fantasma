@@ -597,14 +597,27 @@ const Aligner = {
   },
 
   layoutStage() {
+    // A foto BASE ocupa TODA A LARGURA da tela (rompe o padding horizontal do
+    // corpo), ficando bem maior p/ facilitar o alinhamento. O teto de altura só
+    // evita que fotos MUITO verticais estourem a tela; nesse caso a largura
+    // encolhe e a foto fica centralizada. (v7.10)
     const stage = $("#al-stage");
-    const maxW = stage.parentElement.clientWidth;
-    const maxH = window.innerHeight * 0.6;
+    const body = stage.parentElement;
+    const cs = getComputedStyle(body);
+    const padL = parseFloat(cs.paddingLeft) || 0;
+    const padR = parseFloat(cs.paddingRight) || 0;
+    const vw = document.documentElement.clientWidth || body.clientWidth;
+    const maxH = window.innerHeight * 0.82;
     const aspect = this.baseW / this.baseH;
-    let w = maxW, h = w / aspect;
+    let w = vw, h = w / aspect;
     if (h > maxH) { h = maxH; w = h * aspect; }
     stage.style.width = Math.round(w) + "px";
     stage.style.height = Math.round(h) + "px";
+    // Centraliza na tela; quando é largura total, as margens negativas cancelam
+    // o padding do corpo e a foto vai de ponta a ponta.
+    const extra = Math.max(0, (vw - w) / 2);
+    stage.style.marginLeft = Math.round(extra - padL) + "px";
+    stage.style.marginRight = Math.round(extra - padR) + "px";
   },
 
   // Card "Contorno neon": alterna base (fantasma) e acompanhamento entre a FOTO
