@@ -30,6 +30,23 @@ function alCoverRender(img, W, H) {
   return ctx.getImageData(0, 0, W, H);
 }
 
+// Desenha a imagem CABENDO INTEIRA (contain) num quadro W×H (sobras pretas) e
+// devolve os pixels. Usado para o ACOMPANHAMENTO no alinhamento automático, para
+// casar com a preview/confirmação (object-fit:contain): a foto é medida COMPLETA,
+// sem perder pedaço do membro quando as proporções das duas fotos diferem.
+// Quando as proporções batem (caso clínico comum), o resultado é idêntico ao
+// alCoverRender — a calibração do auto-align fica preservada.
+function alContainRender(img, W, H) {
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const scale = Math.min(W / iw, H / ih);
+  const dw = iw * scale, dh = ih * scale;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, iw, ih, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  return ctx.getImageData(0, 0, W, H);
+}
+
 // Detecção de PELE robusta (tons claros a castanho-escuro): combina uma regra
 // RGB (estilo Kovac) com YCrCb. Como a pele é "quente" (R>G>B, com espalhamento),
 // rejeita bem os fundos comuns nas fotos clínicas: cinza/azul do quarto, campo
@@ -668,14 +685,16 @@ const Aligner = {
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, OUTW, OUTH);
 
-    // Enquadramento COBRINDO (cover) o quadro OUTW×OUTH, num canvas plano — é o
-    // "conteúdo da caixa" antes de qualquer giro (mesmo que a preview CSS pinta
-    // no #al-follow). Depois esse plano é girado/tombado igual à preview.
+    // Enquadramento CABENDO INTEIRO (contain) no quadro OUTW×OUTH, num canvas
+    // plano — é o "conteúdo da caixa" antes de qualquer giro (igual à preview CSS
+    // do #al-follow, que usa object-fit:contain). A foto aparece COMPLETA; as
+    // sobras ficam pretas (tarjas). Depois esse plano é girado/tombado igual à
+    // preview.
     const flat = document.createElement("canvas");
     flat.width = OUTW; flat.height = OUTH;
     const fctx = flat.getContext("2d");
-    const cover = Math.max(OUTW / Wi, OUTH / Hi);
-    const iw = Wi * cover, ih = Hi * cover;
+    const fit = Math.min(OUTW / Wi, OUTH / Hi);
+    const iw = Wi * fit, ih = Hi * fit;
     fctx.drawImage(followImg, (OUTW - iw) / 2, (OUTH - ih) / 2, iw, ih);
 
     const centered = Math.abs(this.fx - 0.5) < 0.001 && Math.abs(this.fy - 0.5) < 0.001;
@@ -777,8 +796,10 @@ const Aligner = {
       const followImg = await loadImageEl(this.followUrl);
       const aspect = (this.baseW / this.baseH) || 0.75;
       const Wg = 200, Hg = Math.max(1, Math.round(Wg / aspect));
+      // Base: o quadro Wg×Hg já tem a proporção da base, então cobrir = caber.
+      // Acompanhamento: contain, casando com a preview/confirmação (completo).
       const bImgd = alCoverRender(baseImg, Wg, Hg);
-      const fImgd = alCoverRender(followImg, Wg, Hg);
+      const fImgd = alContainRender(followImg, Wg, Hg);
       // Silhueta (membro vs fundo liso) — estável entre visitas; dela sai o
       // CONTORNO do membro (traço que não muda com veias/marcas/iluminação).
       const bSil = alForegroundMask(bImgd), fSil = alForegroundMask(fImgd);
