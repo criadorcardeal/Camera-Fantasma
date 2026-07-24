@@ -326,8 +326,40 @@ function alPerspPx() {
   return Math.max(r.width || 300, r.height || 400) * 2.2;
 }
 
+// Dilata um triângulo deslocando CADA aresta PAD px para fora (offset de
+// Minkowski): os novos vértices são a interseção das arestas deslocadas. Ao
+// contrário do empurrão radial pelo centroide, isto move as TRÊS arestas para
+// fora por igual — inclusive a HIPOTENUSA compartilhada entre os dois triângulos
+// da célula, cuja costura era a "grade" diagonal remanescente.
+function alInflateTri(pts, pad) {
+  const cross = (pts[1][0] - pts[0][0]) * (pts[2][1] - pts[0][1]) -
+                (pts[1][1] - pts[0][1]) * (pts[2][0] - pts[0][0]);
+  const ccw = cross > 0;
+  const edge = (i) => {
+    const A = pts[i], B = pts[(i + 1) % 3];
+    let dx = B[0] - A[0], dy = B[1] - A[1];
+    const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+    const nx = ccw ? dy : -dy, ny = ccw ? -dx : dx;   // normal p/ fora
+    return { px: A[0] + nx * pad, py: A[1] + ny * pad, dx, dy };
+  };
+  const inter = (e1, e2) => {
+    const den = e1.dx * (-e2.dy) - e1.dy * (-e2.dx);
+    if (Math.abs(den) < 1e-9) return [e1.px, e1.py];
+    const rx = e2.px - e1.px, ry = e2.py - e1.py;
+    const t = (rx * (-e2.dy) - ry * (-e2.dx)) / den;
+    return [e1.px + t * e1.dx, e1.py + t * e1.dy];
+  };
+  const e0 = edge(0), e1 = edge(1), e2 = edge(2);
+  return [inter(e2, e0), inter(e0, e1), inter(e1, e2)];
+}
+
 // Desenha um triângulo do canvas de origem no destino (mapeamento afim +
 // recorte no triângulo destino). Usado pelo warp projetivo (giro 3D).
+// O recorte é DILATADO ~0.75px para fora (alInflateTri), de modo que triângulos
+// vizinhos se SOBREPONHAM levemente e cubram as costuras de anti-aliasing entre
+// as células — senão a malha aparece como um "quadriculado" fino na imagem.
+// A transformação afim continua vinda dos vértices ORIGINAIS: só o recorte cresce
+// (a textura extrapola um fio além da borda, exatamente sobre o vizinho correto).
 function alTexTri(ctx, img, s0, s1, s2, d0, d1, d2) {
   const [x0, y0] = s0, [x1, y1] = s1, [x2, y2] = s2;
   const [u0, v0] = d0, [u1, v1] = d1, [u2, v2] = d2;
@@ -339,9 +371,10 @@ function alTexTri(ctx, img, s0, s1, s2, d0, d1, d2) {
   const D = (v0 * (y1 - y2) - v1 * (y0 - y2) + v2 * (y0 - y1)) / den;
   const E = (x0 * (v1 - v2) - x1 * (v0 - v2) + x2 * (v0 - v1)) / den;
   const F = (x0 * (y1 * v2 - y2 * v1) - x1 * (y0 * v2 - y2 * v0) + x2 * (y0 * v1 - y1 * v0)) / den;
+  const q = alInflateTri([[u0, v0], [u1, v1], [u2, v2]], 0.75);
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(u0, v0); ctx.lineTo(u1, v1); ctx.lineTo(u2, v2); ctx.closePath();
+  ctx.moveTo(q[0][0], q[0][1]); ctx.lineTo(q[1][0], q[1][1]); ctx.lineTo(q[2][0], q[2][1]); ctx.closePath();
   ctx.clip();
   ctx.transform(A, D, Bc, E, C, F);   // (srcX,srcY) -> (destX,destY)
   ctx.drawImage(img, 0, 0);

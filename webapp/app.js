@@ -98,6 +98,13 @@ function defaultLabel(kind) {
 const baseSrc = (s) => s.baseImageView || s.baseImage;
 const followSrc = (s) => s.followImageView || s.followImage;
 
+// Fonte da MONTAGEM (comparação exibida na tela de detalhe): quando o "Contorno
+// neon" está ligado no card da Base/Acompanhamento, TROCA a foto exibida pelo
+// contorno (em vez de abrir uma prévia à parte). A miniatura da home e as
+// exportações continuam usando a foto real (baseSrc/followSrc).
+const baseMontageSrc = (s) => (s.baseSketchOn && s.baseSketch) ? s.baseSketch : baseSrc(s);
+const followMontageSrc = (s) => (s.followSketchOn && s.followSketch) ? s.followSketch : followSrc(s);
+
 /* ---------------- Contorno neon (imagem fantasma) ----------------
    Gera (uma vez) e guarda o contorno neon de cada foto, para usar como
    fantasma na câmera de acompanhamento e na janela de posicionamento.
@@ -885,7 +892,7 @@ async function openDetail(id) {
          ${segBtn("curtain", "Cortina")}${segBtn("side", "Lado a lado")}${segBtn("overlay", "Sobrepor")}
        </div>
        <div id="cmp-host"></div>`
-    : `<div class="compare-stage" id="cmp-host"><img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}</div>`;
+    : `<div class="compare-stage" id="cmp-host"><img src="${baseMontageSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}</div>`;
 
   // Depois de gerar a comparação (crédito confirmado), as fotos ficam travadas.
   const locked = s.creditState === "confirmed";
@@ -911,11 +918,11 @@ async function openDetail(id) {
 
   const openCls = (id) => _detailOpenCards[id] ? " open" : "";
 
-  // Botão + prévia do contorno neon (fantasma). `on` = ligado.
+  // Botão do contorno neon: LIGADO troca a imagem exibida na comparação (acima)
+  // pelo contorno; não abre mais uma prévia separada abaixo do botão.
   const contourLabel = (on) => on ? "✨ Contorno neon: ligado" : "✨ Contorno neon";
   const contourBlock = (kind, on, sketch) => `
-    <button class="btn outline card-full contour-btn${on ? " active" : ""}" id="btn-${kind}-contour">${contourLabel(on)}</button>
-    ${on && sketch ? `<div class="contour-preview"><img src="${sketch}" alt="Prévia do contorno" /></div>` : ""}`;
+    <button class="btn outline card-full contour-btn${on ? " active" : ""}" id="btn-${kind}-contour">${contourLabel(on)}</button>`;
 
   // Card BASE (recolhível, fechado por padrão): Refazer/Importar + Contorno neon.
   const baseCard = `
@@ -1249,7 +1256,7 @@ function refreshCompareCaptions() {
   if (!s) return;
   if (!s.followImage) {
     const host = $("#cmp-host");
-    if (host) host.innerHTML = `<img src="${baseSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}`;
+    if (host) host.innerHTML = `<img src="${baseMontageSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}`;
     requestAnimationFrame(sizeWmNames);
     return;
   }
@@ -1266,8 +1273,8 @@ function renderCompare(mode) {
   const wm = Profile.wmHtml(Profile.config(), true);
   if (mode === "side") {
     host.innerHTML = `<div class="side-by-side">
-        <div class="side-cell"><img src="${baseSrc(s)}" />${capHtml(s.baseLabel, "cap-center", show)}${wm}</div>
-        <div class="side-cell"><img src="${followSrc(s)}" />${capHtml(s.followLabel, "cap-center", show)}${wm}</div>
+        <div class="side-cell"><img src="${baseMontageSrc(s)}" />${capHtml(s.baseLabel, "cap-center", show)}${wm}</div>
+        <div class="side-cell"><img src="${followMontageSrc(s)}" />${capHtml(s.followLabel, "cap-center", show)}${wm}</div>
       </div>`;
     requestAnimationFrame(sizeWmNames);
     return;
@@ -1275,8 +1282,8 @@ function renderCompare(mode) {
   if (mode === "overlay") {
     host.innerHTML = `
       <div class="compare-stage">
-        <img src="${baseSrc(s)}" />
-        <img src="${followSrc(s)}" id="ov-after" style="opacity:0.5" />
+        <img src="${baseMontageSrc(s)}" />
+        <img src="${followMontageSrc(s)}" id="ov-after" style="opacity:0.5" />
         ${capB}${capF}${wm}
       </div>
       <div class="seg" style="margin-top:8px;background:transparent;padding:0">
@@ -1303,8 +1310,8 @@ function renderCompare(mode) {
   // (igual ao Sobrepor). Sobre a foto fica só uma linha fina indicando o corte.
   host.innerHTML = `
     <div class="compare-stage" id="curtain">
-      <img src="${baseSrc(s)}" />
-      <div class="after-clip" style="position:absolute;inset:0;width:50%"><img src="${followSrc(s)}" style="width:200%;max-width:none" id="cur-after"/></div>
+      <img src="${baseMontageSrc(s)}" />
+      <div class="after-clip" style="position:absolute;inset:0;width:50%"><img src="${followMontageSrc(s)}" style="width:200%;max-width:none" id="cur-after"/></div>
       <div class="curtain-line" id="cur-line" style="left:50%"></div>
       ${capB}${capF}${wm}
     </div>

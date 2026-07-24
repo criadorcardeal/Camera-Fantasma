@@ -646,7 +646,7 @@ html, body {
   pointer-events: none; transform: translateX(-1px);
 }
 .side-by-side { display: flex; gap: 3px; }
-.side-by-side img { position: relative; width: 50%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; }
+.side-by-side img { position: relative; width: 50%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; background: #000; }
 
 .info-block { background: var(--card); border-radius: 12px; padding: 6px 12px; margin-top: 12px; }
 .info-block .row { display: flex; padding: 4px 0; font-size: 0.82rem; }
