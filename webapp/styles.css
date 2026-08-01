@@ -122,6 +122,35 @@ html, body {
 
 .content { flex: 1; overflow-y: auto; padding: 12px; padding-bottom: 96px; }
 
+/* ---------- Telas com foto: foto FIXA + controles rolantes + botão flutuante (v8.2) ----------
+   A área da foto fica fixa no topo (não rola); os controles e as seções rolam
+   abaixo, e o botão de ação (Confirmar/Comparar) flutua na metade inferior direita. */
+.photo-fixed {
+  flex: 0 0 auto;
+  padding: 10px 12px 4px;
+  display: flex; flex-direction: column; align-items: center;
+  background: var(--bg);
+}
+.photo-fixed .compare-stage { max-height: 56dvh; }
+.photo-fixed .side-by-side img { max-height: 56dvh; }
+.scroll-area {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  padding: 12px; padding-bottom: 108px;
+}
+.scroll-area > * + * { margin-top: 12px; }
+/* Botão flutuante de ação (Confirmar / Comparar): sempre à frente, canto inferior direito. */
+.fab-confirm {
+  position: fixed; z-index: 60;
+  right: max(env(safe-area-inset-right, 0px), 16px);
+  bottom: max(env(safe-area-inset-bottom, 0px), 18px);
+  padding: 14px 26px; border-radius: 30px;
+  background: var(--primary); color: #fff; border: none;
+  font-size: 1rem; font-weight: 700; cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.32);
+}
+.fab-confirm:disabled { opacity: 0.6; }
+.fab-confirm:active { transform: translateY(1px); }
+
 /* ---------- Barra de créditos (v3.3) ---------- */
 .credits-bar {
   display: flex; align-items: center; justify-content: space-between;
@@ -503,6 +532,7 @@ html, body {
   left: 0; right: 0;
   display: flex; justify-content: center; gap: 10px;
   padding: 0 16px;
+  z-index: 40;   /* sempre à frente dos cards (v8.2) */
 }
 .fab {
   background: var(--primary);
@@ -621,6 +651,9 @@ html, body {
 }
 
 /* ---------- Detail / comparison ---------- */
+/* v8.2: a Montagem também tem a foto FIXA no topo e os cards rolando abaixo. */
+#detail-content { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: 0; }
+#cmp-host { width: 100%; }
 .seg {
   display: flex; gap: 4px; margin-bottom: 12px;
   background: #e3e8eb; border-radius: 10px; padding: 4px;
@@ -759,12 +792,13 @@ html, body {
 }
 
 /* ---------- Alinhar acompanhamento (v2.0) ---------- */
-.al-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px; overflow-y: auto; overflow-x: hidden; }
+/* v8.2: corpo não rola — a foto fica fixa (.photo-fixed) e os controles rolam (.scroll-area). */
+.al-body { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .al-auto { margin-top: 0; }
 /* Palco full-bleed: largura/altura e margens horizontais são definidas pelo JS
    (layoutStage) — a base ocupa toda a largura da tela (v7.10). */
 .al-stage {
-  position: relative; align-self: flex-start; flex-shrink: 0; overflow: hidden;
+  position: relative; align-self: center; flex-shrink: 0; overflow: hidden;
   background: #000; touch-action: none; user-select: none;
 }
 .al-stage img { touch-action: none; }
@@ -833,10 +867,10 @@ html, body {
 }
 
 /* ---------- Remover distrações (v8.1) ---------- */
-.ds-body { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px; overflow-y: auto; overflow-x: hidden; }
+.ds-body { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 /* Palco full-bleed: largura/altura e margens definidas pelo JS (Distract._layout). */
 .ds-stage {
-  position: relative; align-self: flex-start; flex-shrink: 0; overflow: hidden;
+  position: relative; align-self: center; flex-shrink: 0; overflow: hidden;
   background: #000; touch-action: none; user-select: none;
 }
 .ds-photo, .ds-mask {
@@ -894,7 +928,9 @@ html, body {
 .roi-controls .btn { margin-top: 0; flex: 1; min-width: 140px; }
 
 /* ---------- Editor de imagens (v2.0) ---------- */
-.ed-content { padding-bottom: 32px; }
+/* v8.2: editor com previews fixas no topo e sliders rolando abaixo. */
+.ed-content { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: 0; }
+.ed-content .ed-previews { width: 100%; margin: 0; }
 /* Botões do editor: brancos por padrão; azul só quando clicados/selecionados. */
 .ed-content .btn.outline.active,
 .ed-content .btn.outline:active { background: var(--primary); color: #fff; border-color: var(--primary); }

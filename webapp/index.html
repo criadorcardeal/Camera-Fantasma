@@ -49,7 +49,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v8.1</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v8.2</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -88,7 +88,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v8.1</span>
+      <span class="version-badge">v8.2</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -165,38 +165,47 @@
       <span class="topbar-spacer"></span>
     </header>
     <div class="al-body">
-      <div class="al-stage" id="al-stage">
-        <img id="al-follow" alt="" />
-        <img id="al-ghost" class="al-ghost" alt="" />
-        <div id="al-fulcrum" class="al-fulcrum" hidden></div>
-        <div id="al-roidraw" class="al-roidraw" hidden><div id="al-roirect" class="al-roirect" hidden></div></div>
-        <div id="al-fulcrum-hint" class="al-modehint" hidden>Toque para posicionar o eixo de giro (fulcro)</div>
-        <div id="al-roi-hint" class="al-modehint" hidden>Arraste sobre a região a comparar — inclua a <b>borda do membro</b> e um ponto fixo (ex.: o joelho)</div>
-        <div class="al-hint">Arraste para posicionar • pince para dar zoom</div>
-      </div>
-      <button id="al-auto" class="btn primary al-auto">✨ Alinhamento automático</button>
-      <div class="al-controls">
-        <label class="al-slider"><span>Zoom</span>
-          <input type="range" id="al-zoom" min="0.5" max="4" step="0.01" value="1" /></label>
-        <label class="al-slider"><span>Girar ⟳ (Z)</span>
-          <input type="range" id="al-rotate" min="-180" max="180" step="1" value="0" /></label>
-        <label class="al-slider"><span>Girar ↕ (X)</span>
-          <input type="range" id="al-rotate-x" min="-60" max="60" step="1" value="0" /></label>
-        <label class="al-slider"><span>Girar ↔ (Y)</span>
-          <input type="range" id="al-rotate-y" min="-60" max="60" step="1" value="0" /></label>
-        <label class="al-slider"><span>Fantasma</span>
-          <input type="range" id="al-opacity" min="0" max="1" step="0.01" value="0.5" /></label>
-        <div class="al-btn-row">
-          <button id="al-rotate-reset" class="al-reset">↺ Zerar giros</button>
-          <button id="al-fulcrum-btn" class="al-reset">✜ Reposicionar fulcro</button>
+      <div class="photo-fixed">
+        <div class="al-stage" id="al-stage">
+          <img id="al-follow" alt="" />
+          <img id="al-ghost" class="al-ghost" alt="" />
+          <div id="al-fulcrum" class="al-fulcrum" hidden></div>
+          <div id="al-roidraw" class="al-roidraw" hidden><div id="al-roirect" class="al-roirect" hidden></div></div>
+          <div id="al-fulcrum-hint" class="al-modehint" hidden>Toque para posicionar o eixo de giro (fulcro)</div>
+          <div id="al-roi-hint" class="al-modehint" hidden>Arraste sobre a região a comparar — inclua a <b>borda do membro</b> e um ponto fixo (ex.: o joelho)</div>
+          <div class="al-hint">Arraste para posicionar • pince para dar zoom</div>
         </div>
       </div>
-      <div class="al-roi-card" id="al-contour-card">
-        <div class="al-roi-head">Contorno neon</div>
-        <label class="roi-tog"><input type="checkbox" id="al-contour-base" /> <span>Base como contorno (verde)</span></label>
-        <label class="roi-tog"><input type="checkbox" id="al-contour-follow" /> <span>Acompanhamento como contorno (ciano)</span></label>
+      <div class="scroll-area">
+        <button id="al-auto" class="btn primary al-auto">✨ Alinhamento automático</button>
+        <div class="al-controls">
+          <label class="al-slider"><span>Zoom</span>
+            <input type="range" id="al-zoom" min="0.5" max="4" step="0.01" value="1" /></label>
+          <label class="al-slider"><span>Girar ⟳ (Z)</span>
+            <input type="range" id="al-rotate" min="-180" max="180" step="1" value="0" /></label>
+          <label class="al-slider"><span>Girar ↕ (X)</span>
+            <input type="range" id="al-rotate-x" min="-60" max="60" step="1" value="0" /></label>
+          <label class="al-slider"><span>Girar ↔ (Y)</span>
+            <input type="range" id="al-rotate-y" min="-60" max="60" step="1" value="0" /></label>
+          <label class="al-slider"><span>Fantasma</span>
+            <input type="range" id="al-opacity" min="0" max="1" step="0.01" value="0.5" /></label>
+          <div class="al-btn-row">
+            <button id="al-rotate-reset" class="al-reset">↺ Zerar giros</button>
+            <button id="al-fulcrum-btn" class="al-reset">✜ Reposicionar fulcro</button>
+          </div>
+        </div>
+        <div class="al-roi-card" id="al-contour-card">
+          <div class="al-roi-head">Contorno neon</div>
+          <label class="roi-tog"><input type="checkbox" id="al-contour-base" /> <span>Base como contorno (verde)</span></label>
+          <label class="roi-tog"><input type="checkbox" id="al-contour-follow" /> <span>Acompanhamento como contorno (ciano)</span></label>
+        </div>
+        <div class="al-roi-card" id="al-distract-card">
+          <div class="al-roi-head">Distrações removidas</div>
+          <label class="roi-tog"><input type="checkbox" id="al-distract-base" /> <span>Base sem distrações</span></label>
+          <label class="roi-tog"><input type="checkbox" id="al-distract-follow" /> <span>Acompanhamento sem distrações</span></label>
+        </div>
       </div>
-      <button id="al-confirm" class="btn primary screen-confirm">Confirmar</button>
+      <button id="al-confirm" class="fab-confirm">Confirmar</button>
     </div>
   </section>
 
@@ -208,22 +217,26 @@
       <span class="topbar-spacer"></span>
     </header>
     <div class="ds-body">
-      <div class="ds-stage" id="ds-stage">
-        <canvas id="ds-photo" class="ds-photo"></canvas>
-        <canvas id="ds-mask" class="ds-mask"></canvas>
+      <div class="photo-fixed">
+        <div class="ds-stage" id="ds-stage">
+          <canvas id="ds-photo" class="ds-photo"></canvas>
+          <canvas id="ds-mask" class="ds-mask"></canvas>
+        </div>
       </div>
-      <p class="ds-hint">Pinte com o dedo sobre o que quer <b>tirar de foco</b>
-        (marcas de caneta, veias novas, objetos, mão). Essas áreas ficam
-        desfocadas e são <b>ignoradas</b> no alinhamento e no contorno neon.</p>
-      <div class="al-controls">
-        <label class="al-slider"><span>Pincel</span>
-          <input type="range" id="ds-brush" min="12" max="120" step="1" value="48" /></label>
+      <div class="scroll-area">
+        <p class="ds-hint">Pinte com o dedo sobre o que quer <b>tirar de foco</b>
+          (marcas de caneta, veias novas, objetos, mão). Essas áreas ficam
+          desfocadas e são <b>ignoradas</b> no alinhamento e no contorno neon.</p>
+        <div class="al-controls">
+          <label class="al-slider"><span>Pincel</span>
+            <input type="range" id="ds-brush" min="12" max="120" step="1" value="48" /></label>
+        </div>
+        <div class="al-btn-row">
+          <button id="ds-cancel2" class="al-reset">Cancelar</button>
+          <button id="ds-clear" class="al-reset">↺ Zerar ajustes</button>
+        </div>
       </div>
-      <div class="al-btn-row">
-        <button id="ds-cancel2" class="al-reset">Cancelar</button>
-        <button id="ds-clear" class="al-reset">↺ Zerar ajustes</button>
-      </div>
-      <button id="ds-confirm" class="btn primary screen-confirm">Confirmar</button>
+      <button id="ds-confirm" class="fab-confirm">Confirmar</button>
     </div>
   </section>
 
@@ -234,32 +247,36 @@
       <h1>Colorações e Exposição</h1>
       <span class="topbar-spacer"></span>
     </header>
-    <div class="content ed-content">
-      <div class="ed-previews">
-        <figure><canvas id="ed-canvas-base"></canvas><figcaption>Base</figcaption></figure>
-        <figure><canvas id="ed-canvas-follow"></canvas><figcaption>Acompanhamento</figcaption></figure>
-      </div>
-      <div class="ed-auto-row">
-        <button id="ed-auto-rel" class="btn outline">Ajuste Relativo</button>
-        <button id="ed-auto-abs" class="btn outline">Ajuste Absoluto</button>
-      </div>
-      <div class="ed-reset-row">
-        <button id="ed-reset" class="btn outline">Zerar ajustes</button>
-        <label class="ed-lock ed-lock-inline">
-          <input type="checkbox" id="ed-lock-toggle" />
-          <span>Travar as 2 imagens</span>
-        </label>
-      </div>
-      <p class="ed-auto-hint">Absoluto: mesmos valores nas duas fotos. Relativo: ajustes (±) próprios de cada foto. Travar: mexer numa altera a outra igual.</p>
-      <div class="ed-which-row" id="ed-which-row">
-        <span>Editando:</span>
-        <div class="seg ed-seg" id="ed-which">
-          <button data-img="base" class="active">Base</button>
-          <button data-img="follow">Acompanhamento</button>
+    <div class="ed-content">
+      <div class="photo-fixed">
+        <div class="ed-previews">
+          <figure><canvas id="ed-canvas-base"></canvas><figcaption>Base</figcaption></figure>
+          <figure><canvas id="ed-canvas-follow"></canvas><figcaption>Acompanhamento</figcaption></figure>
         </div>
       </div>
-      <div id="ed-sliders"></div>
-      <button id="ed-save" class="btn primary screen-confirm">Confirmar</button>
+      <div class="scroll-area">
+        <div class="ed-auto-row">
+          <button id="ed-auto-rel" class="btn outline">Ajuste Relativo</button>
+          <button id="ed-auto-abs" class="btn outline">Ajuste Absoluto</button>
+        </div>
+        <div class="ed-reset-row">
+          <button id="ed-reset" class="btn outline">Zerar ajustes</button>
+          <label class="ed-lock ed-lock-inline">
+            <input type="checkbox" id="ed-lock-toggle" />
+            <span>Travar as 2 imagens</span>
+          </label>
+        </div>
+        <p class="ed-auto-hint">Absoluto: mesmos valores nas duas fotos. Relativo: ajustes (±) próprios de cada foto. Travar: mexer numa altera a outra igual.</p>
+        <div class="ed-which-row" id="ed-which-row">
+          <span>Editando:</span>
+          <div class="seg ed-seg" id="ed-which">
+            <button data-img="base" class="active">Base</button>
+            <button data-img="follow">Acompanhamento</button>
+          </div>
+        </div>
+        <div id="ed-sliders"></div>
+      </div>
+      <button id="ed-save" class="fab-confirm">Confirmar</button>
     </div>
   </section>
 

@@ -181,6 +181,25 @@ function showScreen(id) {
   $("#" + id).classList.add("active");
 }
 
+// v8.2: dimensiona um palco de foto DENTRO da área fixa (.photo-fixed), no
+// aspecto da imagem e com teto de altura — assim todas as telas mostram a foto
+// no mesmo formato fixo da Montagem (sem rolagem). Centraliza com margem auto.
+function fitStageEl(stage, aspect) {
+  const box = stage.parentElement;   // .photo-fixed
+  const boxW = (box && box.clientWidth) || document.documentElement.clientWidth || 320;
+  const availW = Math.max(1, boxW - 24);          // padding lateral do .photo-fixed
+  const capH = Math.round((window.innerHeight || 640) * 0.56);
+  if (!aspect || !isFinite(aspect) || aspect <= 0) aspect = 0.75;
+  let w = availW, h = w / aspect;
+  if (h > capH) { h = capH; w = h * aspect; }
+  if (w > availW) { w = availW; h = w / aspect; }
+  stage.style.width = Math.round(w) + "px";
+  stage.style.height = Math.round(h) + "px";
+  stage.style.marginLeft = "auto";
+  stage.style.marginRight = "auto";
+}
+window.fitStageEl = fitStageEl;
+
 /* ---------------- Tela inicial ---------------- */
 async function renderHome() {
   const list = await DB.getAll();
@@ -897,12 +916,15 @@ async function openDetail(id) {
   const mode0 = MODES.includes(s.compareMode) ? s.compareMode : "curtain";
   const segBtn = (m, label) => `<button data-mode="${m}"${m === mode0 ? ' class="active"' : ""}>${label}</button>`;
 
-  const compareHtml = hasFollow
-    ? `<div class="seg" id="cmp-seg">
-         ${segBtn("curtain", "Cortina")}${segBtn("side", "Lado a lado")}${segBtn("overlay", "Sobrepor")}
-       </div>
-       <div id="cmp-host"></div>`
+  // v8.2: a foto (#cmp-host) fica na área FIXA do topo; o seletor de modo
+  // (Cortina/Lado a lado/Sobrepor) vai ABAIXO da foto, junto dos controles que
+  // rolam. O botão "Comparar" passa a flutuar (fab-confirm).
+  const stageHtml = hasFollow
+    ? `<div id="cmp-host"></div>`
     : `<div class="compare-stage" id="cmp-host"><img src="${baseMontageSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}</div>`;
+  const segHtml = hasFollow
+    ? `<div class="seg" id="cmp-seg">${segBtn("curtain", "Cortina")}${segBtn("side", "Lado a lado")}${segBtn("overlay", "Sobrepor")}</div>`
+    : "";
 
   // Depois de gerar a comparação (crédito confirmado), as fotos ficam travadas.
   const locked = s.creditState === "confirmed";
@@ -981,11 +1003,16 @@ async function openDetail(id) {
     ? `<p class="lock-note">🔒 Comparação concluída — as fotos não podem mais ser alteradas.</p>`
     : "";
 
-  // Botão Comparar (largura total).
+  // Botão Comparar FLUTUANTE (metade inferior direita, sempre à frente).
   const secondRow = hasFollow
-    ? `<button class="btn primary" id="btn-share" style="margin-top:12px">🔀 Comparar</button>` : "";
+    ? `<button class="fab-confirm" id="btn-share">🔀 Comparar</button>` : "";
 
-  c.innerHTML = compareHtml + labelHtml + lockNote + baseCard + acCard + fineCard + secondRow;
+  // v8.2: foto FIXA no topo (.photo-fixed); modo + cards rolam (.scroll-area);
+  // botão Comparar flutua fora do fluxo.
+  c.innerHTML =
+    `<div class="photo-fixed">${stageHtml}</div>` +
+    `<div class="scroll-area">${segHtml + labelHtml + lockNote + baseCard + acCard + fineCard}</div>` +
+    secondRow;
 
   // Ativa a tela ANTES de montar a comparação, para o palco já ter largura
   // (a cortina depende de clientWidth para dimensionar a foto de acompanhamento).

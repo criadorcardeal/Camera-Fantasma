@@ -555,6 +555,24 @@ async function alLoadMaskFrame(maskUrl, W, H) {
   return m;
 }
 
+// Como alLoadMaskFrame, mas CONTÉM a máscara (preserva o aspecto dela) no quadro
+// W×H — usado quando a máscara está sobre a foto ORIGINAL (aspecto próprio) e o
+// quadro do alinhamento tem outro aspecto (a foto entra "contida"/letterboxed).
+async function alContainMaskFrame(maskUrl, W, H) {
+  const img = await loadImageEl(maskUrl);
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.clearRect(0, 0, W, H);
+  const fit = Math.min(W / iw, H / ih), dw = iw * fit, dh = ih * fit;
+  ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  const d = ctx.getImageData(0, 0, W, H).data;
+  const m = new Uint8Array(W * H);
+  for (let p = 0, i = 0; p < W * H; p++, i += 4) m[p] = d[i + 3] > 40 ? 1 : 0;
+  return m;
+}
+
 // Zera na máscara de feições (mask) os pixels marcados como distração (ex).
 function alApplyExclude(mask, ex) {
   if (!ex) return;
@@ -567,9 +585,12 @@ function alApplyExclude(mask, ex) {
 // pela transformação salva (followAlign) até a posição alinhada e amostramos lá.
 async function alFollowExclude(session, W, H) {
   if (!session || !session.followMask) return null;
-  const aligned = await alLoadMaskFrame(session.followMask, W, H);
   const a = session.followAlign;
-  if (!a) return aligned;   // sem alinhamento salvo: mesma geometria
+  // Sem alinhamento salvo, a máscara está sobre a foto ORIGINAL (aspecto próprio):
+  // entra CONTIDA no quadro, igual à foto (alContainRender). Com alinhamento, a
+  // máscara está sobre a foto ALINHADA (aspecto da base = aspecto do quadro).
+  if (!a) return await alContainMaskFrame(session.followMask, W, H);
+  const aligned = await alLoadMaskFrame(session.followMask, W, H);
   const P = 2.2 * Math.max(W, H);
   const proj = alMakeProject({
     z: a.z, txp: (a.txn || 0) * W, typ: (a.tyn || 0) * H,
@@ -631,10 +652,14 @@ const Aligner = {
     $("#al-ghost").src = session.baseImage;
     $("#al-ghost").style.opacity = 0.5;
     $("#al-follow").src = followUrl;
-    // Contornos neon (gerados sob demanda) para o fantasma da base e do acomp.
+    // Contornos neon e desfoques (gerados sob demanda) da base e do acomp.
     this._baseSketch = null;
     this._followSketch = null;
-    this._setupContourUI();
+    this._baseDefocus = null;
+    this._followDefocus = null;
+    this._folOrigDone = false;
+    this._folOrigMask = null;
+    this._setupViewToggles();
     showScreen("screen-align");
     requestAnimationFrame(() => {
       this.layoutStage();
@@ -648,63 +673,114 @@ const Aligner = {
   },
 
   layoutStage() {
-    // A foto BASE ocupa TODA A LARGURA da tela (rompe o padding horizontal do
-    // corpo), ficando bem maior p/ facilitar o alinhamento. O teto de altura só
-    // evita que fotos MUITO verticais estourem a tela; nesse caso a largura
-    // encolhe e a foto fica centralizada. (v7.10)
-    const stage = $("#al-stage");
-    const body = stage.parentElement;
-    const cs = getComputedStyle(body);
-    const padL = parseFloat(cs.paddingLeft) || 0;
-    const padR = parseFloat(cs.paddingRight) || 0;
-    const vw = document.documentElement.clientWidth || body.clientWidth;
-    const maxH = window.innerHeight * 0.82;
-    const aspect = this.baseW / this.baseH;
-    let w = vw, h = w / aspect;
-    if (h > maxH) { h = maxH; w = h * aspect; }
-    stage.style.width = Math.round(w) + "px";
-    stage.style.height = Math.round(h) + "px";
-    // Centraliza na tela; quando é largura total, as margens negativas cancelam
-    // o padding do corpo e a foto vai de ponta a ponta.
-    const extra = Math.max(0, (vw - w) / 2);
-    stage.style.marginLeft = Math.round(extra - padL) + "px";
-    stage.style.marginRight = Math.round(extra - padR) + "px";
+    // v8.2: a foto fica FIXA no topo (área .photo-fixed), no aspecto da base e
+    // com o mesmo teto das demais telas (fitStageEl) — sem rolagem e centralizada.
+    fitStageEl($("#al-stage"), this.baseW / this.baseH);
   },
 
-  // Card "Contorno neon": alterna base (fantasma) e acompanhamento entre a FOTO
-  // e o CONTORNO neon. Vale só para a exibição; ao confirmar, o acompanhamento
-  // é sempre recortado da foto real (this.followUrl).
-  _setupContourUI() {
-    const cbBase = $("#al-contour-base"), cbFol = $("#al-contour-follow");
-    if (!cbBase || !cbFol) return;
-    // Defaults: herda a preferência marcada na tela de detalhe.
-    cbBase.checked = !!(this.session && this.session.baseSketchOn);
-    cbFol.checked = !!(this.session && this.session.followSketchOn);
-    if (cbBase.checked) this.setBaseContour(true);
-    if (cbFol.checked) this.setFollowContour(true);
+  // Cards "Contorno neon" e "Distrações removidas": herdam o estado marcado na
+  // Montagem (v8.2). A base (fantasma) e o acompanhamento são exibidos conforme
+  // as marcações. Vale só para a EXIBIÇÃO; ao confirmar, o acompanhamento é
+  // sempre recortado da foto real (this.followUrl).
+  _setupViewToggles() {
+    const cbCB = $("#al-contour-base"), cbCF = $("#al-contour-follow");
+    const cbDB = $("#al-distract-base"), cbDF = $("#al-distract-follow");
+    const hasBM = !!(this.session && this.session.baseMask);
+    const hasFM = !!(this.session && this.session.followMask);
+    const bSk = !!(this.session && this.session.baseSketchOn);
+    const fSk = !!(this.session && this.session.followSketchOn);
+    if (cbCB) cbCB.checked = bSk;
+    if (cbCF) cbCF.checked = fSk;
+    // Espelha a Montagem: com contorno LIGADO mostra o contorno (que já exclui as
+    // distrações); senão, com máscara, mostra a foto desfocada. Desabilita a
+    // opção de distração quando não há nada a remover naquele lado.
+    if (cbDB) { cbDB.checked = hasBM && !bSk; cbDB.disabled = !hasBM; cbDB.closest(".roi-tog").style.opacity = hasBM ? "" : "0.45"; }
+    if (cbDF) { cbDF.checked = hasFM && !fSk; cbDF.disabled = !hasFM; cbDF.closest(".roi-tog").style.opacity = hasFM ? "" : "0.45"; }
+    // Esconde o card de distrações se não há máscara em nenhum lado.
+    const dcard = $("#al-distract-card"); if (dcard) dcard.hidden = !(hasBM || hasFM);
+    this.refreshBaseView();
+    this.refreshFollowView();
   },
 
-  async setBaseContour(on) {
+  // Máscara de distrações do ACOMPANHAMENTO no espaço da foto ORIGINAL (a que é
+  // posicionada aqui). A máscara guardada é sobre a foto ALINHADA; mapeia-se de
+  // volta pela transformação salva (followAlign). Sem alinhamento salvo, a
+  // máscara já está sobre a original (1:1). Resultado em cache.
+  async _followOrigMaskUrl() {
+    if (this._folOrigDone) return this._folOrigMask;
+    this._folOrigDone = true;
+    this._folOrigMask = null;
+    const md = this.session && this.session.followMask;
+    if (!md) return null;
+    const a = this.session.followAlign;
+    if (!a) { this._folOrigMask = md; return md; }   // já está sobre a original
+    const FW = 260, FH = Math.max(1, Math.round(FW * (this.baseH / this.baseW)));
+    const am = await alLoadMaskFrame(md, FW, FH);     // máscara alinhada, quadro base
+    const OW = 260, OH = Math.max(1, Math.round(OW * (this.followH / this.followW)));
+    const oc = document.createElement("canvas"); oc.width = OW; oc.height = OH;
+    const octx = oc.getContext("2d");
+    const proj = alMakeProject({
+      z: a.z, txp: (a.txn || 0) * FW, typ: (a.tyn || 0) * FH,
+      rot: a.rot || 0, rotX: a.rotX || 0, rotY: a.rotY || 0,
+      fx: a.fx == null ? 0.5 : a.fx, fy: a.fy == null ? 0.5 : a.fy,
+    }, FW, FH, 2.2 * Math.max(FW, FH));
+    const fit = Math.min(FW / OW, FH / OH), iw = OW * fit, ih = OH * fit;
+    const offX = (FW - iw) / 2, offY = (FH - ih) / 2;
+    octx.fillStyle = "#fff";
+    for (let oy = 0; oy < OH; oy++) for (let ox = 0; ox < OW; ox++) {
+      const d = proj([offX + ox * fit - FW / 2, offY + oy * fit - FH / 2]);
+      const ax = Math.round(d[0]), ay = Math.round(d[1]);
+      if (ax >= 0 && ay >= 0 && ax < FW && ay < FH && am[ay * FW + ax]) octx.fillRect(ox, oy, 1, 1);
+    }
+    this._folOrigMask = oc.toDataURL("image/png");
+    return this._folOrigMask;
+  },
+
+  // Exibe a BASE (fantasma): contorno neon (excluindo distrações) > foto
+  // desfocada (se distrações ligadas) > foto crua.
+  async refreshBaseView() {
     const ghost = $("#al-ghost");
-    if (on) {
+    if (!ghost) return;
+    const contour = $("#al-contour-base") && $("#al-contour-base").checked;
+    const distract = $("#al-distract-base") && $("#al-distract-base").checked;
+    if (contour) {
       if (!this._baseSketch) {
-        try { this._baseSketch = await makeNeonSketch(this.session.baseImage, { color: window.NEON.base }); }
-        catch (_) { return; }
+        try { this._baseSketch = await makeNeonSketch(this.session.baseImage, { color: window.NEON.base, excludeMask: this.session.baseMask }); }
+        catch (_) { ghost.src = this.session.baseImage; return; }
       }
       ghost.src = this._baseSketch;
+    } else if (distract && this.session.baseMask) {
+      if (!this._baseDefocus) {
+        try { this._baseDefocus = await applyDefocus(baseSrcRaw(this.session), this.session.baseMask); }
+        catch (_) { ghost.src = this.session.baseImage; return; }
+      }
+      ghost.src = this._baseDefocus;
     } else {
       ghost.src = this.session.baseImage;
     }
   },
 
-  async setFollowContour(on) {
+  // Exibe o ACOMPANHAMENTO: contorno neon (excluindo distrações) > foto
+  // desfocada > foto crua. Tudo derivado da foto ORIGINAL (this.followUrl).
+  async refreshFollowView() {
     const fol = $("#al-follow");
-    if (on) {
+    if (!fol) return;
+    const contour = $("#al-contour-follow") && $("#al-contour-follow").checked;
+    const distract = $("#al-distract-follow") && $("#al-distract-follow").checked;
+    if (contour) {
       if (!this._followSketch) {
-        try { this._followSketch = await makeNeonSketch(this.followUrl, { color: window.NEON.follow }); }
-        catch (_) { return; }
+        const em = await this._followOrigMaskUrl();
+        try { this._followSketch = await makeNeonSketch(this.followUrl, { color: window.NEON.follow, excludeMask: em }); }
+        catch (_) { fol.src = this.followUrl; return; }
       }
       fol.src = this._followSketch;
+    } else if (distract && this.session.followMask) {
+      if (!this._followDefocus) {
+        const em = await this._followOrigMaskUrl();
+        try { this._followDefocus = em ? await applyDefocus(this.followUrl, em) : this.followUrl; }
+        catch (_) { fol.src = this.followUrl; return; }
+      }
+      fol.src = this._followDefocus;
     } else {
       fol.src = this.followUrl;
     }
@@ -1166,9 +1242,14 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#al-confirm").addEventListener("click", () => Aligner.confirm());
   $("#al-auto").addEventListener("click", () => Aligner.startAuto());
 
-  // Card "Contorno neon": base/acompanhamento como contorno neon (só exibição).
-  $("#al-contour-base").addEventListener("change", (e) => Aligner.setBaseContour(e.target.checked));
-  $("#al-contour-follow").addEventListener("change", (e) => Aligner.setFollowContour(e.target.checked));
+  // Cards "Contorno neon" e "Distrações removidas": só exibição (v8.2).
+  // Contorno e distração são exclusivos por lado: ligar um desmarca o outro.
+  const cbCB = $("#al-contour-base"), cbCF = $("#al-contour-follow");
+  const cbDB = $("#al-distract-base"), cbDF = $("#al-distract-follow");
+  if (cbCB) cbCB.addEventListener("change", (e) => { if (e.target.checked && cbDB) cbDB.checked = false; Aligner.refreshBaseView(); });
+  if (cbCF) cbCF.addEventListener("change", (e) => { if (e.target.checked && cbDF) cbDF.checked = false; Aligner.refreshFollowView(); });
+  if (cbDB) cbDB.addEventListener("change", (e) => { if (e.target.checked && cbCB) cbCB.checked = false; Aligner.refreshBaseView(); });
+  if (cbDF) cbDF.addEventListener("change", (e) => { if (e.target.checked && cbCF) cbCF.checked = false; Aligner.refreshFollowView(); });
 
   window.addEventListener("resize", () => {
     if ($("#screen-align").classList.contains("active")) { Aligner.layoutStage(); Aligner._renderFulcrum(); }

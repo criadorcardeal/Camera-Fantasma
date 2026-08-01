@@ -120,6 +120,7 @@ const Distract = {
     mask.width = MW; mask.height = MH;
     const mctx = mask.getContext("2d", { willReadFrequently: true });
     const existing = kind === "base" ? session.baseMask : session.followMask;
+    this._openMaskUrl = existing || null;   // estado salvo, p/ o "Cancelar" reverter
     if (existing) {
       try { const em = await loadImageEl(existing); mctx.drawImage(em, 0, 0, MW, MH); } catch (_) {}
     }
@@ -132,26 +133,12 @@ const Distract = {
     requestAnimationFrame(() => { this._layout(); this._render(); });
   },
 
-  // Dimensiona o palco: foto em LARGURA TOTAL (rompe o padding do corpo), com
-  // teto de altura — mesmo critério da tela de Posicionamentos (v7.10).
+  // Dimensiona o palco na área FIXA (.photo-fixed), no aspecto da foto e com o
+  // mesmo teto das demais telas (fitStageEl) — sem rolagem (v8.2).
   _layout() {
     const stage = $("#ds-stage");
-    const body = stage.parentElement;
-    const cs = getComputedStyle(body);
-    const padL = parseFloat(cs.paddingLeft) || 0;
-    const padR = parseFloat(cs.paddingRight) || 0;
-    const vw = document.documentElement.clientWidth || body.clientWidth;
-    const maxH = window.innerHeight * 0.72;
-    const aspect = (this._img.naturalWidth || 3) / (this._img.naturalHeight || 4);
-    let w = vw, h = w / aspect;
-    if (h > maxH) { h = maxH; w = h * aspect; }
-    w = Math.round(w); h = Math.round(h);
-    stage.style.width = w + "px";
-    stage.style.height = h + "px";
-    const extra = Math.max(0, (vw - w) / 2);
-    stage.style.marginLeft = Math.round(extra - padL) + "px";
-    stage.style.marginRight = Math.round(extra - padR) + "px";
-
+    fitStageEl(stage, (this._img.naturalWidth || 3) / (this._img.naturalHeight || 4));
+    const w = stage.clientWidth, h = stage.clientHeight;
     const photo = $("#ds-photo"), over = $("#ds-mask");
     for (const cv of [photo, over]) { cv.width = w; cv.height = h; }
     photo.getContext("2d").drawImage(this._img, 0, 0, w, h);
@@ -201,7 +188,7 @@ const Distract = {
     this._render();
   },
 
-  // "Zerar ajustes": apaga a marcação atual (só persiste ao Confirmar).
+  // "Zerar ajustes": apaga TODA a marcação (só persiste ao Confirmar).
   clear() {
     const mctx = this.mask.getContext("2d");
     mctx.clearRect(0, 0, this.mask.width, this.mask.height);
@@ -209,6 +196,19 @@ const Distract = {
     this._render();
   },
 
+  // "Cancelar" (v8.2): descarta as alterações NÃO salvas e CONTINUA na tela,
+  // voltando à marcação como estava ao abrir (não volta para a Montagem).
+  async revert() {
+    const mctx = this.mask.getContext("2d");
+    mctx.clearRect(0, 0, this.mask.width, this.mask.height);
+    if (this._openMaskUrl) {
+      try { const em = await loadImageEl(this._openMaskUrl); mctx.drawImage(em, 0, 0, this.mask.width, this.mask.height); } catch (_) {}
+    }
+    this._last = null;
+    this._render();
+  },
+
+  // Sai da tela (seta ‹ de voltar) sem salvar.
   async cancel() {
     await openDetail(this.session.id);
   },
@@ -265,8 +265,8 @@ window.addEventListener("DOMContentLoaded", () => {
   const brush = $("#ds-brush");
   if (brush) brush.addEventListener("input", () => { Distract.brush = parseInt(brush.value, 10) || 48; });
 
-  $("#ds-cancel").addEventListener("click", () => Distract.cancel());
-  const c2 = $("#ds-cancel2"); if (c2) c2.addEventListener("click", () => Distract.cancel());
+  $("#ds-cancel").addEventListener("click", () => Distract.cancel());          // ‹ voltar (sai da tela)
+  const c2 = $("#ds-cancel2"); if (c2) c2.addEventListener("click", () => Distract.revert());  // Cancelar: reverte e fica (v8.2)
   $("#ds-clear").addEventListener("click", () => Distract.clear());
   $("#ds-confirm").addEventListener("click", () => Distract.confirm());
 });
