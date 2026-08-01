@@ -64,9 +64,12 @@ function _skDilate(mask, W, H) {
 }
 
 // Gera o contorno neon (PNG transparente) a partir de uma imagem (URL/dataURL).
-//   opts.color    -> {r,g,b} da linha neon (padrão verde).
-//   opts.edgeFrac -> fração aproximada de pixels que viram linha (padrão 0.09).
-//   opts.maxSide  -> maior lado do canvas de trabalho (padrão 1280).
+//   opts.color       -> {r,g,b} da linha neon (padrão verde).
+//   opts.edgeFrac    -> fração aproximada de pixels que viram linha (padrão 0.09).
+//   opts.maxSide     -> maior lado do canvas de trabalho (padrão 1280).
+//   opts.excludeMask -> PNG (dataURL) das áreas "Remover distrações": onde o alfa
+//                       é opaco, o pixel é descartado do contorno (v8.1). A máscara
+//                       é normalizada sobre a MESMA imagem, então é esticada ao W×H.
 window.makeNeonSketch = async function (src, opts) {
   opts = opts || {};
   const color = opts.color || window.NEON.base;
@@ -127,6 +130,20 @@ window.makeNeonSketch = async function (src, opts) {
   let mask = new Uint8Array(N);
   for (let p = 0; p < N; p++) mask[p] = q[p] >= th ? 1 : 0;
   mask = _skDilate(mask, W, H);
+
+  // v8.1: descarta as áreas marcadas em "Remover distrações" — assim o contorno
+  // não desenha veias/marcas/objetos que o médico quis tirar de foco.
+  if (opts.excludeMask) {
+    try {
+      const mimg = await loadImageEl(opts.excludeMask);
+      const mc = document.createElement("canvas");
+      mc.width = W; mc.height = H;
+      const mx = mc.getContext("2d", { willReadFrequently: true });
+      mx.drawImage(mimg, 0, 0, W, H);
+      const md = mx.getImageData(0, 0, W, H).data;
+      for (let p = 0, i = 0; p < N; p++, i += 4) if (md[i + 3] > 40) mask[p] = 0;
+    } catch (_) { /* sem máscara: contorno normal */ }
+  }
 
   // Pinta: linha -> cor neon opaca; resto -> transparente.
   const out = ctx.createImageData(W, H);

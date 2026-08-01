@@ -534,6 +534,57 @@ function alAutoRegister(W, H, congruenceFn, init) {
   return best;
 }
 
+/* ---------- Exclusão das áreas "Remover distrações" (v8.1) ----------
+   As máscaras marcadas pelo médico tiram partes da foto do foco. No alinhamento
+   automático, essas partes são REMOVIDAS das feições (silhueta/contorno/bordas)
+   de cada foto — o otimizador não tenta mais casar marcas/veias/objetos que
+   mudam entre as consultas, o que reduz o erro de encaixe. */
+
+// Rasteriza uma máscara (PNG dataURL) num Uint8Array W×H (1 = área a ignorar),
+// esticada para o quadro (a máscara é normalizada sobre a imagem).
+async function alLoadMaskFrame(maskUrl, W, H) {
+  const img = await loadImageEl(maskUrl);
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(img, 0, 0, W, H);
+  const d = ctx.getImageData(0, 0, W, H).data;
+  const m = new Uint8Array(W * H);
+  for (let p = 0, i = 0; p < W * H; p++, i += 4) m[p] = d[i + 3] > 40 ? 1 : 0;
+  return m;
+}
+
+// Zera na máscara de feições (mask) os pixels marcados como distração (ex).
+function alApplyExclude(mask, ex) {
+  if (!ex) return;
+  for (let p = 0; p < mask.length; p++) if (ex[p]) mask[p] = 0;
+}
+
+// Máscara de exclusão do ACOMPANHAMENTO no quadro do alinhamento (Wg×Hg), que
+// usa a foto ORIGINAL contida. A máscara do médico foi pintada sobre a foto
+// ALINHADA (followImage), então mapeamos cada pixel do quadro (foto original)
+// pela transformação salva (followAlign) até a posição alinhada e amostramos lá.
+async function alFollowExclude(session, W, H) {
+  if (!session || !session.followMask) return null;
+  const aligned = await alLoadMaskFrame(session.followMask, W, H);
+  const a = session.followAlign;
+  if (!a) return aligned;   // sem alinhamento salvo: mesma geometria
+  const P = 2.2 * Math.max(W, H);
+  const proj = alMakeProject({
+    z: a.z, txp: (a.txn || 0) * W, typ: (a.tyn || 0) * H,
+    rot: a.rot || 0, rotX: a.rotX || 0, rotY: a.rotY || 0,
+    fx: a.fx == null ? 0.5 : a.fx, fy: a.fy == null ? 0.5 : a.fy,
+  }, W, H, P);
+  const out = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const d = proj([x - W / 2, y - H / 2]);
+    const ax = Math.round(d[0]), ay = Math.round(d[1]);
+    if (ax >= 0 && ay >= 0 && ax < W && ay < H && aligned[ay * W + ax]) out[y * W + x] = 1;
+  }
+  return out;
+}
+
 const Aligner = {
   session: null,
   followUrl: null,
@@ -786,6 +837,9 @@ const Aligner = {
     s.followAdj = null;
     s.followTarget = null;
     if (typeof clearSketch === "function") clearSketch(s, "follow");
+    // v8.1: o realinhamento muda a geometria do acompanhamento — a máscara de
+    // distrações (pintada sobre a imagem anterior) não vale mais; descarta.
+    if (typeof clearDistract === "function") clearDistract(s, "follow");
     await DB.put(s);
     await openDetail(s.id);
   },
@@ -849,8 +903,16 @@ const Aligner = {
       // Silhueta (membro vs fundo liso) — estável entre visitas; dela sai o
       // CONTORNO do membro (traço que não muda com veias/marcas/iluminação).
       const bSil = alForegroundMask(bImgd), fSil = alForegroundMask(fImgd);
+      // v8.1: remove as áreas de "Remover distrações" das feições de cada foto,
+      // ANTES de derivar o contorno e as sementes — o encaixe não persegue mais
+      // marcas/veias/objetos tirados de foco (menos erro de alinhamento).
+      const bEx = this.session.baseMask ? await alLoadMaskFrame(this.session.baseMask, Wg, Hg) : null;
+      const fEx = await alFollowExclude(this.session, Wg, Hg);
+      alApplyExclude(bSil.mask, bEx); alApplyExclude(fSil.mask, fEx);
       const bOut = alOutlineMask(bSil.mask, Wg, Hg), fOut = alOutlineMask(fSil.mask, Wg, Hg);
       const bEdge = alEdgeMask(bImgd), fEdge = alEdgeMask(fImgd);
+      alApplyExclude(bOut, bEx); alApplyExclude(fOut, fEx);
+      alApplyExclude(bEdge.mask, bEx); alApplyExclude(fEdge.mask, fEx);
 
       // ROI (px) no quadro Wg×Hg; margem mínima p/ não degenerar.
       const clampi = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(v)));

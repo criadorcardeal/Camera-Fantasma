@@ -529,6 +529,12 @@ const Editor = {
     s.followTarget = this.target.follow;
     s.baseImageView = this.isNeutral(this.adj.base) ? null : await bakeView(s.baseImage, this.adj.base);
     s.followImageView = this.isNeutral(this.adj.follow) ? null : await bakeView(s.followImage, this.adj.follow);
+    // v8.1: a coloração muda a imagem exibida — reassenta o desfoque de distrações
+    // por cima da nova versão (a máscara é a mesma; só a cor de base mudou).
+    if (typeof rebakeDefocus === "function") {
+      if (s.baseMask) await rebakeDefocus(s, "base");
+      if (s.followMask) await rebakeDefocus(s, "follow");
+    }
     await DB.put(s);
     await openDetail(s.id);
   },

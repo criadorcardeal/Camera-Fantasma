@@ -94,9 +94,15 @@ function defaultLabel(kind) {
   return d ? (d + " • " + prefix) : prefix;
 }
 
-// Usa a versao com ajustes aplicados (se existir) ou a original.
-const baseSrc = (s) => s.baseImageView || s.baseImage;
-const followSrc = (s) => s.followImageView || s.followImage;
+// Foto exibida SEM o desfoque de "Remover distrações" (v8.1): versão com
+// colorações (view) ou a original. É a base sobre a qual a máscara é pintada e
+// o desfoque é assado.
+const baseSrcRaw = (s) => s.baseImageView || s.baseImage;
+const followSrcRaw = (s) => s.followImageView || s.followImage;
+
+// Usa a versao exibida: desfoque de distrações (se houver) > colorações > original.
+const baseSrc = (s) => s.baseDefocus || baseSrcRaw(s);
+const followSrc = (s) => s.followDefocus || followSrcRaw(s);
 
 // Fonte da MONTAGEM (comparação exibida na tela de detalhe): quando o "Contorno
 // neon" está ligado no card da Base/Acompanhamento, TROCA a foto exibida pelo
@@ -111,16 +117,17 @@ const followMontageSrc = (s) => (s.followSketchOn && s.followSketch) ? s.followS
    O contorno é derivado da foto atual; quando a foto muda, é descartado
    (clearSketch) para ser regerado na próxima vez. */
 const SKETCH_META = {
-  base:   { img: "baseImage",   sk: "baseSketch",   on: "baseSketchOn",   color: () => window.NEON.base },
-  follow: { img: "followImage", sk: "followSketch", on: "followSketchOn", color: () => window.NEON.follow },
+  base:   { img: "baseImage",   sk: "baseSketch",   on: "baseSketchOn",   mask: "baseMask",   color: () => window.NEON.base },
+  follow: { img: "followImage", sk: "followSketch", on: "followSketchOn", mask: "followMask", color: () => window.NEON.follow },
 };
 
 // Garante que o contorno neon da foto (kind) existe e o devolve (dataURL PNG).
+// v8.1: exclui do contorno as áreas marcadas em "Remover distrações".
 async function ensureSketch(s, kind) {
   const m = SKETCH_META[kind];
   if (!s || !s[m.img]) return null;
   if (!s[m.sk]) {
-    s[m.sk] = await makeNeonSketch(s[m.img], { color: m.color() });
+    s[m.sk] = await makeNeonSketch(s[m.img], { color: m.color(), excludeMask: s[m.mask] });
     await DB.put(s);
   }
   return s[m.sk];
@@ -680,6 +687,7 @@ const Cam = {
       s.filters = f;
       delete s.baseImageView;   // descarta ajuste anterior da base
       clearSketch(s, "base");   // contorno neon será regerado da nova foto
+      clearDistract(s, "base"); // nova foto: máscara/desfoque de distrações não valem mais
       await DB.put(s);
       this.stop();
       await openDetail(s.id);
@@ -709,6 +717,7 @@ const Cam = {
       s.followLabel = label;
       s.followAt = new Date().toISOString();
       clearSketch(s, "follow");
+      clearDistract(s, "follow");   // nova foto: máscara/desfoque de distrações não valem mais
       await DB.put(s);
       this.stop();
       await openDetail(s.id);
@@ -788,6 +797,7 @@ async function importBasePhoto(file, session) {
     session.baseLabel = res.label;
     delete session.baseImageView;
     clearSketch(session, "base");
+    clearDistract(session, "base");   // nova base: distrações não valem mais
     await DB.put(session);
     await openDetail(session.id);
     return;
@@ -918,11 +928,16 @@ async function openDetail(id) {
 
   const openCls = (id) => _detailOpenCards[id] ? " open" : "";
 
-  // Botão do contorno neon: LIGADO troca a imagem exibida na comparação (acima)
-  // pelo contorno; não abre mais uma prévia separada abaixo do botão.
-  const contourLabel = (on) => on ? "✨ Contorno neon: ligado" : "✨ Contorno neon";
-  const contourBlock = (kind, on, sketch) => `
-    <button class="btn outline card-full contour-btn${on ? " active" : ""}" id="btn-${kind}-contour">${contourLabel(on)}</button>`;
+  // Linha de dois botões (v8.1): "Remover distrações" à ESQUERDA de "Contorno
+  // neon". O contorno LIGADO troca a imagem exibida na comparação (acima) pelo
+  // contorno. "Remover distrações" ATIVO quando já há máscara pintada nesse lado.
+  const contourLabel = (on) => on ? "✨ Contorno: ligado" : "✨ Contorno neon";
+  const distractOn = (kind) => kind === "base" ? !!s.baseMask : !!s.followMask;
+  const contourBlock = (kind, on) => `
+    <div class="btn-row contour-row">
+      <button class="btn outline distract-btn${distractOn(kind) ? " active" : ""}" id="btn-${kind}-distract">🫥 Remover distrações</button>
+      <button class="btn outline contour-btn${on ? " active" : ""}" id="btn-${kind}-contour">${contourLabel(on)}</button>
+    </div>`;
 
   // Card BASE (recolhível, fechado por padrão): Refazer/Importar + Contorno neon.
   const baseCard = `
@@ -1008,6 +1023,8 @@ async function openDetail(id) {
     pickImage().then((file) => importFollowPhoto(s, file)));
   if ($("#btn-base-contour")) $("#btn-base-contour").addEventListener("click", () => toggleContour(s, "base"));
   if ($("#btn-follow-contour")) $("#btn-follow-contour").addEventListener("click", () => toggleContour(s, "follow"));
+  if ($("#btn-base-distract")) $("#btn-base-distract").addEventListener("click", () => Distract.open(s, "base"));
+  if ($("#btn-follow-distract")) $("#btn-follow-distract").addEventListener("click", () => Distract.open(s, "follow"));
   if ($("#btn-base-redo")) $("#btn-base-redo").addEventListener("click", () => Cam.open("base", s));
   if ($("#btn-base-import")) $("#btn-base-import").addEventListener("click", () =>
     pickImage().then((file) => importBasePhoto(file, s)));
@@ -1059,6 +1076,10 @@ async function swapPhotos(s) {
   swap("baseImageView", "followImageView");
   swap("baseAdj", "followAdj");
   swap("baseTarget", "followTarget");
+  // Distrações (v8.1) acompanham a foto: a máscara é normalizada sobre a imagem,
+  // que continua com a mesma geometria após a troca; o desfoque assado também.
+  swap("baseMask", "followMask");
+  swap("baseDefocus", "followDefocus");
   // O acompanhamento passa a ser outra foto: seu "original" vira a própria foto
   // atual e o alinhamento salvo perde sentido (descartado).
   s.followOriginal = s.followImage;
