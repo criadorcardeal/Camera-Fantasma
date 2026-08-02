@@ -84,9 +84,8 @@ const Profile = {
     this._loadDragLogo();
     this._syncNameBox();
     this._applyPreviewOpacity();
-    // Abre "limpo": Cancelar/Salvar só habilitam quando houver alguma mudança.
+    // Abre "limpo": Salvar só habilita quando houver alguma mudança.
     this._dirty = false;
-    $("#prof-close").disabled = true;
     $("#prof-save").disabled = true;
     $("#profile-dialog").showModal();
   },
@@ -114,7 +113,6 @@ const Profile = {
   _markDirty() {
     if (this._dirty) return;
     this._dirty = true;
-    $("#prof-close").disabled = false;
     $("#prof-save").disabled = false;
   },
 
@@ -343,7 +341,6 @@ window.addEventListener("DOMContentLoaded", () => {
     d.showModal();
   });
   // Cancelar fecha SEM salvar (só habilita quando há alteração).
-  $("#prof-close").addEventListener("click", () => $("#profile-dialog").close());
   $("#prof-save").addEventListener("click", () => Profile.save());
   // Qualquer mudança nos campos do diálogo habilita Cancelar/Salvar
   // (exceto a seção Conta, que tem ações próprias).

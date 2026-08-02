@@ -179,7 +179,36 @@ const escAttr = (v) => escHtml(v).replace(/"/g, "&quot;");
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   $("#" + id).classList.add("active");
+  refreshScrollCues();
 }
+
+/* v8.3: seta de rolagem. Mostra um indicador "⌄" no rodapé de uma área rolável
+   quando ainda há conteúdo abaixo; some ao chegar ao fim. Tocar rola p/ baixo. */
+function ensureScrollCue(scrollEl) {
+  const parent = scrollEl.parentElement;
+  if (!parent) return;
+  let cue = parent.querySelector(":scope > .scroll-cue");
+  if (!cue) {
+    cue = document.createElement("div");
+    cue.className = "scroll-cue";
+    cue.setAttribute("aria-hidden", "true");
+    cue.textContent = "⌄";
+    parent.appendChild(cue);
+    const upd = () => {
+      const more = scrollEl.scrollHeight - scrollEl.clientHeight - scrollEl.scrollTop > 8;
+      cue.classList.toggle("show", more);
+    };
+    scrollEl._cueUpd = upd;
+    scrollEl.addEventListener("scroll", upd, { passive: true });
+    cue.addEventListener("click", () => scrollEl.scrollBy({ top: scrollEl.clientHeight * 0.7, behavior: "smooth" }));
+  }
+  if (scrollEl._cueUpd) scrollEl._cueUpd();
+}
+// Atualiza as setas de todas as áreas roláveis da tela ativa (após render/resize).
+function refreshScrollCues() {
+  document.querySelectorAll(".screen.active .scroll-area").forEach(ensureScrollCue);
+}
+window.addEventListener("resize", refreshScrollCues);
 
 // v8.2: dimensiona um palco de foto DENTRO da área fixa (.photo-fixed), no
 // aspecto da imagem e com teto de altura — assim todas as telas mostram a foto
@@ -488,7 +517,6 @@ const Cam = {
       $("#f-brightness").value = f.brightness;
       $("#f-contrast").value = f.contrast;
       $("#f-saturate").value = f.saturate;
-      $("#distance-chip").textContent = "Mantenha 40–60 cm do local";
     } else {
       // Modo "base": foto nova (session null) ou refazer a base de uma
       // comparação existente (session preenchida).
@@ -501,7 +529,6 @@ const Cam = {
       $("#f-brightness").value = f.brightness;
       $("#f-contrast").value = f.contrast;
       $("#f-saturate").value = f.saturate;
-      $("#distance-chip").textContent = "Mantenha 40–60 cm do local";
     }
     $("#ghost").style.opacity = $("#ghost-opacity").value;
     this.applyLiveFilter();
@@ -917,13 +944,22 @@ async function openDetail(id) {
   const segBtn = (m, label) => `<button data-mode="${m}"${m === mode0 ? ' class="active"' : ""}>${label}</button>`;
 
   // v8.2: a foto (#cmp-host) fica na área FIXA do topo; o seletor de modo
-  // (Cortina/Lado a lado/Sobrepor) vai ABAIXO da foto, junto dos controles que
-  // rolam. O botão "Comparar" passa a flutuar (fab-confirm).
+  // (Cortina/Lado a lado/Sobrepor) vai ABAIXO da foto, na seção "Tipo de
+  // comparação". O botão "Comparar" fica na topbar (#detail-action, v8.3).
   const stageHtml = hasFollow
     ? `<div id="cmp-host"></div>`
     : `<div class="compare-stage" id="cmp-host"><img src="${baseMontageSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}</div>`;
+  // v8.3: seção expansível "Tipo de comparação" com o seletor de modo E o
+  // controle deslizante (o slider é injetado em #cmp-slider por renderCompare).
+  const cmpTypeOpen = _detailOpenCards["cmptype-card"] !== false ? " open" : "";  // aberta por padrão
   const segHtml = hasFollow
-    ? `<div class="seg" id="cmp-seg">${segBtn("curtain", "Cortina")}${segBtn("side", "Lado a lado")}${segBtn("overlay", "Sobrepor")}</div>`
+    ? `<div class="act-card collapsible${cmpTypeOpen}" id="cmptype-card">
+         <div class="act-head"><span class="act-title">Tipo de comparação</span><span class="chev">▾</span></div>
+         <div class="act-body">
+           <div class="seg" id="cmp-seg">${segBtn("curtain", "Cortina")}${segBtn("side", "Lado a lado")}${segBtn("overlay", "Sobrepor")}</div>
+           <div id="cmp-slider"></div>
+         </div>
+       </div>`
     : "";
 
   // Depois de gerar a comparação (crédito confirmado), as fotos ficam travadas.
@@ -968,7 +1004,7 @@ async function openDetail(id) {
       <div class="act-body">
         ${locked ? "" : `<div class="btn-row">
           <button class="btn outline" id="btn-base-redo">📷 Refazer</button>
-          <button class="btn outline" id="btn-base-import">🖼 Importar</button>
+          <button class="btn outline" id="btn-base-import">🖼 ${s.baseImage ? "Importar nova" : "Importar"}</button>
         </div>`}
         ${contourBlock("base", !!s.baseSketchOn, s.baseSketch)}
       </div>
@@ -981,7 +1017,7 @@ async function openDetail(id) {
       <div class="act-body">
         ${locked ? "" : `<div class="btn-row">
           <button class="btn outline" id="btn-redo">${hasFollow ? "📷 Refazer" : "📷 Tirar"}</button>
-          <button class="btn outline" id="btn-follow-import">🖼 Importar</button>
+          <button class="btn outline" id="btn-follow-import">🖼 ${hasFollow ? "Importar nova" : "Importar"}</button>
         </div>`}
         ${hasFollow ? contourBlock("follow", !!s.followSketchOn, s.followSketch) : ""}
       </div>
@@ -1003,16 +1039,18 @@ async function openDetail(id) {
     ? `<p class="lock-note">🔒 Comparação concluída — as fotos não podem mais ser alteradas.</p>`
     : "";
 
-  // Botão Comparar FLUTUANTE (metade inferior direita, sempre à frente).
-  const secondRow = hasFollow
-    ? `<button class="fab-confirm" id="btn-share">🔀 Comparar</button>` : "";
-
-  // v8.2: foto FIXA no topo (.photo-fixed); modo + cards rolam (.scroll-area);
-  // botão Comparar flutua fora do fluxo.
+  // v8.3: o botão "Comparar" foi para a topbar (#detail-action). Aqui só monta
+  // a foto FIXA no topo e os cards que rolam.
   c.innerHTML =
     `<div class="photo-fixed">${stageHtml}</div>` +
-    `<div class="scroll-area">${segHtml + labelHtml + lockNote + baseCard + acCard + fineCard}</div>` +
-    secondRow;
+    `<div class="scroll-area">${segHtml + labelHtml + lockNote + baseCard + acCard + fineCard}</div>`;
+
+  // Botão "Comparar" na topbar: só quando há acompanhamento.
+  const actBtn = $("#detail-action");
+  if (actBtn) {
+    actBtn.hidden = !hasFollow;
+    actBtn.onclick = hasFollow ? () => confirmThenSave(s) : null;
+  }
 
   // Ativa a tela ANTES de montar a comparação, para o palco já ter largura
   // (a cortina depende de clientWidth para dimensionar a foto de acompanhamento).
@@ -1027,19 +1065,21 @@ async function openDetail(id) {
         s.compareMode = b.dataset.mode;   // lembra a aba p/ quando voltar à Montagem
         await DB.put(s);
         renderCompare(b.dataset.mode);
+        refreshScrollCues();   // troca de modo muda o slider (altura da seção)
       });
     });
   }
   enableWmEdit();
   requestAnimationFrame(sizeWmNames);
 
-  // Cards recolhíveis (Base / Acompanhamento / Ajustes Finos): cabeçalho abre/fecha
-  // e lembra o estado (p/ reabrir a Montagem no mesmo estado).
-  ["#base-card", "#ac-card", "#fine-card"].forEach((sel) => {
+  // Cards recolhíveis (Tipo de comparação / Base / Acompanhamento / Ajustes Finos):
+  // o cabeçalho abre/fecha e lembra o estado (p/ reabrir a Montagem igual).
+  ["#cmptype-card", "#base-card", "#ac-card", "#fine-card"].forEach((sel) => {
     const card = $(sel);
     if (card) card.querySelector(".act-head").addEventListener("click", () => {
       card.classList.toggle("open");
       _detailOpenCards[card.id] = card.classList.contains("open");
+      refreshScrollCues();   // a altura mudou: recalcula a seta de rolagem
     });
   });
 
@@ -1055,7 +1095,6 @@ async function openDetail(id) {
   if ($("#btn-base-redo")) $("#btn-base-redo").addEventListener("click", () => Cam.open("base", s));
   if ($("#btn-base-import")) $("#btn-base-import").addEventListener("click", () =>
     pickImage().then((file) => importBasePhoto(file, s)));
-  if ($("#btn-share")) $("#btn-share").addEventListener("click", () => confirmThenSave(s));
   if ($("#btn-swap")) $("#btn-swap").addEventListener("click", () => swapPhotos(s));
 
   // Card de rótulo: seta de expansão abre/fecha os campos de edição.
@@ -1315,6 +1354,10 @@ function refreshCompareCaptions() {
 function renderCompare(mode) {
   const s = _detailSession;
   const host = $("#cmp-host");
+  // v8.3: o slider (cortina/sobrepor) vai para a seção "Tipo de comparação"
+  // (#cmp-slider), NÃO junto da foto fixa. #cmp-host guarda só o palco.
+  const sliderHost = $("#cmp-slider");
+  if (sliderHost) sliderHost.innerHTML = "";
   const show = s.showLabels;
   const capB = capHtml(s.baseLabel, "cap-left", show);
   const capF = capHtml(s.followLabel, "cap-right", show);
@@ -1333,10 +1376,8 @@ function renderCompare(mode) {
         <img src="${baseMontageSrc(s)}" />
         <img src="${followMontageSrc(s)}" id="ov-after" style="opacity:0.5" />
         ${capB}${capF}${wm}
-      </div>
-      <div class="seg" style="margin-top:8px;background:transparent;padding:0">
-        <input type="range" min="0" max="1" step="0.01" value="0.5" id="ov-range" style="width:100%" />
       </div>`;
+    if (sliderHost) sliderHost.innerHTML = `<div class="cmp-slider-row"><input type="range" min="0" max="1" step="0.01" value="0.5" id="ov-range" /></div>`;
     // Rótulos só aparecem quando a respectiva foto tem MAIS de 50% visível.
     // No Sobrepor, a "visibilidade" do acompanhamento é a própria opacidade.
     const ovStage = host.querySelector(".compare-stage");
@@ -1362,10 +1403,8 @@ function renderCompare(mode) {
       <div class="after-clip" style="position:absolute;inset:0;width:50%"><img src="${followMontageSrc(s)}" style="width:200%;max-width:none" id="cur-after"/></div>
       <div class="curtain-line" id="cur-line" style="left:50%"></div>
       ${capB}${capF}${wm}
-    </div>
-    <div class="seg" style="margin-top:8px;background:transparent;padding:0">
-      <input type="range" min="0" max="1" step="0.01" value="0.5" id="cur-range" style="width:100%" />
     </div>`;
+  if (sliderHost) sliderHost.innerHTML = `<div class="cmp-slider-row"><input type="range" min="0" max="1" step="0.01" value="0.5" id="cur-range" /></div>`;
   const stage = $("#curtain");
   const clip = stage.querySelector(".after-clip");
   const after = $("#cur-after");

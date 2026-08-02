@@ -114,6 +114,17 @@ html, body {
   cursor: pointer;
 }
 .icon-btn.dark { background: rgba(255,255,255,0.2); }
+/* Botão de ação na topbar (Confirmar/Comparar) — canto superior direito, na
+   mesma faixa do título e do voltar (v8.3). Pílula branca sobre o azul. */
+.topbar-action {
+  flex-shrink: 0; border: none; cursor: pointer;
+  background: #fff; color: var(--primary);
+  font-weight: 700; font-size: 0.9rem;
+  padding: 9px 16px; border-radius: 18px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.22);
+}
+.topbar-action:disabled { opacity: 0.55; }
+.topbar-action:active { transform: translateY(1px); }
 /* Ícone de perfil na topbar com a logo como avatar. */
 .icon-btn.has-logo {
   background-size: cover; background-position: center; background-repeat: no-repeat;
@@ -135,21 +146,24 @@ html, body {
 .photo-fixed .side-by-side img { max-height: 56dvh; }
 .scroll-area {
   flex: 1 1 auto; min-height: 0; overflow-y: auto;
-  padding: 12px; padding-bottom: 108px;
+  padding: 12px; padding-bottom: 40px;
 }
 .scroll-area > * + * { margin-top: 12px; }
-/* Botão flutuante de ação (Confirmar / Comparar): sempre à frente, canto inferior direito. */
-.fab-confirm {
-  position: fixed; z-index: 60;
-  right: max(env(safe-area-inset-right, 0px), 16px);
-  bottom: max(env(safe-area-inset-bottom, 0px), 18px);
-  padding: 14px 26px; border-radius: 30px;
-  background: var(--primary); color: #fff; border: none;
-  font-size: 1rem; font-weight: 700; cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.32);
+
+/* Seta de rolagem (v8.3): aparece no rodapé da área rolável quando há MAIS
+   conteúdo abaixo; some ao chegar ao fim. Tocar rola para baixo. */
+.al-body, .ds-body, .ed-content, #detail-content { position: relative; }
+.scroll-cue {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(27,94,140,0.92); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; line-height: 1; padding-bottom: 2px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.32);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  z-index: 55;
 }
-.fab-confirm:disabled { opacity: 0.6; }
-.fab-confirm:active { transform: translateY(1px); }
+.scroll-cue.show { opacity: 1; pointer-events: auto; cursor: pointer; }
 
 /* ---------- Barra de créditos (v3.3) ---------- */
 .credits-bar {
@@ -621,6 +635,8 @@ html, body {
   border-radius: 16px;
   font-size: 0.85rem;
 }
+/* v8.3: sem a dica fixa "40–60 cm"; o chip só aparece p/ avisos passageiros (flash). */
+.chip:empty { display: none; }
 .shutter {
   width: 72px; height: 72px;
   border-radius: 50%;
@@ -654,6 +670,10 @@ html, body {
 /* v8.2: a Montagem também tem a foto FIXA no topo e os cards rolando abaixo. */
 #detail-content { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: 0; }
 #cmp-host { width: 100%; }
+/* v8.3: slider da comparação dentro da seção "Tipo de comparação". */
+.cmp-slider-row { padding: 6px 2px 2px; }
+.cmp-slider-row input[type="range"] { width: 100%; accent-color: var(--primary); }
+#cmp-seg { margin-bottom: 0; }
 .seg {
   display: flex; gap: 4px; margin-bottom: 12px;
   background: #e3e8eb; border-radius: 10px; padding: 4px;
@@ -1021,6 +1041,22 @@ dialog menu button:disabled { opacity: 0.4; cursor: not-allowed; }
 .saved-dialog menu { justify-content: center; }
 
 /* ---------- Perfil do usuário (v3.5.1) ---------- */
+/* Cabeçalho do pop-up Perfil (v8.3): X à esquerda, título centralizado, Salvar
+   à direita. Fica fixo no topo enquanto o conteúdo rola. */
+.prof-head {
+  position: sticky; top: -20px; z-index: 3;
+  margin: -20px -20px 12px; padding: 16px 14px 10px;
+  background: #fff; border-bottom: 1px solid #eef1f3; border-radius: 16px 16px 0 0;
+  display: flex; align-items: center; gap: 8px;
+}
+.prof-head h3 { flex: 1; text-align: center; margin: 0; font-size: 1.1rem; }
+.prof-head-btn {
+  flex-shrink: 0; border: none; cursor: pointer;
+  background: #eef3f6; color: var(--muted);
+  border-radius: 16px; padding: 8px 12px; font-size: 0.95rem; line-height: 1;
+}
+.prof-head-save { background: var(--primary); color: #fff; font-weight: 700; padding: 8px 16px; }
+.prof-head-save:disabled { opacity: 0.5; cursor: not-allowed; }
 /* Ícone de perfil: círculo com a logo como avatar (ou 👤 quando não há logo).
    Mesmo tamanho/estilo do avatar da Montagem (icon-btn) — ambos na topbar. */
 .cred-profile {

@@ -49,7 +49,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v8.2</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v8.3</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -88,7 +88,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v8.2</span>
+      <span class="version-badge">v8.3</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -138,7 +138,7 @@
     </div>
 
     <div class="cam-bottom">
-      <div id="distance-chip" class="chip">Mantenha 40–60 cm do local</div>
+      <div id="distance-chip" class="chip"></div>
       <button id="cam-shoot" class="shutter" aria-label="Capturar"><span class="shutter-ic">📷</span></button>
     </div>
     <div id="cam-start" class="cam-start" hidden>
@@ -152,7 +152,7 @@
     <header class="topbar">
       <button id="detail-back" class="icon-btn dark">‹</button>
       <h1>Montagem</h1>
-      <button id="detail-profile" class="icon-btn dark" title="Perfil">👤</button>
+      <button id="detail-action" class="topbar-action" type="button" hidden>🔀 Comparar</button>
     </header>
     <div class="content" id="detail-content"></div>
   </section>
@@ -162,7 +162,7 @@
     <header class="topbar">
       <button id="al-cancel" class="icon-btn dark">‹</button>
       <h1>Posicionamentos</h1>
-      <span class="topbar-spacer"></span>
+      <button id="al-confirm" class="topbar-action" type="button">Confirmar</button>
     </header>
     <div class="al-body">
       <div class="photo-fixed">
@@ -205,7 +205,6 @@
           <label class="roi-tog"><input type="checkbox" id="al-distract-follow" /> <span>Acompanhamento sem distrações</span></label>
         </div>
       </div>
-      <button id="al-confirm" class="fab-confirm">Confirmar</button>
     </div>
   </section>
 
@@ -214,7 +213,7 @@
     <header class="topbar">
       <button id="ds-cancel" class="icon-btn dark">‹</button>
       <h1>Remover distrações</h1>
-      <span class="topbar-spacer"></span>
+      <button id="ds-confirm" class="topbar-action" type="button">Confirmar</button>
     </header>
     <div class="ds-body">
       <div class="photo-fixed">
@@ -236,7 +235,6 @@
           <button id="ds-clear" class="al-reset">↺ Zerar ajustes</button>
         </div>
       </div>
-      <button id="ds-confirm" class="fab-confirm">Confirmar</button>
     </div>
   </section>
 
@@ -245,7 +243,7 @@
     <header class="topbar">
       <button id="ed-cancel" class="icon-btn dark">‹</button>
       <h1>Colorações e Exposição</h1>
-      <span class="topbar-spacer"></span>
+      <button id="ed-save" class="topbar-action" type="button">Confirmar</button>
     </header>
     <div class="ed-content">
       <div class="photo-fixed">
@@ -276,7 +274,6 @@
         </div>
         <div id="ed-sliders"></div>
       </div>
-      <button id="ed-save" class="fab-confirm">Confirmar</button>
     </div>
   </section>
 
@@ -414,8 +411,11 @@
 
   <!-- ============ DIÁLOGO: PERFIL DO USUÁRIO (v3.5.1) ============ -->
   <dialog id="profile-dialog">
-    <button id="prof-x" class="dialog-x" type="button" aria-label="Fechar sem salvar">✕</button>
-    <h3>Perfil</h3>
+    <div class="prof-head">
+      <button id="prof-x" class="prof-head-btn" type="button" aria-label="Fechar sem salvar">✕</button>
+      <h3>Perfil</h3>
+      <button id="prof-save" class="prof-head-btn prof-head-save" type="button" disabled>Salvar</button>
+    </div>
 
     <div class="prof-acc">
       <div class="prof-acc-row">Conta: <b id="prof-acc-email">—</b></div>
@@ -498,10 +498,6 @@
       </select>
     </label>
 
-    <menu>
-      <button id="prof-close" disabled>Cancelar</button>
-      <button id="prof-save" class="primary" disabled>Salvar</button>
-    </menu>
   </dialog>
 
   <!-- ============ DIÁLOGO: DESCARTAR ALTERAÇÕES (v3.6.3) ============ -->
