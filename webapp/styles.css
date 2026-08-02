@@ -377,10 +377,25 @@ html, body {
 .prof-wm-title { margin: 0 0 8px; font-size: 1rem; color: var(--primary); }
 
 /* ---------- Resgatar voucher / ler QR (Adquirir) ---------- */
-#buy-redeem { background: var(--primary); color: #fff; border-color: var(--primary); }
 .buy-scan {
   width: 100%; margin-top: 8px; padding: 10px; border-radius: 8px; cursor: pointer;
   border: 1.5px solid var(--primary); background: #fff; color: var(--primary); font-weight: 600; font-size: 0.9rem;
+}
+
+/* v8.4: título centralizado, X no topo esquerdo. "Ler QR Code" trocou de lugar
+   com "Resgatar": o QR fica ao lado do campo (em duas linhas = altura dupla, mais
+   estreito, sem encolher o campo) e "Resgatar" vira botão de largura total. */
+#buy-dialog h3 { text-align: center; padding: 2px 40px 0; }
+.dialog-x-left { left: 10px; right: auto; }
+#buy-dialog .buy-voucher-row { align-items: center; }
+#buy-dialog .buy-voucher-row .buy-scan {
+  width: auto; margin-top: 0; flex-shrink: 0; min-height: 56px;
+  padding: 6px 14px; line-height: 1.15; text-align: center; white-space: normal;
+}
+.buy-redeem-full {
+  width: 100%; margin-top: 8px; padding: 11px; border-radius: 8px; cursor: pointer;
+  background: var(--primary); color: #fff; border: 1.5px solid var(--primary);
+  font-weight: 600; font-size: 0.95rem;
 }
 .vb-card-btns button[data-act="delete"] { border-color: #c0392b; color: #c0392b; }
 

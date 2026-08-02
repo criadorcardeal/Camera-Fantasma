@@ -49,7 +49,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v8.3</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v8.4</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -88,7 +88,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v8.3</span>
+      <span class="version-badge">v8.4</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -279,22 +279,20 @@
 
   <!-- ============ DIÁLOGO: COMPRAR CRÉDITOS (v3.3) ============ -->
   <dialog id="buy-dialog">
+    <button id="buy-close" class="dialog-x dialog-x-left" type="button" aria-label="Fechar">✕</button>
     <h3>Adquirir créditos</h3>
     <div class="buy-bal-row">Seu saldo: <b id="buy-bal">…</b> créditos</div>
     <label class="prof-acc-vlabel">Resgatar voucher
-      <span class="prof-voucher-row">
+      <span class="prof-voucher-row buy-voucher-row">
         <input type="text" id="buy-voucher" autocomplete="off" placeholder="Código do voucher" />
-        <button id="buy-redeem" type="button">Resgatar</button>
+        <button id="buy-scan" type="button" class="buy-scan">📷 Ler<br>QR Code</button>
       </span>
     </label>
-    <button id="buy-scan" type="button" class="buy-scan">📷 Ler QR code do voucher</button>
+    <button id="buy-redeem" type="button" class="buy-redeem-full">Resgatar</button>
     <p id="buy-redeem-msg" class="acc-msg"></p>
     <p id="buy-msg" class="buy-msg" hidden></p>
     <p class="buy-note">Cada comparação consome 1 crédito. A compra avulsa (Mercado Pago)
       entra em breve — por enquanto, adicione créditos resgatando um voucher.</p>
-    <menu>
-      <button id="buy-close" class="primary">Fechar</button>
-    </menu>
   </dialog>
 
   <!-- ============ DIÁLOGO: ADMINISTRAÇÃO (v3.3) ============ -->
