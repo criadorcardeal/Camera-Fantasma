@@ -612,6 +612,11 @@ const Aligner = {
   z: 1, tx: 0, ty: 0, rot: 0, rotX: 0, rotY: 0, fx: 0.5, fy: 0.5,
   fulcrumMode: false, roiDrawing: false,
   baseW: 1, baseH: 1,
+  // v8.5: qual foto aparece como FANTASMA (translúcida por cima) — 'base'
+  // (padrão) ou 'follow'. A foto MOVIDA continua sendo o acompanhamento.
+  ghostWhich: "base", ghostOpacity: 0.5,
+  // v8.5: enquadramento de GRUPO (as 2 fotos juntas), gravado na composição.
+  groupMode: false, gz: 1, grot: 0, gtx: 0, gty: 0, _gtxn: 0, _gtyn: 0,
 
   // isReposition=true quando é só reajuste/reposicionamento de uma foto já
   // adquirida (NÃO pede rótulo na saída — o rótulo só é pedido ao ADQUIRIR).
@@ -631,6 +636,14 @@ const Aligner = {
     this.rot = a ? a.rot : 0; this.rotX = a ? (a.rotX || 0) : 0; this.rotY = a ? (a.rotY || 0) : 0;
     this.fx = a && a.fx != null ? a.fx : 0.5; this.fy = a && a.fy != null ? a.fy : 0.5;
     this.fulcrumMode = false; this.roiDrawing = false;
+    // v8.5: fantasma sempre volta p/ Base ao abrir; enquadramento de grupo vem
+    // do que já foi salvo na sessão (aplicado às duas fotos na composição).
+    this.ghostWhich = "base"; this.ghostOpacity = 0.5; this.groupMode = false;
+    const gf = (session && session.groupFrame) ? session.groupFrame : null;
+    this.gz = gf ? gf.z : 1; this.grot = gf ? gf.rot : 0;
+    this._gtxn = gf && gf.txn != null ? gf.txn : 0;
+    this._gtyn = gf && gf.tyn != null ? gf.tyn : 0;
+    this.gtx = 0; this.gty = 0;
     this._setFulcrumMode(false);
     if ($("#al-roidraw")) $("#al-roidraw").hidden = true;
     if ($("#al-roi-hint")) $("#al-roi-hint").hidden = true;
@@ -660,6 +673,7 @@ const Aligner = {
     this._folOrigDone = false;
     this._folOrigMask = null;
     this._setupViewToggles();
+    this._syncImgToolsUI();
     showScreen("screen-align");
     requestAnimationFrame(() => {
       this.layoutStage();
@@ -667,9 +681,53 @@ const Aligner = {
       const stage = $("#al-stage");
       this.tx = this._txn * stage.clientWidth;
       this.ty = this._tyn * stage.clientHeight;
+      this.gtx = this._gtxn * stage.clientWidth;
+      this.gty = this._gtyn * stage.clientHeight;
       this.apply();
     });
     this.apply();
+  },
+
+  // Sincroniza os controles do card "Imagens" (fantasma/grupo) e os sliders ao
+  // alvo ativo (grupo ou acompanhamento).
+  _syncImgToolsUI() {
+    const seg = $("#al-ghost-seg");
+    if (seg) seg.querySelectorAll("button").forEach((b) =>
+      b.classList.toggle("active", b.dataset.which === this.ghostWhich));
+    const grp = $("#al-group"); if (grp) grp.checked = this.groupMode;
+    // Sliders Zoom/Girar(Z) refletem o alvo ativo; no modo grupo os giros 3D e o
+    // fulcro/auto ficam desligados (são ferramentas de alinhar o acompanhamento).
+    if (this.groupMode) {
+      $("#al-zoom").value = this.gz;
+      $("#al-rotate").value = Math.round(this.grot);
+    } else {
+      $("#al-zoom").value = this.z;
+      $("#al-rotate").value = Math.round(this.rot);
+    }
+    const dis = this.groupMode;
+    ["#al-rotate-x", "#al-rotate-y"].forEach((id) => { const el = $(id); if (el) el.disabled = dis; });
+    const ab = $("#al-auto"); if (ab) ab.disabled = dis;
+    const fb = $("#al-fulcrum-btn"); if (fb) fb.disabled = dis;
+  },
+
+  toggleGroupMode(on) {
+    this.groupMode = on;
+    if (on) this._setFulcrumMode(false);
+    this._syncImgToolsUI();
+    this.apply();
+  },
+
+  setGhostWhich(which) {
+    this.ghostWhich = which === "follow" ? "follow" : "base";
+    this._syncImgToolsUI();
+    this.apply();
+  },
+
+  // Arraste: move o GRUPO (as duas fotos) no modo grupo; senão move só o
+  // acompanhamento.
+  panBy(dx, dy) {
+    if (this.groupMode) { this.gtx += dx; this.gty += dy; }
+    else { this.tx += dx; this.ty += dy; }
   },
 
   layoutStage() {
@@ -795,7 +853,26 @@ const Aligner = {
     fol.style.transform =
       `translate(${this.tx}px, ${this.ty}px) scale(${this.z}) ` +
       `perspective(${P}px) rotateX(${this.rotX}deg) rotateY(${this.rotY}deg) rotateZ(${this.rot}deg)`;
+    // v8.5: transformação de GRUPO aplicada às DUAS fotos juntas (no wrapper).
+    const wrap = $("#al-imgwrap");
+    if (wrap) wrap.style.transform =
+      `translate(${this.gtx}px, ${this.gty}px) scale(${this.gz}) rotate(${this.grot}deg)`;
+    this._applyGhostVisual();
     this._renderFulcrum();
+  },
+
+  // v8.5: define qual foto é a translúcida (fantasma) e fica por cima.
+  _applyGhostVisual() {
+    const fol = $("#al-follow"), ghost = $("#al-ghost");
+    if (!fol || !ghost) return;
+    const op = this.ghostOpacity;
+    if (this.ghostWhich === "follow") {
+      fol.style.opacity = op; fol.style.zIndex = 2;
+      ghost.style.opacity = 1; ghost.style.zIndex = 1;
+    } else {
+      ghost.style.opacity = op; ghost.style.zIndex = 2;
+      fol.style.opacity = 1; fol.style.zIndex = 1;
+    }
   },
 
   // Marca do fulcro (eixo de giro): posiciona o marcador no ponto (fx,fy) do palco.
@@ -916,6 +993,13 @@ const Aligner = {
     // v8.1: o realinhamento muda a geometria do acompanhamento — a máscara de
     // distrações (pintada sobre a imagem anterior) não vale mais; descarta.
     if (typeof clearDistract === "function") clearDistract(s, "follow");
+    // v8.5: enquadramento de GRUPO (as duas fotos juntas) — gravado na composição
+    // (aplicado a base e acompanhamento na Montagem/exportações). null = sem corte.
+    const gId = Math.abs(this.gz - 1) < 0.001 && Math.abs(this.grot) < 0.01 &&
+                Math.abs(this.gtx) < 0.5 && Math.abs(this.gty) < 0.5;
+    s.groupFrame = gId ? null : {
+      z: this.gz, rot: this.grot, txn: this.gtx / (Wc || 1), tyn: this.gty / (Hc || 1),
+    };
     await DB.put(s);
     await openDetail(s.id);
   },
@@ -926,6 +1010,14 @@ const Aligner = {
 
   // ---- Zerar giros (item 3): volta à IMAGEM ORIGINAL, não à última confirmada.
   async resetGiros() {
+    // No modo GRUPO, zera só o enquadramento das duas fotos (sem tocar no
+    // alinhamento do acompanhamento).
+    if (this.groupMode) {
+      this.gz = 1; this.grot = 0; this.gtx = 0; this.gty = 0; this._gtxn = 0; this._gtyn = 0;
+      $("#al-zoom").value = 1; $("#al-rotate").value = 0;
+      this.apply();
+      return;
+    }
     const ok = await confirmDialog(
       "Zerar giros",
       "Isto descarta todos os ajustes de posição (zoom, giros e fulcro) e volta à " +
@@ -942,9 +1034,17 @@ const Aligner = {
     this.apply();
   },
 
-  // ---- Alinhamento automático 3D (item 5): pede a zona de interesse e otimiza.
-  // Passo 1: entra no modo de desenho da ROI sobre o palco.
+  // ---- Alinhamento automático 3D (v8.5): SEM marcação de área — o app usa
+  // automaticamente a PARTE CENTRAL das fotos (onde o membro costuma estar) para
+  // otimizar o encaixe. Central ~60% na horizontal e ~70% na vertical.
   startAuto() {
+    if (this.groupMode) return;   // ferramenta de alinhar o acompanhamento
+    this._setFulcrumMode(false);
+    this.runAuto({ x0: 0.20, y0: 0.15, x1: 0.80, y1: 0.85 });
+  },
+
+  // (legado) desenho manual da ROI — não usado desde a v8.5 (auto usa o centro).
+  startAutoRoi() {
     if (this.roiDrawing) return;
     this._setFulcrumMode(false);
     this.roiDrawing = true;
@@ -1061,8 +1161,9 @@ const Aligner = {
 window.addEventListener("DOMContentLoaded", () => {
   const stage = $("#al-stage");
   const setZoom = (z) => {
-    Aligner.z = Math.max(0.5, Math.min(4, z));
-    $("#al-zoom").value = Aligner.z;
+    z = Math.max(0.5, Math.min(4, z));
+    if (Aligner.groupMode) Aligner.gz = z; else Aligner.z = z;
+    $("#al-zoom").value = z;
   };
 
   // No Safari (iPhone) a pinca e um GESTO NATIVO: eventos de toque nao a
@@ -1079,7 +1180,7 @@ window.addEventListener("DOMContentLoaded", () => {
   stage.addEventListener("gesturestart", (e) => {
     e.preventDefault();
     if (Aligner.roiDrawing || Aligner.fulcrumMode) return;
-    gestureOn = true; gZoom = Aligner.z;
+    gestureOn = true; gZoom = Aligner.groupMode ? Aligner.gz : Aligner.z;
     gLast = { x: e.clientX || 0, y: e.clientY || 0 };
   }, { passive: false });
   stage.addEventListener("gesturechange", (e) => {
@@ -1087,8 +1188,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (Aligner.roiDrawing || Aligner.fulcrumMode) return;
     setZoom(gZoom * e.scale);
     if (e.clientX != null) {
-      Aligner.tx += e.clientX - gLast.x;
-      Aligner.ty += e.clientY - gLast.y;
+      Aligner.panBy(e.clientX - gLast.x, e.clientY - gLast.y);
       gLast = { x: e.clientX, y: e.clientY };
     }
     Aligner.apply();
@@ -1110,7 +1210,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.touches.length === 1) {
       tLast = { x: e.touches[0].clientX, y: e.touches[0].clientY }; pinchBase = null;
     } else if (e.touches.length >= 2 && !supportsGesture) {
-      pinchBase = { dist: d2(e.touches), zoom: Aligner.z, mid: m2(e.touches) }; tLast = null;
+      pinchBase = { dist: d2(e.touches), zoom: Aligner.groupMode ? Aligner.gz : Aligner.z, mid: m2(e.touches) }; tLast = null;
     }
   }, { passive: false });
 
@@ -1123,13 +1223,11 @@ window.addEventListener("DOMContentLoaded", () => {
     if (t.length >= 2 && pinchBase) {
       const d = d2(t), m = m2(t);
       setZoom(pinchBase.zoom * (d / pinchBase.dist));
-      Aligner.tx += m.x - pinchBase.mid.x;
-      Aligner.ty += m.y - pinchBase.mid.y;
+      Aligner.panBy(m.x - pinchBase.mid.x, m.y - pinchBase.mid.y);
       pinchBase.mid = m;
       Aligner.apply();
     } else if (t.length === 1 && tLast) {
-      Aligner.tx += t[0].clientX - tLast.x;
-      Aligner.ty += t[0].clientY - tLast.y;
+      Aligner.panBy(t[0].clientX - tLast.x, t[0].clientY - tLast.y);
       tLast = { x: t[0].clientX, y: t[0].clientY };
       Aligner.apply();
     }
@@ -1139,7 +1237,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.touches.length === 1) {
       tLast = { x: e.touches[0].clientX, y: e.touches[0].clientY }; pinchBase = null;
     } else if (e.touches.length >= 2 && !supportsGesture) {
-      pinchBase = { dist: d2(e.touches), zoom: Aligner.z, mid: m2(e.touches) };
+      pinchBase = { dist: d2(e.touches), zoom: Aligner.groupMode ? Aligner.gz : Aligner.z, mid: m2(e.touches) };
     } else if (e.touches.length === 0) {
       tLast = null; pinchBase = null;
     }
@@ -1156,8 +1254,7 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   stage.addEventListener("pointermove", (e) => {
     if (e.pointerType === "touch" || !mouseDrag) return;
-    Aligner.tx += e.clientX - mLast.x;
-    Aligner.ty += e.clientY - mLast.y;
+    Aligner.panBy(e.clientX - mLast.x, e.clientY - mLast.y);
     mLast = { x: e.clientX, y: e.clientY };
     Aligner.apply();
   });
@@ -1216,12 +1313,14 @@ window.addEventListener("DOMContentLoaded", () => {
   stage.addEventListener("pointercancel", spUp);
 
   $("#al-zoom").addEventListener("input", (e) => {
-    Aligner.z = parseFloat(e.target.value);
+    const v = parseFloat(e.target.value);
+    if (Aligner.groupMode) Aligner.gz = v; else Aligner.z = v;
     Aligner.apply();
   });
   // Giro no plano (Z) e giro 3D (tombar em X e Y).
   $("#al-rotate").addEventListener("input", (e) => {
-    Aligner.rot = parseFloat(e.target.value);
+    const v = parseFloat(e.target.value);
+    if (Aligner.groupMode) Aligner.grot = v; else Aligner.rot = v;
     Aligner.apply();
   });
   $("#al-rotate-x").addEventListener("input", (e) => {
@@ -1236,11 +1335,21 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#al-rotate-reset").addEventListener("click", () => Aligner.resetGiros());
   $("#al-fulcrum-btn").addEventListener("click", () => Aligner.toggleFulcrumMode());
   $("#al-opacity").addEventListener("input", (e) => {
-    $("#al-ghost").style.opacity = e.target.value;
+    Aligner.ghostOpacity = parseFloat(e.target.value);
+    Aligner._applyGhostVisual();
   });
   $("#al-cancel").addEventListener("click", () => Aligner.cancel());
   $("#al-confirm").addEventListener("click", () => Aligner.confirm());
   $("#al-auto").addEventListener("click", () => Aligner.startAuto());
+
+  // Card "Imagens" (v8.5): fantasma (base/acomp.), agrupar, cortar.
+  const ghostSeg = $("#al-ghost-seg");
+  if (ghostSeg) ghostSeg.querySelectorAll("button").forEach((b) =>
+    b.addEventListener("click", () => Aligner.setGhostWhich(b.dataset.which)));
+  const grpChk = $("#al-group");
+  if (grpChk) grpChk.addEventListener("change", (e) => Aligner.toggleGroupMode(e.target.checked));
+  if ($("#al-crop-base")) $("#al-crop-base").addEventListener("click", () => Cropper.open(Aligner.session, "base"));
+  if ($("#al-crop-follow")) $("#al-crop-follow").addEventListener("click", () => Cropper.open(Aligner.session, "follow"));
 
   // Cards "Contorno neon" e "Distrações removidas": só exibição (v8.2).
   // Contorno e distração são exclusivos por lado: ligar um desmarca o outro.
@@ -1253,5 +1362,152 @@ window.addEventListener("DOMContentLoaded", () => {
 
   window.addEventListener("resize", () => {
     if ($("#screen-align").classList.contains("active")) { Aligner.layoutStage(); Aligner._renderFulcrum(); }
+  });
+});
+
+/* ================= Cortar foto (v8.5) =================
+   Recorta a foto escolhida (base ou acompanhamento) e passa a valer em toda a
+   comparação. O palco tem a MESMA proporção da foto (contain preenche o palco),
+   então o retângulo em frações do palco mapeia direto na imagem. */
+const Cropper = {
+  session: null, kind: "base", src: null, imgW: 1, imgH: 1,
+  box: { x0: 0, y0: 0, x1: 1, y1: 1 },
+
+  async open(session, kind) {
+    if (!session) return;
+    this.session = session;
+    this.kind = kind === "follow" ? "follow" : "base";
+    // Recorta a versão EXIBIDA (colorações preservadas); geometria = a foto atual.
+    this.src = this.kind === "base" ? baseSrcRaw(session) : followSrcRaw(session);
+    if (!this.src) { alert("Não há foto para cortar deste lado."); return; }
+    const title = $("#cr-title");
+    if (title) title.textContent = this.kind === "base" ? "Cortar foto base" : "Cortar acompanhamento";
+    try {
+      const img = await loadImageEl(this.src);
+      this.imgW = img.naturalWidth || 3; this.imgH = img.naturalHeight || 4;
+    } catch (_) { this.imgW = 3; this.imgH = 4; }
+    $("#cr-img").src = this.src;
+    this.box = { x0: 0, y0: 0, x1: 1, y1: 1 };
+    showScreen("screen-crop");
+    requestAnimationFrame(() => { this.layout(); this.renderBox(); });
+  },
+
+  layout() { fitStageEl($("#cr-stage"), this.imgW / this.imgH); },
+
+  renderBox() {
+    const st = $("#cr-stage"), bx = $("#cr-box");
+    if (!st || !bx) return;
+    const W = st.clientWidth, H = st.clientHeight;
+    const b = this.box;
+    bx.style.left = (b.x0 * W) + "px";
+    bx.style.top = (b.y0 * H) + "px";
+    bx.style.width = ((b.x1 - b.x0) * W) + "px";
+    bx.style.height = ((b.y1 - b.y0) * H) + "px";
+  },
+
+  reset() { this.box = { x0: 0, y0: 0, x1: 1, y1: 1 }; this.renderBox(); },
+
+  async confirm() {
+    const b = this.box;
+    const full = b.x0 < 0.005 && b.y0 < 0.005 && b.x1 > 0.995 && b.y1 > 0.995;
+    const s = this.session;
+    if (full) { await Cropper._backToAligner(); return; }   // nada a cortar
+    // Recorta em px da imagem original.
+    const img = await loadImageEl(this.src);
+    const W = img.naturalWidth, H = img.naturalHeight;
+    const sx = Math.round(b.x0 * W), sy = Math.round(b.y0 * H);
+    const sw = Math.max(1, Math.round((b.x1 - b.x0) * W));
+    const sh = Math.max(1, Math.round((b.y1 - b.y0) * H));
+    const c = document.createElement("canvas");
+    c.width = sw; c.height = sh;
+    c.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    const cropped = c.toDataURL("image/jpeg", 0.92);
+    if (this.kind === "base") {
+      s.baseImage = cropped;
+      s.baseImageView = null; s.baseAdj = null; s.baseTarget = null;
+    } else {
+      s.followImage = cropped;
+      s.followOriginal = cropped;   // o corte vira a nova imagem original
+      s.followAlign = null;         // realinhar a partir da foto cortada
+      s.followImageView = null; s.followAdj = null; s.followTarget = null;
+    }
+    if (typeof clearSketch === "function") clearSketch(s, this.kind);
+    if (typeof clearDistract === "function") clearDistract(s, this.kind);
+    await DB.put(s);
+    await Cropper._backToAligner();
+  },
+
+  async cancel() { await Cropper._backToAligner(); },
+
+  async _backToAligner() {
+    const s = Cropper.session;
+    if (s && typeof Aligner !== "undefined") {
+      Aligner.open(s, s.followOriginal || s.followImage, true);
+    } else if (s) {
+      await openDetail(s.id);
+    }
+  },
+};
+
+/* ---------- Controles da tela Cortar ---------- */
+window.addEventListener("DOMContentLoaded", () => {
+  const stage = $("#cr-stage");
+  if (!stage) return;
+  let mode = null, corner = null, startBox = null, startN = null, capId = null;
+  const MIN = 0.08;
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  const toN = (e) => {
+    const r = stage.getBoundingClientRect();
+    return { x: clamp01((e.clientX - r.left) / r.width), y: clamp01((e.clientY - r.top) / r.height) };
+  };
+  stage.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const n = toN(e);
+    const h = e.target && e.target.classList && e.target.classList.contains("cr-handle")
+      ? e.target.dataset.h : null;
+    if (h) { mode = "resize"; corner = h; }
+    else {
+      const b = Cropper.box;
+      if (n.x >= b.x0 && n.x <= b.x1 && n.y >= b.y0 && n.y <= b.y1) { mode = "move"; }
+      else return;
+    }
+    startBox = Object.assign({}, Cropper.box);
+    startN = n;
+    capId = e.pointerId;
+    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (mode == null || capId !== e.pointerId) return;
+    const n = toN(e);
+    const dx = n.x - startN.x, dy = n.y - startN.y;
+    const b = Object.assign({}, startBox);
+    if (mode === "move") {
+      const w = startBox.x1 - startBox.x0, h = startBox.y1 - startBox.y0;
+      b.x0 = clamp01(startBox.x0 + dx); b.x1 = b.x0 + w;
+      if (b.x1 > 1) { b.x1 = 1; b.x0 = 1 - w; }
+      b.y0 = clamp01(startBox.y0 + dy); b.y1 = b.y0 + h;
+      if (b.y1 > 1) { b.y1 = 1; b.y0 = 1 - h; }
+    } else {
+      if (corner === "tl") { b.x0 = Math.min(clamp01(startBox.x0 + dx), b.x1 - MIN); b.y0 = Math.min(clamp01(startBox.y0 + dy), b.y1 - MIN); }
+      else if (corner === "tr") { b.x1 = Math.max(clamp01(startBox.x1 + dx), b.x0 + MIN); b.y0 = Math.min(clamp01(startBox.y0 + dy), b.y1 - MIN); }
+      else if (corner === "bl") { b.x0 = Math.min(clamp01(startBox.x0 + dx), b.x1 - MIN); b.y1 = Math.max(clamp01(startBox.y1 + dy), b.y0 + MIN); }
+      else if (corner === "br") { b.x1 = Math.max(clamp01(startBox.x1 + dx), b.x0 + MIN); b.y1 = Math.max(clamp01(startBox.y1 + dy), b.y0 + MIN); }
+    }
+    Cropper.box = b;
+    Cropper.renderBox();
+  });
+  const up = (e) => {
+    if (capId !== e.pointerId) return;
+    try { stage.releasePointerCapture(e.pointerId); } catch (_) {}
+    mode = null; corner = null; capId = null;
+  };
+  stage.addEventListener("pointerup", up);
+  stage.addEventListener("pointercancel", up);
+
+  if ($("#cr-confirm")) $("#cr-confirm").addEventListener("click", () => Cropper.confirm());
+  if ($("#cr-cancel")) $("#cr-cancel").addEventListener("click", () => Cropper.cancel());
+  if ($("#cr-reset")) $("#cr-reset").addEventListener("click", () => Cropper.reset());
+  window.addEventListener("resize", () => {
+    if ($("#screen-crop").classList.contains("active")) { Cropper.layout(); Cropper.renderBox(); }
   });
 });

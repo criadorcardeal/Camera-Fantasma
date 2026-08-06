@@ -768,6 +768,16 @@ html, body {
 }
 .btn.primary { background: var(--primary); color: #fff; }
 .btn.outline { background: #fff; color: var(--primary); border: 1.5px solid var(--primary); }
+/* Botão "Apagar" (descartar foto): contorno vermelho. */
+.btn.outline.danger { color: #c0392b; border-color: #e0a29b; }
+.btn.outline.danger:active { background: #c0392b; color: #fff; border-color: #c0392b; }
+
+/* Placeholder quando o lado não tem foto (após Apagar). */
+.empty-stage { display: flex; align-items: center; justify-content: center; }
+.empty-photo {
+  color: #cfd3d8; text-align: center; font-size: 0.9rem; line-height: 1.5;
+  padding: 20px; max-width: 80%;
+}
 
 .lock-note {
   background: #fbeecb; color: #7a5b00; border-radius: 10px;
@@ -837,6 +847,12 @@ html, body {
   background: #000; touch-action: none; user-select: none;
 }
 .al-stage img { touch-action: none; }
+/* Wrapper das 2 fotos: recebe a transformação de GRUPO (enquadrar as duas
+   juntas, v8.5). O #al-follow mantém a sua própria transformação por dentro. */
+#al-imgwrap {
+  position: absolute; inset: 0;
+  transform-origin: center center; will-change: transform;
+}
 #al-follow {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: contain; transform-origin: center center; will-change: transform;
@@ -944,6 +960,32 @@ html, body {
 .al-roi-head { font-size: 0.8rem; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
 .al-roi-card .seg { margin-bottom: 8px; }
 .al-roi-card .roi-tog { margin-top: 6px; }
+/* Card "Imagens" (v8.5): botões de cortar. */
+#al-imgtools-card .al-btn-row { margin-top: 8px; }
+
+/* ---------- Tela Cortar foto (v8.5) ---------- */
+.cr-stage {
+  position: relative; align-self: center; flex-shrink: 0; overflow: hidden;
+  background: #000; touch-action: none; user-select: none;
+}
+.cr-stage img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; pointer-events: none;
+}
+.cr-box {
+  position: absolute; border: 2px solid #fff; box-sizing: border-box;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.55); cursor: move;
+  touch-action: none;
+}
+.cr-handle {
+  position: absolute; width: 28px; height: 28px; z-index: 3;
+  border: 3px solid #fff; background: rgba(255,255,255,0.15);
+  border-radius: 4px; touch-action: none;
+}
+.cr-handle[data-h="tl"] { left: -14px; top: -14px; }
+.cr-handle[data-h="tr"] { right: -14px; top: -14px; }
+.cr-handle[data-h="bl"] { left: -14px; bottom: -14px; }
+.cr-handle[data-h="br"] { right: -14px; bottom: -14px; }
 .ed-seg button:disabled { opacity: 0.4; cursor: default; }
 
 /* Editor da zona (tela #screen-roi) */

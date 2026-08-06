@@ -108,8 +108,51 @@ const followSrc = (s) => s.followDefocus || followSrcRaw(s);
 // neon" está ligado no card da Base/Acompanhamento, TROCA a foto exibida pelo
 // contorno (em vez de abrir uma prévia à parte). A miniatura da home e as
 // exportações continuam usando a foto real (baseSrc/followSrc).
-const baseMontageSrc = (s) => (s.baseSketchOn && s.baseSketch) ? s.baseSketch : baseSrc(s);
-const followMontageSrc = (s) => (s.followSketchOn && s.followSketch) ? s.followSketch : followSrc(s);
+const baseMontageSrc0 = (s) => (s.baseSketchOn && s.baseSketch) ? s.baseSketch : baseSrc(s);
+const followMontageSrc0 = (s) => (s.followSketchOn && s.followSketch) ? s.followSketch : followSrc(s);
+
+/* v8.5: ENQUADRAMENTO de grupo (s.groupFrame) — zoom/giro/deslocamento aplicados
+   às DUAS fotos juntas, gravado na composição. Redesenha a imagem (que já está no
+   aspecto da base) com a transformação e mantém o resto transparente (o fundo do
+   palco é preto). Preserva alfa (contornos) usando PNG. */
+async function applyGroupFrame(src, s) {
+  const gf = s && s.groupFrame;
+  if (!src || !gf) return src;
+  const id = Math.abs(gf.z - 1) < 0.001 && Math.abs(gf.rot || 0) < 0.01 &&
+             Math.abs(gf.txn || 0) < 0.001 && Math.abs(gf.tyn || 0) < 0.001;
+  if (id) return src;
+  let img;
+  try { img = await loadImageEl(src); } catch (_) { return src; }
+  const W = img.naturalWidth || 1, H = img.naturalHeight || 1;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d");
+  ctx.translate(W / 2 + (gf.txn || 0) * W, H / 2 + (gf.tyn || 0) * H);
+  ctx.scale(gf.z, gf.z);
+  ctx.rotate((gf.rot || 0) * Math.PI / 180);
+  ctx.drawImage(img, -W / 2, -H / 2, W, H);
+  return c.toDataURL("image/png");
+}
+window.applyGroupFrame = applyGroupFrame;
+
+// Cache das fontes da montagem JÁ enquadradas (evita reprocessar a cada tecla ao
+// editar rótulos). Chave = fontes cruas + o enquadramento de grupo.
+let _mf = { baseSrc: null, followSrc: null, gfk: null, base: null, follow: null };
+async function ensureMontageFrame(s) {
+  const bs = baseMontageSrc0(s), fs = followMontageSrc0(s);
+  const gfk = JSON.stringify(s.groupFrame || null);
+  if (_mf.baseSrc === bs && _mf.followSrc === fs && _mf.gfk === gfk) return;
+  _mf = { baseSrc: bs, followSrc: fs, gfk,
+          base: await applyGroupFrame(bs, s), follow: await applyGroupFrame(fs, s) };
+}
+// Getters usados pela montagem: devolvem a versão enquadrada quando o cache está
+// quente para a fonte atual; senão a fonte crua (o await acontece antes de render).
+const baseMontageSrc = (s) =>
+  (s.groupFrame && _mf.base && _mf.baseSrc === baseMontageSrc0(s) && _mf.gfk === JSON.stringify(s.groupFrame || null))
+    ? _mf.base : baseMontageSrc0(s);
+const followMontageSrc = (s) =>
+  (s.groupFrame && _mf.follow && _mf.followSrc === followMontageSrc0(s) && _mf.gfk === JSON.stringify(s.groupFrame || null))
+    ? _mf.follow : followMontageSrc0(s);
 
 /* ---------------- Contorno neon (imagem fantasma) ----------------
    Gera (uma vez) e guarda o contorno neon de cada foto, para usar como
@@ -731,7 +774,9 @@ const Cam = {
       s.baseImage = dataUrl;
       s.baseLabel = label;
       s.filters = f;
-      delete s.baseImageView;   // descarta ajuste anterior da base
+      s.baseImageView = null;   // descarta ajuste anterior da base
+      s.baseAdj = null;
+      s.baseTarget = null;
       clearSketch(s, "base");   // contorno neon será regerado da nova foto
       clearDistract(s, "base"); // nova foto: máscara/desfoque de distrações não valem mais
       await DB.put(s);
@@ -762,6 +807,11 @@ const Cam = {
       s.followAlign = null;
       s.followLabel = label;
       s.followAt = new Date().toISOString();
+      // Nova foto: descarta o ajuste de cor anterior (senão followImageView/Adj
+      // ficavam apontando p/ a foto ANTIGA e a Montagem continuava mostrando ela).
+      s.followImageView = null;
+      s.followAdj = null;
+      s.followTarget = null;
       clearSketch(s, "follow");
       clearDistract(s, "follow");   // nova foto: máscara/desfoque de distrações não valem mais
       await DB.put(s);
@@ -841,7 +891,9 @@ async function importBasePhoto(file, session) {
     if (res == null) return;
     session.baseImage = dataUrl;
     session.baseLabel = res.label;
-    delete session.baseImageView;
+    session.baseImageView = null;
+    session.baseAdj = null;
+    session.baseTarget = null;
     clearSketch(session, "base");
     clearDistract(session, "base");   // nova base: distrações não valem mais
     await DB.put(session);
@@ -936,7 +988,12 @@ async function openDetail(id) {
   _detailSession = s;
   const c = $("#detail-content");
 
+  const hasBase = !!s.baseImage;
   const hasFollow = !!s.followImage;
+  // A comparação (cortina/lado a lado/sobrepor) só existe com as DUAS fotos.
+  const bothPhotos = hasBase && hasFollow;
+  // v8.5: prepara as fontes já enquadradas (grupo) antes de montar o HTML.
+  await ensureMontageFrame(s);
 
   // Aba de comparação lembrada da última vez nesta comparação (Cortina por padrão).
   const MODES = ["curtain", "side", "overlay"];
@@ -946,13 +1003,17 @@ async function openDetail(id) {
   // v8.2: a foto (#cmp-host) fica na área FIXA do topo; o seletor de modo
   // (Cortina/Lado a lado/Sobrepor) vai ABAIXO da foto, na seção "Tipo de
   // comparação". O botão "Comparar" fica na topbar (#detail-action, v8.3).
-  const stageHtml = hasFollow
+  const singleSrc = hasBase ? baseMontageSrc(s) : (hasFollow ? followMontageSrc(s) : null);
+  const singleLabel = hasBase ? s.baseLabel : s.followLabel;
+  const stageHtml = bothPhotos
     ? `<div id="cmp-host"></div>`
-    : `<div class="compare-stage" id="cmp-host"><img src="${baseMontageSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}</div>`;
+    : singleSrc
+      ? `<div class="compare-stage" id="cmp-host"><img src="${singleSrc}" style="object-fit:contain" />${capHtml(singleLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}</div>`
+      : `<div class="compare-stage empty-stage" id="cmp-host"><div class="empty-photo">Sem foto.<br>Use os botões abaixo para <b>tirar</b> ou <b>importar</b>.</div></div>`;
   // v8.3: seção expansível "Tipo de comparação" com o seletor de modo E o
   // controle deslizante (o slider é injetado em #cmp-slider por renderCompare).
   const cmpTypeOpen = _detailOpenCards["cmptype-card"] !== false ? " open" : "";  // aberta por padrão
-  const segHtml = hasFollow
+  const segHtml = bothPhotos
     ? `<div class="act-card collapsible${cmpTypeOpen}" id="cmptype-card">
          <div class="act-head"><span class="act-title">Tipo de comparação</span><span class="chev">▾</span></div>
          <div class="act-body">
@@ -1006,7 +1067,8 @@ async function openDetail(id) {
           <button class="btn outline" id="btn-base-redo">📷 Refazer</button>
           <button class="btn outline" id="btn-base-import">🖼 ${s.baseImage ? "Importar nova" : "Importar"}</button>
         </div>`}
-        ${contourBlock("base", !!s.baseSketchOn, s.baseSketch)}
+        ${(!locked && hasBase) ? `<button class="btn outline danger card-full" id="btn-base-del">🗑 Apagar foto base</button>` : ""}
+        ${hasBase ? contourBlock("base", !!s.baseSketchOn, s.baseSketch) : ""}
       </div>
     </div>`;
 
@@ -1019,13 +1081,14 @@ async function openDetail(id) {
           <button class="btn outline" id="btn-redo">${hasFollow ? "📷 Refazer" : "📷 Tirar"}</button>
           <button class="btn outline" id="btn-follow-import">🖼 ${hasFollow ? "Importar nova" : "Importar"}</button>
         </div>`}
+        ${(!locked && hasFollow) ? `<button class="btn outline danger card-full" id="btn-follow-del">🗑 Apagar foto de acompanhamento</button>` : ""}
         ${hasFollow ? contourBlock("follow", !!s.followSketchOn, s.followSketch) : ""}
       </div>
     </div>`;
 
   // Card AJUSTES FINOS (recolhível, fechado): coloração/exposição, posicionamento
   // e inversão. Colorações/Posicionamentos seguem disponíveis mesmo travado.
-  const fineCard = hasFollow ? `
+  const fineCard = bothPhotos ? `
     <div class="act-card collapsible${openCls("fine-card")}" id="fine-card">
       <div class="act-head"><span class="act-title">Ajustes Finos</span><span class="chev">▾</span></div>
       <div class="act-body">
@@ -1048,15 +1111,15 @@ async function openDetail(id) {
   // Botão "Comparar" na topbar: só quando há acompanhamento.
   const actBtn = $("#detail-action");
   if (actBtn) {
-    actBtn.hidden = !hasFollow;
-    actBtn.onclick = hasFollow ? () => confirmThenSave(s) : null;
+    actBtn.hidden = !bothPhotos;
+    actBtn.onclick = bothPhotos ? () => confirmThenSave(s) : null;
   }
 
   // Ativa a tela ANTES de montar a comparação, para o palco já ter largura
   // (a cortina depende de clientWidth para dimensionar a foto de acompanhamento).
   showScreen("screen-detail");
 
-  if (hasFollow) {
+  if (bothPhotos) {
     renderCompare(mode0);
     $("#cmp-seg").querySelectorAll("button").forEach((b) => {
       b.addEventListener("click", async () => {
@@ -1095,6 +1158,8 @@ async function openDetail(id) {
   if ($("#btn-base-redo")) $("#btn-base-redo").addEventListener("click", () => Cam.open("base", s));
   if ($("#btn-base-import")) $("#btn-base-import").addEventListener("click", () =>
     pickImage().then((file) => importBasePhoto(file, s)));
+  if ($("#btn-base-del")) $("#btn-base-del").addEventListener("click", () => discardPhoto(s, "base"));
+  if ($("#btn-follow-del")) $("#btn-follow-del").addEventListener("click", () => discardPhoto(s, "follow"));
   if ($("#btn-swap")) $("#btn-swap").addEventListener("click", () => swapPhotos(s));
 
   // Card de rótulo: seta de expansão abre/fecha os campos de edição.
@@ -1130,6 +1195,32 @@ async function toggleContour(s, kind) {
   } else {
     s[m.on] = false;
   }
+  await DB.put(s);
+  await openDetail(s.id);
+}
+
+// Apaga a foto de um lado (base/acompanhamento), descartando TODOS os derivados
+// daquele lado (ajuste de cor, contorno, distrações, alinhamento). O rótulo é
+// mantido para reaproveitar ao tirar/importar de novo. Confirma antes.
+async function discardPhoto(s, kind) {
+  if (!s) return;
+  const nome = kind === "base" ? "a foto base" : "a foto de acompanhamento";
+  const ok = await confirmDialog(
+    "Apagar foto",
+    `Isto descarta <b>${nome}</b> e todos os seus ajustes (cor, contorno, ` +
+    `distrações e posicionamento). O rótulo é mantido.<br><br>Deseja apagar?`,
+    "Apagar");
+  if (!ok) return;
+  if (kind === "base") {
+    s.baseImage = null;
+    s.baseImageView = null; s.baseAdj = null; s.baseTarget = null;
+  } else {
+    s.followImage = null; s.followOriginal = null; s.followAlign = null;
+    s.followImageView = null; s.followAdj = null; s.followTarget = null;
+    s.followAt = null;
+  }
+  clearSketch(s, kind);
+  clearDistract(s, kind);
   await DB.put(s);
   await openDetail(s.id);
 }
@@ -1338,12 +1429,18 @@ function sizeWmNames() {
 }
 
 // Recolhe o modo de comparação ativo e re-renderiza (para atualizar legendas).
-function refreshCompareCaptions() {
+async function refreshCompareCaptions() {
   const s = _detailSession;
   if (!s) return;
-  if (!s.followImage) {
+  await ensureMontageFrame(s);
+  // Sem as duas fotos não há comparação: mostra a única foto (ou o vazio) e sai.
+  if (!s.baseImage || !s.followImage) {
     const host = $("#cmp-host");
-    if (host) host.innerHTML = `<img src="${baseMontageSrc(s)}" style="object-fit:contain" />${capHtml(s.baseLabel, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}`;
+    const src = s.baseImage ? baseMontageSrc(s) : (s.followImage ? followMontageSrc(s) : null);
+    const lbl = s.baseImage ? s.baseLabel : s.followLabel;
+    if (host) host.innerHTML = src
+      ? `<img src="${src}" style="object-fit:contain" />${capHtml(lbl, "cap-center", s.showLabels)}${Profile.wmHtml(Profile.config(), true)}`
+      : `<div class="empty-photo">Sem foto.<br>Use os botões abaixo para <b>tirar</b> ou <b>importar</b>.</div>`;
     requestAnimationFrame(sizeWmNames);
     return;
   }

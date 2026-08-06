@@ -49,7 +49,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v8.4</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v8.5</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -88,7 +88,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v8.4</span>
+      <span class="version-badge">v8.5</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -167,8 +167,10 @@
     <div class="al-body">
       <div class="photo-fixed">
         <div class="al-stage" id="al-stage">
-          <img id="al-follow" alt="" />
-          <img id="al-ghost" class="al-ghost" alt="" />
+          <div id="al-imgwrap">
+            <img id="al-follow" alt="" />
+            <img id="al-ghost" class="al-ghost" alt="" />
+          </div>
           <div id="al-fulcrum" class="al-fulcrum" hidden></div>
           <div id="al-roidraw" class="al-roidraw" hidden><div id="al-roirect" class="al-roirect" hidden></div></div>
           <div id="al-fulcrum-hint" class="al-modehint" hidden>Toque para posicionar o eixo de giro (fulcro)</div>
@@ -192,6 +194,18 @@
           <div class="al-btn-row">
             <button id="al-rotate-reset" class="al-reset">↺ Zerar giros</button>
             <button id="al-fulcrum-btn" class="al-reset">✜ Reposicionar fulcro</button>
+          </div>
+        </div>
+        <div class="al-roi-card" id="al-imgtools-card">
+          <div class="al-roi-head">Imagens</div>
+          <div class="seg" id="al-ghost-seg">
+            <button type="button" data-which="base" class="active">Fantasma: Base</button>
+            <button type="button" data-which="follow">Fantasma: Acomp.</button>
+          </div>
+          <label class="roi-tog"><input type="checkbox" id="al-group" /> <span>🔗 Agrupar as 2 fotos (enquadrar juntas)</span></label>
+          <div class="al-btn-row">
+            <button id="al-crop-base" class="al-reset" type="button">✂️ Cortar base</button>
+            <button id="al-crop-follow" class="al-reset" type="button">✂️ Cortar acomp.</button>
           </div>
         </div>
         <div class="al-roi-card" id="al-contour-card">
@@ -233,6 +247,36 @@
         <div class="al-btn-row">
           <button id="ds-cancel2" class="al-reset">Cancelar</button>
           <button id="ds-clear" class="al-reset">↺ Zerar ajustes</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TELA: CORTAR FOTO (v8.5) ============ -->
+  <section id="screen-crop" class="screen">
+    <header class="topbar">
+      <button id="cr-cancel" class="icon-btn dark">‹</button>
+      <h1 id="cr-title">Cortar foto</h1>
+      <button id="cr-confirm" class="topbar-action" type="button">Confirmar</button>
+    </header>
+    <div class="ds-body">
+      <div class="photo-fixed">
+        <div class="cr-stage" id="cr-stage">
+          <img id="cr-img" alt="" />
+          <div id="cr-box" class="cr-box">
+            <div class="cr-handle" data-h="tl"></div>
+            <div class="cr-handle" data-h="tr"></div>
+            <div class="cr-handle" data-h="bl"></div>
+            <div class="cr-handle" data-h="br"></div>
+          </div>
+        </div>
+      </div>
+      <div class="scroll-area">
+        <p class="ds-hint">Arraste o <b>retângulo</b> ou seus <b>cantos</b> para
+          recortar. A área fora do retângulo é descartada. O corte passa a valer
+          em toda a comparação.</p>
+        <div class="al-btn-row">
+          <button id="cr-reset" class="al-reset" type="button">↺ Retângulo cheio</button>
         </div>
       </div>
     </div>

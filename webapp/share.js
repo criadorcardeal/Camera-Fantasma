@@ -118,8 +118,9 @@ function drawChip(ctx, text, x, y, align, family, fontPx) {
 // Monta a imagem da comparacao (Base | Acompanhamento). Sem títulos/informações:
 // só as 2 fotos e os rótulos de rodapé como chips (largura do texto, como no vídeo).
 async function generateComparisonImage(s) {
-  const baseImg = await loadImageEl(baseSrc(s));
-  const followImg = await loadImageEl(followSrc(s));
+  // v8.5: aplica o enquadramento de grupo (as duas fotos com o mesmo corte).
+  const baseImg = await loadImageEl(await applyGroupFrame(baseSrc(s), s));
+  const followImg = await loadImageEl(await applyGroupFrame(followSrc(s), s));
   const prof = Profile.config();
   const logoImg = (prof.logoOn && prof.logo) ? await loadImageEl(prof.logo).catch(() => null) : null;
   const aspect = (baseImg.naturalWidth / baseImg.naturalHeight) || 0.75;
@@ -179,8 +180,8 @@ async function generateVideo(s, kind) {
   const mime = pickVideoMime();
   if (!mime) throw new Error("Gravação de vídeo não suportada neste navegador.");
 
-  const baseImg = await loadImageEl(baseSrc(s));
-  const followImg = await loadImageEl(followSrc(s));
+  const baseImg = await loadImageEl(await applyGroupFrame(baseSrc(s), s));
+  const followImg = await loadImageEl(await applyGroupFrame(followSrc(s), s));
   const prof = Profile.config();
   const logoImg = (prof.logoOn && prof.logo) ? await loadImageEl(prof.logo).catch(() => null) : null;
 
@@ -346,9 +347,9 @@ const Share = {
       return c.toDataURL("image/jpeg", 0.92);
     };
     try {
-      this.files.base = await dataUrlToFile(await prep(baseSrc(session), session.baseLabel), "foto-base.jpg");
+      this.files.base = await dataUrlToFile(await prep(await applyGroupFrame(baseSrc(session), session), session.baseLabel), "foto-base.jpg");
       if (hasFollow) {
-        this.files.follow = await dataUrlToFile(await prep(followSrc(session), session.followLabel), "acompanhamento.jpg");
+        this.files.follow = await dataUrlToFile(await prep(await applyGroupFrame(followSrc(session), session), session.followLabel), "acompanhamento.jpg");
         const cmp = await generateComparisonImage(session);
         this.files.compare = await dataUrlToFile(cmp, "comparacao.jpg");
       }
