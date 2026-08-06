@@ -6,8 +6,9 @@
    voucher em "Adquirir creditos", seguido de video obrigatorio do patrocinador.
    Bibliotecas externas (supabase-js) sao cacheadas pelo fetch handler apos o 1o
    acesso, para funcionar offline com sessao ja salva. */
-/* v8.5: re-disparo do deploy do GitHub Pages (o 1o deploy nao publicou a tempo). */
-const CACHE = "fotos-fantasma-v85";
+/* v8.5.1: Montagem reorganizada (seção Fotos única com toggle Base/Acomp., 3
+   botões em linha, Pós-processamento; Inverter em "Tipo de comparação"). */
+const CACHE = "fotos-fantasma-v851";
 const ASSETS = [
   "./",
   "./index.html",

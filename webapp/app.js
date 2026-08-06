@@ -979,12 +979,14 @@ let _detailSession = null;
 // Lembra quais cards de rolagem estão abertos, para reabrir a Montagem no mesmo
 // estado depois de entrar num botão do card (ex.: Ajustes Finos → Colorações).
 let _detailOpenCards = {};
+// Lado (base/acomp.) selecionado no toggle da seção "Fotos" (v8.5).
+let _detailSide = "base";
 
 async function openDetail(id) {
   const s = await DB.get(id);
   if (!s) { showScreen("screen-home"); await renderHome(); return; }
-  // Ao trocar de comparação, esquece o estado dos cards da anterior.
-  if (!_detailSession || _detailSession.id !== id) _detailOpenCards = {};
+  // Ao trocar de comparação, esquece o estado dos cards e o lado da anterior.
+  if (!_detailSession || _detailSession.id !== id) { _detailOpenCards = {}; _detailSide = "base"; }
   _detailSession = s;
   const c = $("#detail-content");
 
@@ -992,6 +994,10 @@ async function openDetail(id) {
   const hasFollow = !!s.followImage;
   // A comparação (cortina/lado a lado/sobrepor) só existe com as DUAS fotos.
   const bothPhotos = hasBase && hasFollow;
+  // Depois de gerar a comparação (crédito confirmado), as fotos ficam travadas.
+  const locked = s.creditState === "confirmed";
+  // Lado selecionado na seção "Fotos" (toggle Base/Acompanhamento, v8.5).
+  const side = _detailSide === "follow" ? "follow" : "base";
   // v8.5: prepara as fontes já enquadradas (grupo) antes de montar o HTML.
   await ensureMontageFrame(s);
 
@@ -1019,12 +1025,10 @@ async function openDetail(id) {
          <div class="act-body">
            <div class="seg" id="cmp-seg">${segBtn("curtain", "Cortina")}${segBtn("side", "Lado a lado")}${segBtn("overlay", "Sobrepor")}</div>
            <div id="cmp-slider"></div>
+           ${locked ? "" : `<button class="btn outline card-full" id="btn-swap">🔁 Inverter base ↔ acompanhamento</button>`}
          </div>
        </div>`
     : "";
-
-  // Depois de gerar a comparação (crédito confirmado), as fotos ficam travadas.
-  const locked = s.creditState === "confirmed";
 
   const labelHtml = `
     <div class="label-card" id="label-card">
@@ -1047,54 +1051,36 @@ async function openDetail(id) {
 
   const openCls = (id) => _detailOpenCards[id] ? " open" : "";
 
-  // Linha de dois botões (v8.1): "Remover distrações" à ESQUERDA de "Contorno
-  // neon". O contorno LIGADO troca a imagem exibida na comparação (acima) pelo
-  // contorno. "Remover distrações" ATIVO quando já há máscara pintada nesse lado.
-  const contourLabel = (on) => on ? "✨ Contorno: ligado" : "✨ Contorno neon";
-  const distractOn = (kind) => kind === "base" ? !!s.baseMask : !!s.followMask;
-  const contourBlock = (kind, on) => `
-    <div class="btn-row contour-row">
-      <button class="btn outline distract-btn${distractOn(kind) ? " active" : ""}" id="btn-${kind}-distract">🫥 Remover distrações</button>
-      <button class="btn outline contour-btn${on ? " active" : ""}" id="btn-${kind}-contour">${contourLabel(on)}</button>
-    </div>`;
-
-  // Card BASE (recolhível, fechado por padrão): Refazer/Importar + Contorno neon.
-  const baseCard = `
-    <div class="act-card collapsible${openCls("base-card")}" id="base-card">
-      <div class="act-head"><span class="act-title">Base</span><span class="chev">▾</span></div>
+  // Card FOTOS (v8.5): UMA seção com toggle Base/Acompanhamento e os 3 botões na
+  // mesma linha (Refazer / Importar nova / Apagar) + "Pós-processamento". O
+  // contorno/distrações/cortar/zoom/girar saíram para a janela de pós-processamento.
+  const sideHas = side === "base" ? hasBase : hasFollow;
+  const redoLabel = sideHas ? "📷 Refazer" : "📷 Tirar";
+  const importLabel = sideHas ? "🖼 Importar nova" : "🖼 Importar";
+  const segSide = (val, label) => `<button data-side="${val}"${val === side ? ' class="active"' : ""}>${label}</button>`;
+  const photoCard = `
+    <div class="act-card collapsible${openCls("photo-card")}" id="photo-card">
+      <div class="act-head"><span class="act-title">Fotos</span><span class="chev">▾</span></div>
       <div class="act-body">
-        ${locked ? "" : `<div class="btn-row">
-          <button class="btn outline" id="btn-base-redo">📷 Refazer</button>
-          <button class="btn outline" id="btn-base-import">🖼 ${s.baseImage ? "Importar nova" : "Importar"}</button>
-        </div>`}
-        ${(!locked && hasBase) ? `<button class="btn outline danger card-full" id="btn-base-del">🗑 Apagar foto base</button>` : ""}
-        ${hasBase ? contourBlock("base", !!s.baseSketchOn, s.baseSketch) : ""}
+        <div class="seg" id="ph-side-seg">${segSide("base", "Base")}${segSide("follow", "Acompanhamento")}</div>
+        ${locked ? `<p class="lock-note-inline">🔒 Fotos travadas — comparação concluída.</p>` : `
+        <div class="btn-row three">
+          <button class="btn outline" id="btn-ph-redo">${redoLabel}</button>
+          <button class="btn outline" id="btn-ph-import">${importLabel}</button>
+          <button class="btn outline danger" id="btn-ph-del"${sideHas ? "" : " disabled"}>🗑 Apagar</button>
+        </div>
+        <button class="btn outline card-full" id="btn-ph-post"${sideHas ? "" : " disabled"}>🎛 Pós-processamento</button>`}
       </div>
     </div>`;
 
-  // Card ACOMPANHAMENTO (recolhível, fechado): Tirar/Refazer/Importar + Contorno.
-  const acCard = `
-    <div class="act-card collapsible${openCls("ac-card")}" id="ac-card">
-      <div class="act-head"><span class="act-title">Acompanhamento</span><span class="chev">▾</span></div>
-      <div class="act-body">
-        ${locked ? "" : `<div class="btn-row">
-          <button class="btn outline" id="btn-redo">${hasFollow ? "📷 Refazer" : "📷 Tirar"}</button>
-          <button class="btn outline" id="btn-follow-import">🖼 ${hasFollow ? "Importar nova" : "Importar"}</button>
-        </div>`}
-        ${(!locked && hasFollow) ? `<button class="btn outline danger card-full" id="btn-follow-del">🗑 Apagar foto de acompanhamento</button>` : ""}
-        ${hasFollow ? contourBlock("follow", !!s.followSketchOn, s.followSketch) : ""}
-      </div>
-    </div>`;
-
-  // Card AJUSTES FINOS (recolhível, fechado): coloração/exposição, posicionamento
-  // e inversão. Colorações/Posicionamentos seguem disponíveis mesmo travado.
+  // Card AJUSTES PARA COMPARAÇÃO (v8.5, ex-"Ajustes Finos"): coloração/exposição e
+  // posicionamento (o "Inverter" foi para "Tipo de comparação").
   const fineCard = bothPhotos ? `
     <div class="act-card collapsible${openCls("fine-card")}" id="fine-card">
-      <div class="act-head"><span class="act-title">Ajustes Finos</span><span class="chev">▾</span></div>
+      <div class="act-head"><span class="act-title">Ajustes para comparação</span><span class="chev">▾</span></div>
       <div class="act-body">
         <button class="btn outline card-full" id="btn-adjust">🎚 Colorações e Exposição</button>
         <button class="btn outline card-full" id="btn-reposition">↔️ Posicionamentos</button>
-        ${locked ? "" : `<button class="btn outline card-full" id="btn-swap">🔁 Inverter base ↔ acompanhamento</button>`}
       </div>
     </div>` : "";
 
@@ -1106,7 +1092,7 @@ async function openDetail(id) {
   // a foto FIXA no topo e os cards que rolam.
   c.innerHTML =
     `<div class="photo-fixed">${stageHtml}</div>` +
-    `<div class="scroll-area">${segHtml + labelHtml + lockNote + baseCard + acCard + fineCard}</div>`;
+    `<div class="scroll-area">${segHtml + labelHtml + lockNote + photoCard + fineCard}</div>`;
 
   // Botão "Comparar" na topbar: só quando há acompanhamento.
   const actBtn = $("#detail-action");
@@ -1135,9 +1121,9 @@ async function openDetail(id) {
   enableWmEdit();
   requestAnimationFrame(sizeWmNames);
 
-  // Cards recolhíveis (Tipo de comparação / Base / Acompanhamento / Ajustes Finos):
+  // Cards recolhíveis (Tipo de comparação / Fotos / Ajustes para comparação):
   // o cabeçalho abre/fecha e lembra o estado (p/ reabrir a Montagem igual).
-  ["#cmptype-card", "#base-card", "#ac-card", "#fine-card"].forEach((sel) => {
+  ["#cmptype-card", "#photo-card", "#fine-card"].forEach((sel) => {
     const card = $(sel);
     if (card) card.querySelector(".act-head").addEventListener("click", () => {
       card.classList.toggle("open");
@@ -1146,20 +1132,23 @@ async function openDetail(id) {
     });
   });
 
+  // Toggle Base/Acompanhamento da seção Fotos: troca o lado e re-renderiza.
+  if ($("#ph-side-seg")) $("#ph-side-seg").querySelectorAll("button").forEach((b) =>
+    b.addEventListener("click", () => {
+      if (b.dataset.side === _detailSide) return;
+      _detailSide = b.dataset.side;
+      _detailOpenCards["photo-card"] = true;   // mantém o card aberto ao trocar
+      openDetail(s.id);
+    }));
+
   if ($("#btn-adjust")) $("#btn-adjust").addEventListener("click", () => Editor.open(s));
   if ($("#btn-reposition")) $("#btn-reposition").addEventListener("click", () => Aligner.open(s, s.followOriginal || s.followImage, true));
-  if ($("#btn-redo")) $("#btn-redo").addEventListener("click", () => Cam.open("follow", s));
-  if ($("#btn-follow-import")) $("#btn-follow-import").addEventListener("click", () =>
-    pickImage().then((file) => importFollowPhoto(s, file)));
-  if ($("#btn-base-contour")) $("#btn-base-contour").addEventListener("click", () => toggleContour(s, "base"));
-  if ($("#btn-follow-contour")) $("#btn-follow-contour").addEventListener("click", () => toggleContour(s, "follow"));
-  if ($("#btn-base-distract")) $("#btn-base-distract").addEventListener("click", () => Distract.open(s, "base"));
-  if ($("#btn-follow-distract")) $("#btn-follow-distract").addEventListener("click", () => Distract.open(s, "follow"));
-  if ($("#btn-base-redo")) $("#btn-base-redo").addEventListener("click", () => Cam.open("base", s));
-  if ($("#btn-base-import")) $("#btn-base-import").addEventListener("click", () =>
-    pickImage().then((file) => importBasePhoto(file, s)));
-  if ($("#btn-base-del")) $("#btn-base-del").addEventListener("click", () => discardPhoto(s, "base"));
-  if ($("#btn-follow-del")) $("#btn-follow-del").addEventListener("click", () => discardPhoto(s, "follow"));
+  // Os 3 botões da seção Fotos agem sobre o LADO selecionado (base/acomp.).
+  if ($("#btn-ph-redo")) $("#btn-ph-redo").addEventListener("click", () => Cam.open(side, s));
+  if ($("#btn-ph-import")) $("#btn-ph-import").addEventListener("click", () =>
+    pickImage().then((file) => side === "base" ? importBasePhoto(file, s) : importFollowPhoto(s, file)));
+  if ($("#btn-ph-del")) $("#btn-ph-del").addEventListener("click", () => discardPhoto(s, side));
+  if ($("#btn-ph-post")) $("#btn-ph-post").addEventListener("click", () => PostProc.open(s, side));
   if ($("#btn-swap")) $("#btn-swap").addEventListener("click", () => swapPhotos(s));
 
   // Card de rótulo: seta de expansão abre/fecha os campos de edição.
@@ -1247,6 +1236,142 @@ async function swapPhotos(s) {
   await DB.put(s);
   await openDetail(s.id);
 }
+
+/* ---------------- Pós-processamento (v8.5) ----------------
+   Janela que age sobre UMA foto (base/acomp.), reunindo as ferramentas por foto:
+   Remover distrações, Contorno neon, Cortar, Zoom e Girar. As telas abertas a
+   partir daqui voltam para cá (finishTool). */
+let _postSide = "base";
+let _toolReturn = null;   // "postproc" quando uma ferramenta foi aberta daqui
+
+// As ferramentas (distrações/cortar/zoom/girar) chamam isto ao terminar: volta
+// ao Pós-processamento quando aberta de lá; senão à Montagem.
+function finishTool(s) {
+  const back = _toolReturn;
+  _toolReturn = null;
+  if (back === "postproc" && s) PostProc.open(s, _postSide);
+  else if (s) openDetail(s.id);
+  else { showScreen("screen-home"); renderHome(); }
+}
+window.finishTool = finishTool;
+
+const PostProc = {
+  session: null, side: "base",
+  async open(session, side) {
+    this.session = session;
+    this.side = side === "follow" ? "follow" : "base";
+    _postSide = this.side;
+    const s = session;
+    const has = this.side === "base" ? !!s.baseImage : !!s.followImage;
+    if (!has) { openDetail(s.id); return; }
+    const src = this.side === "base" ? baseMontageSrc0(s) : followMontageSrc0(s);
+    try { const im = await loadImageEl(src); this._aspect = (im.naturalWidth / im.naturalHeight) || 0.75; }
+    catch (_) { this._aspect = 0.75; }
+    $("#pp-title").textContent = this.side === "base"
+      ? "Pós-processamento — Base" : "Pós-processamento — Acompanhamento";
+    $("#pp-img").src = src;
+    const contourOn = this.side === "base" ? !!s.baseSketchOn : !!s.followSketchOn;
+    const distractOn = this.side === "base" ? !!s.baseMask : !!s.followMask;
+    const cb = $("#pp-contour");
+    if (cb) { cb.classList.toggle("active", contourOn); cb.textContent = contourOn ? "✨ Contorno: ligado" : "✨ Contorno neon"; }
+    const db = $("#pp-distract");
+    if (db) db.classList.toggle("active", distractOn);
+    showScreen("screen-postproc");
+    requestAnimationFrame(() => this.layout());
+  },
+  layout() { fitStageEl($("#pp-stage"), this._aspect || 0.75); },
+  // Abre uma ferramenta marcando que ao terminar deve voltar ao Pós-processamento.
+  openTool(fn) { _toolReturn = "postproc"; fn(); },
+  async toggleContour() {
+    const s = this.session, side = this.side;
+    const m = SKETCH_META[side];
+    const btn = $("#pp-contour");
+    if (!s[m.on]) {
+      if (btn) { btn.disabled = true; btn.textContent = "✨ Gerando contorno…"; }
+      try { await ensureSketch(s, side); }
+      catch (_) { if (btn) btn.disabled = false; alert("Não foi possível gerar o contorno desta foto."); return; }
+      s[m.on] = true;
+    } else { s[m.on] = false; }
+    await DB.put(s);
+    await this.open(s, side);   // re-renderiza o Pós-processamento com o novo estado
+  },
+  back() { if (this.session) openDetail(this.session.id); },
+};
+window.PostProc = PostProc;
+
+/* Zoom / Girar de UMA foto (v8.5): amplia/gira e SALVA a foto (base/acomp.),
+   passando a valer em toda a comparação. Mesmo aspecto da foto original. */
+const PhotoTx = {
+  session: null, side: "base", z: 1, rot: 0, src: null, imgW: 1, imgH: 1,
+  async open(session, side, focus) {
+    this.session = session;
+    this.side = side === "follow" ? "follow" : "base";
+    this.z = 1; this.rot = 0;
+    this.src = this.side === "base" ? baseSrcRaw(session) : followSrcRaw(session);
+    if (!this.src) { finishTool(session); return; }
+    try { const img = await loadImageEl(this.src); this.imgW = img.naturalWidth || 3; this.imgH = img.naturalHeight || 4; }
+    catch (_) { this.imgW = 3; this.imgH = 4; }
+    $("#px-img").src = this.src;
+    $("#px-zoom").value = 1; $("#px-rot").value = 0;
+    $("#px-title").textContent = focus === "rot" ? "Girar foto" : "Zoom da foto";
+    showScreen("screen-phototx");
+    requestAnimationFrame(() => { this.layout(); this.apply(); });
+  },
+  layout() { fitStageEl($("#px-stage"), this.imgW / this.imgH); },
+  apply() {
+    const img = $("#px-img");
+    if (img) img.style.transform = `scale(${this.z}) rotate(${this.rot}deg)`;
+  },
+  async confirm() {
+    const img = await loadImageEl(this.src);
+    const W = img.naturalWidth, H = img.naturalHeight;
+    const c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(this.z, this.z);
+    ctx.rotate(this.rot * Math.PI / 180);
+    ctx.drawImage(img, -W / 2, -H / 2, W, H);
+    const out = c.toDataURL("image/jpeg", 0.92);
+    const s = this.session;
+    if (this.side === "base") {
+      s.baseImage = out; s.baseImageView = null; s.baseAdj = null; s.baseTarget = null;
+    } else {
+      s.followImage = out; s.followOriginal = out; s.followAlign = null;
+      s.followImageView = null; s.followAdj = null; s.followTarget = null;
+    }
+    if (typeof clearSketch === "function") clearSketch(s, this.side);
+    if (typeof clearDistract === "function") clearDistract(s, this.side);
+    await DB.put(s);
+    finishTool(s);
+  },
+  cancel() { finishTool(this.session); },
+};
+window.PhotoTx = PhotoTx;
+
+// Controles das telas Pós-processamento e Zoom/Girar (v8.5).
+window.addEventListener("DOMContentLoaded", () => {
+  const pp = (id) => $(id);
+  if (pp("#pp-back")) pp("#pp-back").addEventListener("click", () => PostProc.back());
+  if (pp("#pp-distract")) pp("#pp-distract").addEventListener("click", () =>
+    PostProc.openTool(() => Distract.open(PostProc.session, PostProc.side)));
+  if (pp("#pp-contour")) pp("#pp-contour").addEventListener("click", () => PostProc.toggleContour());
+  if (pp("#pp-crop")) pp("#pp-crop").addEventListener("click", () =>
+    PostProc.openTool(() => Cropper.open(PostProc.session, PostProc.side)));
+  if (pp("#pp-zoom")) pp("#pp-zoom").addEventListener("click", () =>
+    PostProc.openTool(() => PhotoTx.open(PostProc.session, PostProc.side, "zoom")));
+  if (pp("#pp-rot")) pp("#pp-rot").addEventListener("click", () =>
+    PostProc.openTool(() => PhotoTx.open(PostProc.session, PostProc.side, "rot")));
+  if (pp("#px-cancel")) pp("#px-cancel").addEventListener("click", () => PhotoTx.cancel());
+  if (pp("#px-confirm")) pp("#px-confirm").addEventListener("click", () => PhotoTx.confirm());
+  if (pp("#px-zoom")) pp("#px-zoom").addEventListener("input", (e) => { PhotoTx.z = parseFloat(e.target.value); PhotoTx.apply(); });
+  if (pp("#px-rot")) pp("#px-rot").addEventListener("input", (e) => { PhotoTx.rot = parseFloat(e.target.value); PhotoTx.apply(); });
+  window.addEventListener("resize", () => {
+    if ($("#screen-postproc") && $("#screen-postproc").classList.contains("active")) PostProc.layout();
+    if ($("#screen-phototx") && $("#screen-phototx").classList.contains("active")) PhotoTx.layout();
+  });
+});
 
 // Duplica uma comparação já concluída (travada) para uma NOVA comparação editável.
 // Copia as fotos e ajustes, cobra 1 crédito (reserva) e abre a cópia destravada,

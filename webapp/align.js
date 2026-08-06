@@ -1348,8 +1348,6 @@ window.addEventListener("DOMContentLoaded", () => {
     b.addEventListener("click", () => Aligner.setGhostWhich(b.dataset.which)));
   const grpChk = $("#al-group");
   if (grpChk) grpChk.addEventListener("change", (e) => Aligner.toggleGroupMode(e.target.checked));
-  if ($("#al-crop-base")) $("#al-crop-base").addEventListener("click", () => Cropper.open(Aligner.session, "base"));
-  if ($("#al-crop-follow")) $("#al-crop-follow").addEventListener("click", () => Cropper.open(Aligner.session, "follow"));
 
   // Cards "Contorno neon" e "Distrações removidas": só exibição (v8.2).
   // Contorno e distração são exclusivos por lado: ligar um desmarca o outro.
@@ -1411,7 +1409,7 @@ const Cropper = {
     const b = this.box;
     const full = b.x0 < 0.005 && b.y0 < 0.005 && b.x1 > 0.995 && b.y1 > 0.995;
     const s = this.session;
-    if (full) { await Cropper._backToAligner(); return; }   // nada a cortar
+    if (full) { Cropper._done(s); return; }   // nada a cortar
     // Recorta em px da imagem original.
     const img = await loadImageEl(this.src);
     const W = img.naturalWidth, H = img.naturalHeight;
@@ -1434,18 +1432,15 @@ const Cropper = {
     if (typeof clearSketch === "function") clearSketch(s, this.kind);
     if (typeof clearDistract === "function") clearDistract(s, this.kind);
     await DB.put(s);
-    await Cropper._backToAligner();
+    Cropper._done(s);
   },
 
-  async cancel() { await Cropper._backToAligner(); },
+  async cancel() { Cropper._done(Cropper.session); },
 
-  async _backToAligner() {
-    const s = Cropper.session;
-    if (s && typeof Aligner !== "undefined") {
-      Aligner.open(s, s.followOriginal || s.followImage, true);
-    } else if (s) {
-      await openDetail(s.id);
-    }
+  // v8.5: o corte é aberto pelo Pós-processamento — volta para lá (finishTool).
+  _done(s) {
+    if (typeof finishTool === "function") finishTool(s);
+    else if (s) openDetail(s.id);
   },
 };
 

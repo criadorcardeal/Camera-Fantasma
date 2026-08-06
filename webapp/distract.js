@@ -208,9 +208,11 @@ const Distract = {
     this._render();
   },
 
-  // Sai da tela (seta ‹ de voltar) sem salvar.
+  // Sai da tela (seta ‹ de voltar) sem salvar. Volta ao Pós-processamento quando
+  // aberta de lá (v8.5), senão à Montagem.
   async cancel() {
-    await openDetail(this.session.id);
+    if (typeof finishTool === "function") finishTool(this.session);
+    else await openDetail(this.session.id);
   },
 
   // A máscara tem alguma marcação? (alfa opaco em qualquer pixel)
@@ -238,7 +240,8 @@ const Distract = {
     } finally {
       btn.disabled = false; btn.textContent = label;
     }
-    await openDetail(s.id);
+    if (typeof finishTool === "function") finishTool(s);
+    else await openDetail(s.id);
   },
 };
 window.Distract = Distract;

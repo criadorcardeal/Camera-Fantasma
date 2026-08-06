@@ -49,7 +49,7 @@
   <div id="login-gate">
     <div class="lg-card">
       <img src="./icon.svg" alt="" class="lg-ic" />
-      <div class="lg-name">ComparaCam <span class="lg-ver">v8.5</span></div>
+      <div class="lg-name">ComparaCam <span class="lg-ver">v8.5.1</span></div>
 
       <div id="lg-step1">
         <p class="lg-sub">Entre com seu e-mail. Enviaremos um código de acesso — sem senha.</p>
@@ -88,7 +88,7 @@
         <span id="cred-balance">🪙 0 créditos</span>
         <button id="cred-buy" class="cred-buy">Adquirir</button>
       </span>
-      <span class="version-badge">v8.5</span>
+      <span class="version-badge">v8.5.1</span>
     </div>
     <div class="content" id="home-list"></div>
     <div class="fab-row">
@@ -203,10 +203,6 @@
             <button type="button" data-which="follow">Fantasma: Acomp.</button>
           </div>
           <label class="roi-tog"><input type="checkbox" id="al-group" /> <span>🔗 Agrupar as 2 fotos (enquadrar juntas)</span></label>
-          <div class="al-btn-row">
-            <button id="al-crop-base" class="al-reset" type="button">✂️ Cortar base</button>
-            <button id="al-crop-follow" class="al-reset" type="button">✂️ Cortar acomp.</button>
-          </div>
         </div>
         <div class="al-roi-card" id="al-contour-card">
           <div class="al-roi-head">Contorno neon</div>
@@ -277,6 +273,54 @@
           em toda a comparação.</p>
         <div class="al-btn-row">
           <button id="cr-reset" class="al-reset" type="button">↺ Retângulo cheio</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TELA: PÓS-PROCESSAMENTO (v8.5) ============ -->
+  <section id="screen-postproc" class="screen">
+    <header class="topbar">
+      <button id="pp-back" class="icon-btn dark">‹</button>
+      <h1 id="pp-title">Pós-processamento</h1>
+      <button class="icon-btn dark" type="button" style="visibility:hidden" tabindex="-1">‹</button>
+    </header>
+    <div class="ds-body">
+      <div class="photo-fixed">
+        <div class="pp-stage" id="pp-stage"><img id="pp-img" alt="" /></div>
+      </div>
+      <div class="scroll-area">
+        <p class="ds-hint">Ferramentas aplicadas a <b>esta foto</b>.</p>
+        <button class="btn outline card-full distract-btn" id="pp-distract" type="button">🫥 Remover distrações</button>
+        <button class="btn outline card-full contour-btn" id="pp-contour" type="button">✨ Contorno neon</button>
+        <button class="btn outline card-full" id="pp-crop" type="button">✂️ Cortar</button>
+        <div class="btn-row">
+          <button class="btn outline" id="pp-zoom" type="button">🔍 Zoom</button>
+          <button class="btn outline" id="pp-rot" type="button">🔄 Girar</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TELA: ZOOM / GIRAR FOTO (v8.5) ============ -->
+  <section id="screen-phototx" class="screen">
+    <header class="topbar">
+      <button id="px-cancel" class="icon-btn dark">‹</button>
+      <h1 id="px-title">Zoom / Girar</h1>
+      <button id="px-confirm" class="topbar-action" type="button">Confirmar</button>
+    </header>
+    <div class="ds-body">
+      <div class="photo-fixed">
+        <div class="px-stage" id="px-stage"><img id="px-img" alt="" /></div>
+      </div>
+      <div class="scroll-area">
+        <p class="ds-hint">Ajuste e confirme — o resultado é salvo nesta foto e
+          passa a valer em toda a comparação.</p>
+        <div class="al-controls">
+          <label class="al-slider"><span>Zoom</span>
+            <input type="range" id="px-zoom" min="0.5" max="3" step="0.01" value="1" /></label>
+          <label class="al-slider"><span>Girar</span>
+            <input type="range" id="px-rot" min="-180" max="180" step="1" value="0" /></label>
         </div>
       </div>
     </div>
