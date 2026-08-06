@@ -34,6 +34,11 @@ jobs:
 
       - name: Configurar Pages
         uses: actions/configure-pages@v5
+        with:
+          # Habilita/configura o Pages para build via GitHub Actions se estiver
+          # desligado ou apontando para "deploy from branch" — evita a falha
+          # "Get Pages site failed" que travou o deploy da v8.5.
+          enablement: true
 
       - name: Enviar arquivos do app web
         uses: actions/upload-pages-artifact@v3
