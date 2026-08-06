@@ -17,10 +17,13 @@ permissions:
   pages: write
   id-token: write
 
-# Garante um deploy por vez
+# Garante um deploy por vez, mas SEM cancelar runs no meio: cancelar depois do
+# upload deixava artefatos "github-pages" órfãos e o deploy-pages@v4 falhava com
+# "Multiple artifacts named github-pages" (conta 2). Agora os runs enfileiram e
+# terminam limpos (1 artefato por run).
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
