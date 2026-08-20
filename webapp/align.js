@@ -665,9 +665,11 @@ const Aligner = {
     $("#al-ghost").src = session.baseImage;
     $("#al-ghost").style.opacity = 0.5;
     $("#al-follow").src = followUrl;
-    // Contornos neon e desfoques (gerados sob demanda) da base e do acomp.
+    // Contornos neon, preto e branco e desfoques (sob demanda) da base e do acomp.
     this._baseSketch = null;
     this._followSketch = null;
+    this._baseBw = null;
+    this._followBw = null;
     this._baseDefocus = null;
     this._followDefocus = null;
     this._folOrigDone = false;
@@ -736,19 +738,24 @@ const Aligner = {
     fitStageEl($("#al-stage"), this.baseW / this.baseH);
   },
 
-  // Cards "Contorno neon" e "Distrações removidas": herdam o estado marcado na
-  // Montagem (v8.2). A base (fantasma) e o acompanhamento são exibidos conforme
-  // as marcações. Vale só para a EXIBIÇÃO; ao confirmar, o acompanhamento é
-  // sempre recortado da foto real (this.followUrl).
+  // Cards "Filtro do fantasma" e "Distrações removidas": herdam o estado marcado
+  // na Montagem (v8.2). A base (fantasma) e o acompanhamento são exibidos
+  // conforme as marcações. Vale só para a EXIBIÇÃO; ao confirmar, o
+  // acompanhamento é sempre recortado da foto real (this.followUrl).
   _setupViewToggles() {
     const cbCB = $("#al-contour-base"), cbCF = $("#al-contour-follow");
+    const cbWB = $("#al-bw-base"), cbWF = $("#al-bw-follow");
     const cbDB = $("#al-distract-base"), cbDF = $("#al-distract-follow");
     const hasBM = !!(this.session && this.session.baseMask);
     const hasFM = !!(this.session && this.session.followMask);
-    const bSk = !!(this.session && this.session.baseSketchOn);
-    const fSk = !!(this.session && this.session.followSketchOn);
-    if (cbCB) cbCB.checked = bSk;
-    if (cbCF) cbCF.checked = fSk;
+    // v8.6.1: o filtro agora tem 3 modos (foto / contorno / preto e branco).
+    const bMode = ghostMode(this.session, "base");
+    const fMode = ghostMode(this.session, "follow");
+    const bSk = bMode !== "off", fSk = fMode !== "off";
+    if (cbCB) cbCB.checked = bMode === "neon";
+    if (cbCF) cbCF.checked = fMode === "neon";
+    if (cbWB) cbWB.checked = bMode === "bw";
+    if (cbWF) cbWF.checked = fMode === "bw";
     // Espelha a Montagem: com contorno LIGADO mostra o contorno (que já exclui as
     // distrações); senão, com máscara, mostra a foto desfocada. Desabilita a
     // opção de distração quando não há nada a remover naquele lado.
@@ -794,12 +801,13 @@ const Aligner = {
     return this._folOrigMask;
   },
 
-  // Exibe a BASE (fantasma): contorno neon (excluindo distrações) > foto
-  // desfocada (se distrações ligadas) > foto crua.
+  // Exibe a BASE (fantasma): contorno neon (excluindo distrações) > preto e
+  // branco > foto desfocada (se distrações ligadas) > foto crua.
   async refreshBaseView() {
     const ghost = $("#al-ghost");
     if (!ghost) return;
     const contour = $("#al-contour-base") && $("#al-contour-base").checked;
+    const bw = $("#al-bw-base") && $("#al-bw-base").checked;
     const distract = $("#al-distract-base") && $("#al-distract-base").checked;
     if (contour) {
       if (!this._baseSketch) {
@@ -807,6 +815,12 @@ const Aligner = {
         catch (_) { ghost.src = this.session.baseImage; return; }
       }
       ghost.src = this._baseSketch;
+    } else if (bw) {
+      if (!this._baseBw) {
+        try { this._baseBw = await makeBwGhost(this.session.baseImage, { mask: this.session.baseMask }); }
+        catch (_) { ghost.src = this.session.baseImage; return; }
+      }
+      ghost.src = this._baseBw;
     } else if (distract && this.session.baseMask) {
       if (!this._baseDefocus) {
         try { this._baseDefocus = await applyDefocus(baseSrcRaw(this.session), this.session.baseMask); }
@@ -818,12 +832,14 @@ const Aligner = {
     }
   },
 
-  // Exibe o ACOMPANHAMENTO: contorno neon (excluindo distrações) > foto
-  // desfocada > foto crua. Tudo derivado da foto ORIGINAL (this.followUrl).
+  // Exibe o ACOMPANHAMENTO: contorno neon (excluindo distrações) > preto e
+  // branco > foto desfocada > foto crua. Tudo derivado da foto ORIGINAL
+  // (this.followUrl).
   async refreshFollowView() {
     const fol = $("#al-follow");
     if (!fol) return;
     const contour = $("#al-contour-follow") && $("#al-contour-follow").checked;
+    const bw = $("#al-bw-follow") && $("#al-bw-follow").checked;
     const distract = $("#al-distract-follow") && $("#al-distract-follow").checked;
     if (contour) {
       if (!this._followSketch) {
@@ -832,6 +848,13 @@ const Aligner = {
         catch (_) { fol.src = this.followUrl; return; }
       }
       fol.src = this._followSketch;
+    } else if (bw) {
+      if (!this._followBw) {
+        const em = await this._followOrigMaskUrl();
+        try { this._followBw = await makeBwGhost(this.followUrl, { mask: em }); }
+        catch (_) { fol.src = this.followUrl; return; }
+      }
+      fol.src = this._followBw;
     } else if (distract && this.session.followMask) {
       if (!this._followDefocus) {
         const em = await this._followOrigMaskUrl();
@@ -929,44 +952,62 @@ const Aligner = {
     const followImg = await loadImageEl(this.followUrl);
     const Wi = followImg.naturalWidth, Hi = followImg.naturalHeight;
 
-    const c = document.createElement("canvas");
-    c.width = OUTW; c.height = OUTH;
-    const ctx = c.getContext("2d");
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, OUTW, OUTH);
-
     // Enquadramento CABENDO INTEIRO (contain) no quadro OUTW×OUTH, num canvas
     // plano — é o "conteúdo da caixa" antes de qualquer giro (igual à preview CSS
     // do #al-follow, que usa object-fit:contain). A foto aparece COMPLETA; as
     // sobras ficam pretas (tarjas). Depois esse plano é girado/tombado igual à
     // preview.
-    const flat = document.createElement("canvas");
-    flat.width = OUTW; flat.height = OUTH;
-    const fctx = flat.getContext("2d");
     const fit = Math.min(OUTW / Wi, OUTH / Hi);
     const iw = Wi * fit, ih = Hi * fit;
-    fctx.drawImage(followImg, (OUTW - iw) / 2, (OUTH - ih) / 2, iw, ih);
-
     const centered = Math.abs(this.fx - 0.5) < 0.001 && Math.abs(this.fy - 0.5) < 0.001;
-    if (Math.abs(this.rotX) < 0.01 && Math.abs(this.rotY) < 0.01 && centered) {
-      // Sem tombamento e fulcro no centro: caminho 2D simples (nítido).
-      ctx.save();
-      ctx.translate(OUTW / 2 + this.tx * f, OUTH / 2 + this.ty * f);
-      ctx.rotate(this.rot * Math.PI / 180);
-      ctx.scale(this.z, this.z);
-      ctx.drawImage(flat, -OUTW / 2, -OUTH / 2);
-      ctx.restore();
-    } else {
-      // Giro 3D e/ou fulcro deslocado: warp projetivo com a mesma projeção da
-      // preview (alMakeProject), garantindo WYSIWYG.
-      const P = alPerspPx() * f;
-      const params = {
-        z: this.z, txp: this.tx * f, typ: this.ty * f,
-        rot: this.rot, rotX: this.rotX, rotY: this.rotY, fx: this.fx, fy: this.fy,
-      };
-      alDrawWarp(ctx, flat, OUTW, OUTH, alMakeProject(params, OUTW, OUTH, P), 18);
-    }
-    const aligned = c.toDataURL("image/jpeg", 0.9);
+
+    // v8.6.1: extraído para uma função porque a MÁSCARA de distrações passa pelo
+    // mesmo caminho (mesmo enquadramento, mesmo giro) — assim o desfoque
+    // acompanha o reposicionamento em vez de ser descartado. `bg` null = fundo
+    // transparente (a máscara não pode ganhar tarjas pretas opacas).
+    const renderLike = (srcImg, bg) => {
+      const cc = document.createElement("canvas");
+      cc.width = OUTW; cc.height = OUTH;
+      const cx = cc.getContext("2d");
+      if (bg) { cx.fillStyle = bg; cx.fillRect(0, 0, OUTW, OUTH); }
+
+      const flat = document.createElement("canvas");
+      flat.width = OUTW; flat.height = OUTH;
+      flat.getContext("2d").drawImage(srcImg, (OUTW - iw) / 2, (OUTH - ih) / 2, iw, ih);
+
+      if (Math.abs(this.rotX) < 0.01 && Math.abs(this.rotY) < 0.01 && centered) {
+        // Sem tombamento e fulcro no centro: caminho 2D simples (nítido).
+        cx.save();
+        cx.translate(OUTW / 2 + this.tx * f, OUTH / 2 + this.ty * f);
+        cx.rotate(this.rot * Math.PI / 180);
+        cx.scale(this.z, this.z);
+        cx.drawImage(flat, -OUTW / 2, -OUTH / 2);
+        cx.restore();
+      } else {
+        // Giro 3D e/ou fulcro deslocado: warp projetivo com a mesma projeção da
+        // preview (alMakeProject), garantindo WYSIWYG.
+        const P = alPerspPx() * f;
+        const params = {
+          z: this.z, txp: this.tx * f, typ: this.ty * f,
+          rot: this.rot, rotX: this.rotX, rotY: this.rotY, fx: this.fx, fy: this.fy,
+        };
+        alDrawWarp(cx, flat, OUTW, OUTH, alMakeProject(params, OUTW, OUTH, P), 18);
+      }
+      return cc;
+    };
+
+    const aligned = renderLike(followImg, "#000").toDataURL("image/jpeg", 0.9);
+
+    // Máscara de distrações do acompanhamento levada para o novo enquadramento.
+    // Parte da máscara no espaço da foto ORIGINAL (a que está sendo posicionada)
+    // e passa pelo mesmo warp. Precisa ser calculada ANTES de sobrescrever
+    // s.followAlign, que é o que _followOrigMaskUrl() usa para desfazer o
+    // alinhamento anterior.
+    let newFollowMask = null;
+    try {
+      const om = await this._followOrigMaskUrl();
+      if (om) newFollowMask = renderLike(await loadImageEl(om), null).toDataURL("image/png");
+    } catch (_) { newFollowMask = null; }
 
     const s = this.session;
     // O rótulo só é pedido ao ADQUIRIR a foto. No reposicionamento/reajuste de
@@ -990,9 +1031,15 @@ const Aligner = {
     s.followAdj = null;
     s.followTarget = null;
     if (typeof clearSketch === "function") clearSketch(s, "follow");
-    // v8.1: o realinhamento muda a geometria do acompanhamento — a máscara de
-    // distrações (pintada sobre a imagem anterior) não vale mais; descarta.
-    if (typeof clearDistract === "function") clearDistract(s, "follow");
+    // v8.6.1: a máscara de distrações acompanha o realinhamento (foi passada pelo
+    // mesmo warp acima). Antes ela era descartada aqui e o desfoque sumia ao
+    // voltar para a comparação. Sem máscara transportável, descarta como antes.
+    if (newFollowMask) {
+      s.followMask = newFollowMask;
+      await rebakeDefocus(s, "follow");
+    } else if (typeof clearDistract === "function") {
+      clearDistract(s, "follow");
+    }
     // v8.5: enquadramento de GRUPO (as duas fotos juntas) — gravado na composição
     // (aplicado a base e acompanhamento na Montagem/exportações). null = sem corte.
     const gId = Math.abs(this.gz - 1) < 0.001 && Math.abs(this.grot) < 0.01 &&
@@ -1349,14 +1396,25 @@ window.addEventListener("DOMContentLoaded", () => {
   const grpChk = $("#al-group");
   if (grpChk) grpChk.addEventListener("change", (e) => Aligner.toggleGroupMode(e.target.checked));
 
-  // Cards "Contorno neon" e "Distrações removidas": só exibição (v8.2).
-  // Contorno e distração são exclusivos por lado: ligar um desmarca o outro.
+  // Cards "Filtro do fantasma" e "Distrações removidas": só exibição (v8.2).
+  // Por lado, contorno, preto e branco e distração são exclusivos: ligar um
+  // desmarca os outros dois (v8.6.1).
   const cbCB = $("#al-contour-base"), cbCF = $("#al-contour-follow");
+  const cbWB = $("#al-bw-base"), cbWF = $("#al-bw-follow");
   const cbDB = $("#al-distract-base"), cbDF = $("#al-distract-follow");
-  if (cbCB) cbCB.addEventListener("change", (e) => { if (e.target.checked && cbDB) cbDB.checked = false; Aligner.refreshBaseView(); });
-  if (cbCF) cbCF.addEventListener("change", (e) => { if (e.target.checked && cbDF) cbDF.checked = false; Aligner.refreshFollowView(); });
-  if (cbDB) cbDB.addEventListener("change", (e) => { if (e.target.checked && cbCB) cbCB.checked = false; Aligner.refreshBaseView(); });
-  if (cbDF) cbDF.addEventListener("change", (e) => { if (e.target.checked && cbCF) cbCF.checked = false; Aligner.refreshFollowView(); });
+  const exclusive = (side, mine, others) => {
+    if (!mine) return;
+    mine.addEventListener("change", (e) => {
+      if (e.target.checked) others.forEach((o) => { if (o) o.checked = false; });
+      if (side === "base") Aligner.refreshBaseView(); else Aligner.refreshFollowView();
+    });
+  };
+  exclusive("base", cbCB, [cbWB, cbDB]);
+  exclusive("base", cbWB, [cbCB, cbDB]);
+  exclusive("base", cbDB, [cbCB, cbWB]);
+  exclusive("follow", cbCF, [cbWF, cbDF]);
+  exclusive("follow", cbWF, [cbCF, cbDF]);
+  exclusive("follow", cbDF, [cbCF, cbWF]);
 
   window.addEventListener("resize", () => {
     if ($("#screen-align").classList.contains("active")) { Aligner.layoutStage(); Aligner._renderFulcrum(); }
@@ -1420,6 +1478,15 @@ const Cropper = {
     c.width = sw; c.height = sh;
     c.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
     const cropped = c.toDataURL("image/jpeg", 0.92);
+    // v8.6.1: recorta também a máscara de distrações (ela é normalizada sobre a
+    // foto), para o desfoque sobreviver ao corte em vez de ser descartado.
+    const mk = this.kind === "base" ? "baseMask" : "followMask";
+    const newMask = typeof remapMask === "function"
+      ? await remapMask(s[mk], sw, sh, (mx, mi) => {
+          const MW = mi.naturalWidth || 1, MH = mi.naturalHeight || 1;
+          mx.drawImage(mi, b.x0 * MW, b.y0 * MH, (b.x1 - b.x0) * MW, (b.y1 - b.y0) * MH, 0, 0, sw, sh);
+        })
+      : null;
     if (this.kind === "base") {
       s.baseImage = cropped;
       s.baseImageView = null; s.baseAdj = null; s.baseTarget = null;
@@ -1430,7 +1497,8 @@ const Cropper = {
       s.followImageView = null; s.followAdj = null; s.followTarget = null;
     }
     if (typeof clearSketch === "function") clearSketch(s, this.kind);
-    if (typeof clearDistract === "function") clearDistract(s, this.kind);
+    if (newMask) { s[mk] = newMask; await rebakeDefocus(s, this.kind); }
+    else if (typeof clearDistract === "function") clearDistract(s, this.kind);
     await DB.put(s);
     Cropper._done(s);
   },

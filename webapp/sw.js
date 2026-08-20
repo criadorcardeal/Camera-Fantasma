@@ -6,9 +6,14 @@
    voucher em "Adquirir creditos", seguido de video obrigatorio do patrocinador.
    Bibliotecas externas (supabase-js) sao cacheadas pelo fetch handler apos o 1o
    acesso, para funcionar offline com sessao ja salva. */
-/* v8.5.1: Montagem reorganizada (seção Fotos única com toggle Base/Acomp., 3
-   botões em linha, Pós-processamento; Inverter em "Tipo de comparação"). */
-const CACHE = "fotos-fantasma-v851";
+/* v8.6.1: (1) faixa azul do topo imóvel (documento não rola mais no Android);
+   (2) o desfoque de "Remover distrações" sobrevive a cortar/zoom/girar/
+   reposicionar (a máscara é levada pela mesma transformação); (3) a comparação
+   só é dada por concluída quando uma foto/vídeo é realmente salvo, não ao abrir
+   o diálogo; (4) a câmera de acompanhamento retoma o zoom da foto base e o
+   fantasma é encaixado sobre o frame do vídeo (fim do zoom aparente);
+   (5) novo filtro "Preto e branco" para a foto fantasma, ao lado do contorno. */
+const CACHE = "fotos-fantasma-v861";
 const ASSETS = [
   "./",
   "./index.html",

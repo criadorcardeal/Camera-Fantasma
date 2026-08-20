@@ -85,9 +85,28 @@ function clearDistract(s, kind) {
   if (kind === "follow" || kind === "all") { delete s.followMask; delete s.followDefocus; }
 }
 
+// v8.6.1: leva a máscara de distrações JUNTO com a foto quando a geometria dela
+// muda (cortar, zoom, girar, reposicionar). Antes, qualquer uma dessas ações
+// descartava a máscara e o desfoque sumia sem aviso ao voltar à comparação.
+// `draw(ctx, img)` desenha a máscara no canvas de saída com a MESMA
+// transformação aplicada à foto. O fundo fica transparente = área sem desfoque.
+// Devolve um PNG (dataURL) ou null quando não há máscara / algo falha.
+async function remapMask(maskUrl, W, H, draw) {
+  if (!maskUrl) return null;
+  try {
+    const img = await loadImageEl(maskUrl);
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(W));
+    c.height = Math.max(1, Math.round(H));
+    draw(c.getContext("2d"), img);
+    return c.toDataURL("image/png");
+  } catch (_) { return null; }
+}
+
 window.applyDefocus = applyDefocus;
 window.rebakeDefocus = rebakeDefocus;
 window.clearDistract = clearDistract;
+window.remapMask = remapMask;
 
 /* ---------------- Tela "Remover distrações" ---------------- */
 const Distract = {

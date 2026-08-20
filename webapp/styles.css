@@ -79,15 +79,27 @@
   background: var(--primary); color: #fff; font-weight: 600; font-size: 0.95rem; cursor: pointer;
 }
 
-html, body {
-  margin: 0;
+/* v8.6.1: o DOCUMENTO nunca rola — quem rola é sempre um container interno
+   (.content / .scroll-area). Antes o body tinha height:100% (que no Android
+   resolve pelo viewport GRANDE, com a barra de endereços escondida) enquanto a
+   tela tinha 100dvh (viewport atual): o body ficava mais alto que a área
+   visível e a página inteira rolava, arrastando a faixa azul do topo junto.
+   Agora body = 100dvh e overflow:hidden nos dois — a faixa fica imóvel. */
+html {
   height: 100%;
+  overflow: hidden;
+}
+body {
+  margin: 0;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
 }
 
-.screen { display: none; height: 100dvh; flex-direction: column; }
+.screen { display: none; height: 100%; flex-direction: column; }
 .screen.active { display: flex; }
 
 /* ---------- Topbar ---------- */
@@ -95,6 +107,11 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
+  /* Nunca encolhe e fica colada no topo, mesmo se algo dentro da tela crescer. */
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 5;
   padding: max(env(safe-area-inset-top), 12px) 12px 12px;
   background: var(--primary);
   color: #fff;
@@ -600,7 +617,7 @@ html, body {
 #cam-torch.on { background: var(--accent); }
 #cam-torch.disabled { opacity: 0.35; }
 
-/* Switch fantasma: Foto ↔ Contorno neon (câmera de acompanhamento) */
+/* Switch fantasma: Foto / Contorno neon / Preto e branco (câmera de acomp.) */
 .cam-switch {
   flex: 0 0 auto; display: inline-flex; gap: 0; padding: 3px;
   border: 1.5px solid rgba(255,255,255,0.55);
@@ -611,9 +628,12 @@ html, body {
   color: rgba(255,255,255,0.8); transition: background 0.15s, color 0.15s;
   white-space: nowrap; line-height: 1.1;
 }
-/* OFF = Foto ativa; ON (.on) = Contorno ativo (verde neon). */
-.cam-switch:not(.on) .sw-foto { background: #fff; color: #111; }
-.cam-switch.on .sw-contorno { background: #19ff6a; color: #063; }
+/* v8.6.1: 3 estados — .mode-off (Foto), .mode-neon (Contorno), .mode-bw (P&B).
+   Toque no switch avança para o próximo. */
+.cam-sw-opt { padding: 4px 9px; }
+.cam-switch.mode-off .sw-foto { background: #fff; color: #111; }
+.cam-switch.mode-neon .sw-contorno { background: #19ff6a; color: #063; }
+.cam-switch.mode-bw .sw-bw { background: #e8e8e8; color: #111; }
 
 .cam-side {
   position: absolute; right: 10px; top: 64px; bottom: 150px;
@@ -810,6 +830,14 @@ html, body {
 .contour-btn.active {
   background: #0f2417; color: #19ff6a;
   border-color: #19ff6a; font-weight: 700;
+}
+/* Ressalva do aviso "Concluir comparação" (v8.6.1). */
+.save-warn-note { font-size: 0.85rem; color: var(--muted); margin-top: -4px; }
+
+/* Preto e branco (v8.6.1): mesmo papel do contorno, em cinza. */
+.bw-btn.active {
+  background: #2b2b2b; color: #f2f2f2;
+  border-color: #f2f2f2; font-weight: 700;
 }
 .contour-preview {
   margin-top: 8px; border-radius: 10px; overflow: hidden;

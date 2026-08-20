@@ -108,8 +108,8 @@ const followSrc = (s) => s.followDefocus || followSrcRaw(s);
 // neon" está ligado no card da Base/Acompanhamento, TROCA a foto exibida pelo
 // contorno (em vez de abrir uma prévia à parte). A miniatura da home e as
 // exportações continuam usando a foto real (baseSrc/followSrc).
-const baseMontageSrc0 = (s) => (s.baseSketchOn && s.baseSketch) ? s.baseSketch : baseSrc(s);
-const followMontageSrc0 = (s) => (s.followSketchOn && s.followSketch) ? s.followSketch : followSrc(s);
+const baseMontageSrc0 = (s) => ghostSrc(s, "base") || baseSrc(s);
+const followMontageSrc0 = (s) => ghostSrc(s, "follow") || followSrc(s);
 
 /* v8.5: ENQUADRAMENTO de grupo (s.groupFrame) — zoom/giro/deslocamento aplicados
    às DUAS fotos juntas, gravado na composição. Redesenha a imagem (que já está no
@@ -154,33 +154,85 @@ const followMontageSrc = (s) =>
   (s.groupFrame && _mf.follow && _mf.followSrc === followMontageSrc0(s) && _mf.gfk === JSON.stringify(s.groupFrame || null))
     ? _mf.follow : followMontageSrc0(s);
 
-/* ---------------- Contorno neon (imagem fantasma) ----------------
-   Gera (uma vez) e guarda o contorno neon de cada foto, para usar como
-   fantasma na câmera de acompanhamento e na janela de posicionamento.
-   O contorno é derivado da foto atual; quando a foto muda, é descartado
-   (clearSketch) para ser regerado na próxima vez. */
+/* ---------------- Filtro da imagem fantasma ----------------
+   A foto pode ser exibida como fantasma (câmera de acompanhamento, janela de
+   posicionamento e montagem) de 3 formas:
+     "off"  -> a própria foto;
+     "neon" -> contorno neon (sketch.js, v7.6.1);
+     "bw"   -> preto e branco com contraste realçado (v8.6.1).
+   Cada versão é gerada uma vez e guardada na composição; quando a foto muda,
+   as duas são descartadas (clearSketch) para serem regeradas sob demanda. */
 const SKETCH_META = {
-  base:   { img: "baseImage",   sk: "baseSketch",   on: "baseSketchOn",   mask: "baseMask",   color: () => window.NEON.base },
-  follow: { img: "followImage", sk: "followSketch", on: "followSketchOn", mask: "followMask", color: () => window.NEON.follow },
+  base:   { img: "baseImage",   sk: "baseSketch",   bw: "baseBw",   on: "baseSketchOn",   mode: "baseGhost",   mask: "baseMask",   color: () => window.NEON.base },
+  follow: { img: "followImage", sk: "followSketch", bw: "followBw", on: "followSketchOn", mode: "followGhost", mask: "followMask", color: () => window.NEON.follow },
 };
+const GHOST_MODES = ["off", "neon", "bw"];
 
-// Garante que o contorno neon da foto (kind) existe e o devolve (dataURL PNG).
-// v8.1: exclui do contorno as áreas marcadas em "Remover distrações".
-async function ensureSketch(s, kind) {
+// Modo atual de um lado. Composições antigas só têm o booleano *SketchOn (que
+// era só "contorno ligado/desligado"), então ele é a reserva.
+function ghostMode(s, kind) {
+  if (!s) return "off";
   const m = SKETCH_META[kind];
-  if (!s || !s[m.img]) return null;
-  if (!s[m.sk]) {
-    s[m.sk] = await makeNeonSketch(s[m.img], { color: m.color(), excludeMask: s[m.mask] });
-    await DB.put(s);
-  }
-  return s[m.sk];
+  const v = s[m.mode];
+  if (GHOST_MODES.includes(v)) return v;
+  return s[m.on] ? "neon" : "off";
 }
 
-// Descarta o contorno guardado (chamado quando a foto correspondente muda).
+// Versão JÁ gerada do modo atual (null = usar a própria foto).
+function ghostSrc(s, kind) {
+  if (!s) return null;
+  const m = SKETCH_META[kind];
+  const mode = ghostMode(s, kind);
+  if (mode === "neon") return s[m.sk] || null;
+  if (mode === "bw") return s[m.bw] || null;
+  return null;
+}
+
+// Garante que a versão do modo pedido existe e a devolve (dataURL).
+// v8.1: as áreas marcadas em "Remover distrações" são excluídas do contorno
+// (e, no preto e branco, apagadas por um véu claro).
+async function ensureGhost(s, kind, mode) {
+  const m = SKETCH_META[kind];
+  mode = mode || ghostMode(s, kind);
+  if (!s || !s[m.img] || mode === "off") return null;
+  const key = mode === "bw" ? m.bw : m.sk;
+  if (!s[key]) {
+    s[key] = mode === "bw"
+      ? await makeBwGhost(s[m.img], { mask: s[m.mask] })
+      : await makeNeonSketch(s[m.img], { color: m.color(), excludeMask: s[m.mask] });
+    await DB.put(s);
+  }
+  return s[key];
+}
+
+// Troca o modo de um lado, gerando a imagem se ainda não existir.
+async function setGhostMode(s, kind, mode) {
+  const m = SKETCH_META[kind];
+  if (!GHOST_MODES.includes(mode)) mode = "off";
+  if (mode !== "off") await ensureGhost(s, kind, mode);
+  s[m.mode] = mode;
+  s[m.on] = mode === "neon";   // compatibilidade com versões anteriores
+  await DB.put(s);
+}
+
+// Regera o que faltar do modo ativo (v8.6.1). Chamado pelas telas que exibem a
+// montagem: sem isto, qualquer coisa que descarta a versão guardada (pintar
+// distrações, por exemplo) fazia o filtro "sumir" em silêncio, com o botão
+// continuando ligado.
+async function syncGhosts(s) {
+  if (!s) return;
+  for (const kind of ["base", "follow"]) {
+    if (ghostMode(s, kind) !== "off" && !ghostSrc(s, kind)) {
+      try { await ensureGhost(s, kind); } catch (_) {}
+    }
+  }
+}
+
+// Descarta as versões guardadas (chamado quando a foto correspondente muda).
 function clearSketch(s, kind) {
   if (!s) return;
-  if (kind === "base" || kind === "all") delete s.baseSketch;
-  if (kind === "follow" || kind === "all") delete s.followSketch;
+  if (kind === "base" || kind === "all") { delete s.baseSketch; delete s.baseBw; }
+  if (kind === "follow" || kind === "all") { delete s.followSketch; delete s.followBw; }
 }
 
 // Título do card: nome personalizado (se o usuário definiu) ou o padrão com a data.
@@ -510,29 +562,36 @@ const Cam = {
     }
   },
 
-  // Fantasma: alterna entre a FOTO base e o CONTORNO neon (verde). Guarda a
-  // preferência na sessão para valer também na janela de posicionamento.
-  async _setGhostContour(on) {
+  // Fantasma: FOTO base, CONTORNO neon (verde) ou PRETO E BRANCO (v8.6.1).
+  // Guarda a preferência na sessão para valer também no posicionamento.
+  async _setGhostMode(mode) {
     const s = this.session;
     const btn = $("#cam-contour");
     const ghost = $("#ghost");
     if (!s || this.mode !== "follow") { if (btn) btn.hidden = true; return; }
-    if (btn) { btn.hidden = false; btn.classList.toggle("on", !!on); btn.setAttribute("aria-checked", on ? "true" : "false"); }
-    if (on) {
-      let sk = null;
-      try { sk = await ensureSketch(s, "base"); } catch (_) {}
-      // Só troca se a câmera ainda está no modo follow desta sessão.
-      if (sk && this.session === s && this.mode === "follow") ghost.src = sk;
-    } else {
-      ghost.src = s.baseImage;
+    if (!GHOST_MODES.includes(mode)) mode = "off";
+    if (btn) {
+      btn.hidden = false;
+      btn.classList.remove("mode-off", "mode-neon", "mode-bw");
+      btn.classList.add("mode-" + mode);
     }
-    this._ghostContourOn = !!on;
-    s.baseSketchOn = !!on;
-    try { await DB.put(s); } catch (_) {}
+    this._ghostMode = mode;
+    if (mode === "off") {
+      ghost.src = s.baseImage;
+    } else {
+      let g = null;
+      try { g = await ensureGhost(s, "base", mode); } catch (_) {}
+      // Só troca se a câmera ainda está no modo follow desta sessão e o usuário
+      // não avançou o switch de novo enquanto a imagem era gerada.
+      if (g && this.session === s && this.mode === "follow" && this._ghostMode === mode) ghost.src = g;
+    }
+    try { await setGhostMode(s, "base", mode); } catch (_) {}
   },
 
-  toggleGhostContour() {
-    this._setGhostContour(!this._ghostContourOn);
+  // Toque no switch avança Foto → Contorno → P&B → Foto.
+  cycleGhostMode() {
+    const i = GHOST_MODES.indexOf(this._ghostMode || "off");
+    this._setGhostMode(GHOST_MODES[(i + 1) % GHOST_MODES.length]);
   },
 
   async open(mode, session) {
@@ -552,9 +611,9 @@ const Cam = {
       ghost.src = session.baseImage;
       ghost.style.display = "block";
       $("#ghost-wrap").style.display = "flex";
-      // Contorno neon como fantasma: se ligado na base, mostra o contorno (verde)
-      // por cima do vídeo. O botão 🟢 permite alternar contorno ↔ foto ao vivo.
-      this._setGhostContour(!!session.baseSketchOn);
+      // Filtro do fantasma (foto / contorno neon / preto e branco): herda o que
+      // estiver marcado na base. O switch no topo alterna entre os 3.
+      this._setGhostMode(ghostMode(session, "base"));
       $("#cam-title").textContent = "Foto de acompanhamento";
       const f = session.filters || { brightness: 1, contrast: 1, saturate: 1 };
       $("#f-brightness").value = f.brightness;
@@ -605,7 +664,9 @@ const Cam = {
         const pr = video.play();
         if (pr && pr.catch) pr.catch(() => {});
       };
-      video.onloadedmetadata = tryPlay;
+      // O tamanho do frame só é conhecido nos metadados — é quando o fantasma
+      // pode ser encaixado sobre ele (v8.6.1).
+      video.onloadedmetadata = () => { tryPlay(); this.layoutGhost(); };
       tryPlay();
       // So mostra o botao manual se, apos 1s, o video realmente nao tocou.
       setTimeout(() => {
@@ -613,6 +674,7 @@ const Cam = {
           this.showStartButton();
         } else {
           $("#cam-start").hidden = true;
+          this.layoutGhost();
         }
       }, 1000);
     } catch (e) {
@@ -682,6 +744,17 @@ const Cam = {
       slider.min = 1; slider.max = 4; slider.step = 0.01;
       this.zoom = 1; slider.value = 1;
     }
+    // v8.6.1: na foto de ACOMPANHAMENTO, retoma o zoom usado na foto base. O
+    // zoom fica "impresso" na foto base (recorte no digital, hardware no
+    // nativo), então o fantasma já vem ampliado; se a câmera reabrisse em 1x,
+    // o fantasma parecia estar com zoom em relação ao vídeo ao vivo. Só vale se
+    // o tipo de zoom for o mesmo (nativo↔nativo), pois a escala é diferente.
+    const s = this.session;
+    if (this.mode === "follow" && s && s.camZoom != null &&
+        !!s.camZoomNative === !!this._zoomNative) {
+      this.setZoom(s.camZoom);
+      return;   // setZoom já aplica a transformação
+    }
     this.applyZoomTransform();
   },
 
@@ -705,6 +778,44 @@ const Cam = {
     const t = `scale(${scale})`;
     $("#video").style.transform = t;
     $("#cam-fx").style.transform = t;
+    this.layoutGhost();
+  },
+
+  /* v8.6.1: encaixa o FANTASMA exatamente sobre o retângulo que o frame da
+     câmera ocupa na tela — o mesmo recorte "cover" do vídeo, mais o zoom
+     digital, inclusive a parte que sobra fora da tela. Dentro desse retângulo a
+     foto base entra INTEIRA (contain).
+
+     Antes, o fantasma era recortado por object-fit:cover usando a proporção
+     DELE. Quando a proporção da foto base não batia com a do vídeo ao vivo (foto
+     importada da galeria, ou a câmera negociando outra resolução), os dois
+     ficavam com recortes diferentes — e o fantasma aparecia com zoom em relação
+     à imagem ao vivo. */
+  layoutGhost() {
+    const v = $("#video"), g = $("#ghost");
+    if (!v || !g || g.style.display === "none") return;
+    const host = v.parentElement;
+    const box = host && host.getBoundingClientRect();
+    const vw = v.videoWidth, vh = v.videoHeight;
+    if (!vw || !vh || !box || !box.width || !box.height) return;
+    const z = this._zoomNative ? 1 : (this.zoom || 1);
+    const k = Math.max(box.width / vw, box.height / vh) * z;
+    const fw = vw * k, fh = vh * k;
+    g.style.width = fw + "px";
+    g.style.height = fh + "px";
+    g.style.left = ((box.width - fw) / 2) + "px";
+    g.style.top = ((box.height - fh) / 2) + "px";
+    g.style.right = "auto";
+    g.style.bottom = "auto";
+    g.style.objectFit = "contain";
+  },
+
+  // Devolve o fantasma ao posicionamento do CSS (usado ao fechar a câmera).
+  resetGhostLayout() {
+    const g = $("#ghost");
+    if (!g) return;
+    ["width", "height", "left", "top", "right", "bottom", "objectFit"]
+      .forEach((p) => { g.style[p] = ""; });
   },
 
   stop() {
@@ -713,6 +824,7 @@ const Cam = {
     // Zera transformações de zoom para não vazar p/ a próxima abertura.
     $("#video").style.transform = "";
     $("#cam-fx").style.transform = "";
+    this.resetGhostLayout();
     if (this.stream) {
       this.stream.getTracks().forEach((t) => t.stop());
       this.stream = null;
@@ -777,6 +889,9 @@ const Cam = {
       s.baseImageView = null;   // descarta ajuste anterior da base
       s.baseAdj = null;
       s.baseTarget = null;
+      // v8.6.1: guarda o zoom da base p/ a câmera de acompanhamento reabrir nele.
+      s.camZoom = this.zoom;
+      s.camZoomNative = !!this._zoomNative;
       clearSketch(s, "base");   // contorno neon será regerado da nova foto
       clearDistract(s, "base"); // nova foto: máscara/desfoque de distrações não valem mais
       await DB.put(s);
@@ -794,6 +909,9 @@ const Cam = {
         followImage: null,
         followAt: null,
         creditState: "reserved",
+        // v8.6.1: zoom usado nesta foto — a câmera de acompanhamento reabre nele.
+        camZoom: this.zoom,
+        camZoomNative: !!this._zoomNative,
       };
       await DB.put(session);
       await Credits.reserve();
@@ -998,6 +1116,9 @@ async function openDetail(id) {
   const locked = s.creditState === "confirmed";
   // Lado selecionado na seção "Fotos" (toggle Base/Acompanhamento, v8.5).
   const side = _detailSide === "follow" ? "follow" : "base";
+  // v8.6.1: regera o contorno/preto e branco que tenha sido descartado (a foto
+  // mudou), senão o filtro sumia da montagem com o botão continuando ligado.
+  await syncGhosts(s);
   // v8.5: prepara as fontes já enquadradas (grupo) antes de montar o HTML.
   await ensureMontageFrame(s);
 
@@ -1165,29 +1286,6 @@ async function openDetail(id) {
   if (hasFollow) $("#lbl-follow").addEventListener("input", (e) => onLabelInput("followLabel", e.target.value));
 }
 
-// Liga/desliga o contorno neon (fantasma) da foto base/acompanhamento.
-// Ao ligar, gera o contorno (se ainda não existir) e mostra a prévia no card.
-async function toggleContour(s, kind) {
-  const m = SKETCH_META[kind];
-  const btn = $("#btn-" + kind + "-contour");
-  if (!s[m.on]) {
-    // Ligar: gera o contorno (pode levar um instante).
-    if (btn) { btn.disabled = true; btn.textContent = "✨ Gerando contorno…"; }
-    try {
-      await ensureSketch(s, kind);
-    } catch (_) {
-      if (btn) { btn.disabled = false; btn.textContent = "✨ Contorno neon"; }
-      alert("Não foi possível gerar o contorno desta foto.");
-      return;
-    }
-    s[m.on] = true;
-  } else {
-    s[m.on] = false;
-  }
-  await DB.put(s);
-  await openDetail(s.id);
-}
-
 // Apaga a foto de um lado (base/acompanhamento), descartando TODOS os derivados
 // daquele lado (ajuste de cor, contorno, distrações, alinhamento). O rótulo é
 // mantido para reaproveitar ao tirar/importar de novo. Confirma antes.
@@ -1264,16 +1362,20 @@ const PostProc = {
     const s = session;
     const has = this.side === "base" ? !!s.baseImage : !!s.followImage;
     if (!has) { openDetail(s.id); return; }
+    await syncGhosts(s);   // v8.6.1: regera o filtro se a foto mudou
     const src = this.side === "base" ? baseMontageSrc0(s) : followMontageSrc0(s);
     try { const im = await loadImageEl(src); this._aspect = (im.naturalWidth / im.naturalHeight) || 0.75; }
     catch (_) { this._aspect = 0.75; }
     $("#pp-title").textContent = this.side === "base"
       ? "Pós-processamento — Base" : "Pós-processamento — Acompanhamento";
     $("#pp-img").src = src;
-    const contourOn = this.side === "base" ? !!s.baseSketchOn : !!s.followSketchOn;
+    // Filtro do fantasma (v8.6.1): contorno neon e preto e branco são exclusivos.
+    const mode = ghostMode(s, this.side);
     const distractOn = this.side === "base" ? !!s.baseMask : !!s.followMask;
     const cb = $("#pp-contour");
-    if (cb) { cb.classList.toggle("active", contourOn); cb.textContent = contourOn ? "✨ Contorno: ligado" : "✨ Contorno neon"; }
+    if (cb) { cb.disabled = false; cb.classList.toggle("active", mode === "neon"); cb.textContent = mode === "neon" ? "✨ Contorno: ligado" : "✨ Contorno neon"; }
+    const wb = $("#pp-bw");
+    if (wb) { wb.disabled = false; wb.classList.toggle("active", mode === "bw"); wb.textContent = mode === "bw" ? "◐ Preto e branco: ligado" : "◐ Preto e branco"; }
     const db = $("#pp-distract");
     if (db) db.classList.toggle("active", distractOn);
     showScreen("screen-postproc");
@@ -1282,17 +1384,22 @@ const PostProc = {
   layout() { fitStageEl($("#pp-stage"), this._aspect || 0.75); },
   // Abre uma ferramenta marcando que ao terminar deve voltar ao Pós-processamento.
   openTool(fn) { _toolReturn = "postproc"; fn(); },
-  async toggleContour() {
+  // Liga o filtro pedido; tocar de novo no que já está ligado volta para a foto.
+  async setFilter(mode) {
     const s = this.session, side = this.side;
-    const m = SKETCH_META[side];
-    const btn = $("#pp-contour");
-    if (!s[m.on]) {
-      if (btn) { btn.disabled = true; btn.textContent = "✨ Gerando contorno…"; }
-      try { await ensureSketch(s, side); }
-      catch (_) { if (btn) btn.disabled = false; alert("Não foi possível gerar o contorno desta foto."); return; }
-      s[m.on] = true;
-    } else { s[m.on] = false; }
-    await DB.put(s);
+    const cur = ghostMode(s, side);
+    const next = cur === mode ? "off" : mode;
+    const btn = $(mode === "bw" ? "#pp-bw" : "#pp-contour");
+    if (next !== "off" && btn) {
+      btn.disabled = true;
+      btn.textContent = mode === "bw" ? "◐ Gerando preto e branco…" : "✨ Gerando contorno…";
+    }
+    try { await setGhostMode(s, side, next); }
+    catch (_) {
+      if (btn) btn.disabled = false;
+      alert("Não foi possível gerar esta versão da foto.");
+      return;
+    }
     await this.open(s, side);   // re-renderiza o Pós-processamento com o novo estado
   },
   back() { if (this.session) openDetail(this.session.id); },
@@ -1335,6 +1442,17 @@ const PhotoTx = {
     ctx.drawImage(img, -W / 2, -H / 2, W, H);
     const out = c.toDataURL("image/jpeg", 0.92);
     const s = this.session;
+    // v8.6.1: gira/amplia a máscara de distrações com a MESMA transformação, para
+    // o desfoque continuar em cima do que o médico marcou (antes era descartado).
+    const mk = this.side === "base" ? "baseMask" : "followMask";
+    const newMask = typeof remapMask === "function"
+      ? await remapMask(s[mk], W, H, (mx, mi) => {
+          mx.translate(W / 2, H / 2);
+          mx.scale(this.z, this.z);
+          mx.rotate(this.rot * Math.PI / 180);
+          mx.drawImage(mi, -W / 2, -H / 2, W, H);
+        })
+      : null;
     if (this.side === "base") {
       s.baseImage = out; s.baseImageView = null; s.baseAdj = null; s.baseTarget = null;
     } else {
@@ -1342,7 +1460,8 @@ const PhotoTx = {
       s.followImageView = null; s.followAdj = null; s.followTarget = null;
     }
     if (typeof clearSketch === "function") clearSketch(s, this.side);
-    if (typeof clearDistract === "function") clearDistract(s, this.side);
+    if (newMask) { s[mk] = newMask; await rebakeDefocus(s, this.side); }
+    else if (typeof clearDistract === "function") clearDistract(s, this.side);
     await DB.put(s);
     finishTool(s);
   },
@@ -1356,7 +1475,8 @@ window.addEventListener("DOMContentLoaded", () => {
   if (pp("#pp-back")) pp("#pp-back").addEventListener("click", () => PostProc.back());
   if (pp("#pp-distract")) pp("#pp-distract").addEventListener("click", () =>
     PostProc.openTool(() => Distract.open(PostProc.session, PostProc.side)));
-  if (pp("#pp-contour")) pp("#pp-contour").addEventListener("click", () => PostProc.toggleContour());
+  if (pp("#pp-contour")) pp("#pp-contour").addEventListener("click", () => PostProc.setFilter("neon"));
+  if (pp("#pp-bw")) pp("#pp-bw").addEventListener("click", () => PostProc.setFilter("bw"));
   if (pp("#pp-crop")) pp("#pp-crop").addEventListener("click", () =>
     PostProc.openTool(() => Cropper.open(PostProc.session, PostProc.side)));
   if (pp("#pp-zoom")) pp("#pp-zoom").addEventListener("click", () =>
@@ -1370,6 +1490,8 @@ window.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("resize", () => {
     if ($("#screen-postproc") && $("#screen-postproc").classList.contains("active")) PostProc.layout();
     if ($("#screen-phototx") && $("#screen-phototx").classList.contains("active")) PhotoTx.layout();
+    // v8.6.1: o fantasma é posicionado em px sobre o frame — refaz ao virar a tela.
+    if ($("#screen-camera") && $("#screen-camera").classList.contains("active")) Cam.layoutGhost();
   });
 });
 
@@ -1408,14 +1530,12 @@ function duplicateComparison(s) {
   dlg.showModal();
 }
 
-// Clicar em "Comparar" TRAVA a comparação (as fotos não podem mais ser alteradas)
-// e abre o diálogo "Gerar comparação". Confirma o crédito reservado.
+// Clicar em "Comparar" abre o diálogo "Gerar comparação".
+// v8.6.1: NÃO trava mais a comparação aqui. Antes, só abrir o diálogo já
+// confirmava o crédito e dava a comparação por concluída — quem abrisse e
+// fechasse no X, sem gerar foto nem vídeo, perdia o crédito e ficava com as
+// fotos travadas. Agora quem conclui é o salvamento de verdade (Share.handle).
 async function lockAndGenerate(s) {
-  if (s.creditState === "reserved") {
-    s.creditState = "confirmed";
-    await DB.put(s);
-    await openDetail(s.id);          // re-renderiza já travado (sem cards de editar)
-  }
   Share.open(_detailSession || s);
 }
 
@@ -1729,7 +1849,7 @@ function wireEvents() {
   });
   $("#cam-shoot").addEventListener("click", () => Cam.shoot());
   $("#cam-torch").addEventListener("click", () => Cam.toggleTorch());
-  if ($("#cam-contour")) $("#cam-contour").addEventListener("click", () => Cam.toggleGhostContour());
+  if ($("#cam-contour")) $("#cam-contour").addEventListener("click", () => Cam.cycleGhostMode());
   $("#cam-start").querySelector("button").addEventListener("click", async () => {
     $("#cam-start").hidden = true;
     try { await $("#video").play(); } catch (_) {}

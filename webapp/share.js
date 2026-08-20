@@ -385,19 +385,35 @@ const Share = {
 
   handle(what) {
     $("#share-dialog").close();
+    const session = this.session;
+    // So conta como comparacao CONCLUIDA quando o arquivo foi mesmo salvo/
+    // compartilhado (shareFile devolve false se o usuario cancelar a folha de
+    // compartilhamento do sistema).
+    const done = (ok) => {
+      if (!ok) return;
+      showSavedPopup(what);
+      this.markDone(session);
+    };
     if (what === "separate") {
       // Salva as 2 fotos (base e acompanhamento) isoladamente.
       const files = [this.files.base, this.files.follow].filter(Boolean);
-      if (files.length) shareFiles(files).then((ok) => { if (ok) showSavedPopup("separate"); });
+      if (files.length) shareFiles(files).then(done);
     } else {
       const file = this.files[what];
-      if (file) shareFile(file).then((ok) => { if (ok) showSavedPopup(what); });
+      if (file) shareFile(file).then(done);
     }
-    // Gerar a comparacao ja confirmou o credito; aqui e so garantia.
-    if (this.session && this.session.creditState === "reserved") {
-      this.session.creditState = "confirmed";
-      DB.put(this.session);
-    }
+  },
+
+  // v8.6.1: conclui a comparacao — confirma o credito reservado e trava as
+  // fotos. Antes isto acontecia ao ABRIR este dialogo, entao abrir e fechar no
+  // X ja marcava como comparada sem nada ter sido gerado.
+  async markDone(session) {
+    const s = session || this.session;
+    if (!s || s.creditState !== "reserved") return;
+    s.creditState = "confirmed";
+    await DB.put(s);
+    // Re-renderiza a Montagem para mostrar o estado travado.
+    if (typeof openDetail === "function") await openDetail(s.id);
   },
 };
 

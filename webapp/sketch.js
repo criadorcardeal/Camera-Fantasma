@@ -158,3 +158,67 @@ window.makeNeonSketch = async function (src, opts) {
   ctx.putImageData(out, 0, 0);
   return c.toDataURL("image/png");
 };
+
+/* -------------------------------------------------------------------------
+   v8.6.1 - Filtro "Preto e branco" para a foto fantasma.
+
+   Alternativa ao contorno neon: em vez de reduzir a foto a linhas, mantém a
+   foto INTEIRA em tons de cinza com contraste realçado. Tirando a cor, o que
+   sobra é forma/relevo — o que ajuda a encaixar o membro sem a cor da pele e
+   da iluminação "puxando o olho". Diferente do contorno, o resultado é OPACO
+   (a transparência quem controla é o cursor "Fantasma" da câmera).
+
+     opts.mask    -> PNG das áreas "Remover distrações": recebem um véu claro,
+                     para não competirem com o que interessa.
+     opts.maxSide -> maior lado do canvas de trabalho (padrão 1280).
+     opts.contrast-> ganho de contraste em torno do cinza médio (padrão 1.25).
+   ------------------------------------------------------------------------- */
+window.makeBwGhost = async function (src, opts) {
+  opts = opts || {};
+  const maxSide = opts.maxSide || 1280;
+  const k = opts.contrast != null ? opts.contrast : 1.25;
+
+  const img = await loadImageEl(src);
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  const scale = Math.min(1, maxSide / Math.max(iw, ih));
+  const W = Math.max(1, Math.round(iw * scale));
+  const H = Math.max(1, Math.round(ih * scale));
+
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, W, H);
+
+  const im = ctx.getImageData(0, 0, W, H);
+  const d = im.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let v = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    v = (v - 127.5) * k + 127.5;                 // contraste (mesma conta do CSS)
+    v = v < 0 ? 0 : v > 255 ? 255 : v;
+    d[i] = d[i + 1] = d[i + 2] = v;
+    d[i + 3] = 255;
+  }
+  ctx.putImageData(im, 0, 0);
+
+  // Véu claro nas áreas de "Remover distrações" (o contorno neon simplesmente
+  // as descarta; aqui, como a foto continua inteira, elas são apagadas).
+  if (opts.mask) {
+    try {
+      const mimg = await loadImageEl(opts.mask);
+      const mc = document.createElement("canvas");
+      mc.width = W; mc.height = H;
+      const mx = mc.getContext("2d");
+      const feather = Math.max(1, Math.round(Math.max(W, H) / 90));
+      mx.filter = "blur(" + feather + "px)";
+      mx.drawImage(mimg, 0, 0, W, H);
+      mx.filter = "none";
+      mx.globalCompositeOperation = "source-in";
+      mx.fillStyle = "rgba(255,255,255,0.62)";
+      mx.fillRect(0, 0, W, H);
+      ctx.drawImage(mc, 0, 0, W, H);
+    } catch (_) { /* sem máscara: preto e branco normal */ }
+  }
+
+  return c.toDataURL("image/jpeg", 0.9);
+};
