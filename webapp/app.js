@@ -490,6 +490,10 @@ const Cam = {
   _zoomNative: false,// true quando a camera suporta zoom por hardware
   _zoomCaps: null,   // {min,max,step} do zoom nativo, quando houver
 
+  // v8.6.2: folga entre o fantasma e as bordas da tela (4% = 2% de cada lado no
+  // eixo apertado). Único ponto a mexer para deixar o fantasma maior ou menor.
+  GHOST_MARGIN: 0.04,
+
   filters() {
     return {
       brightness: parseFloat($("#f-brightness").value),
@@ -637,6 +641,9 @@ const Cam = {
     $("#cam-error").hidden = true;
 
     showScreen("screen-camera");
+    // v8.6.2: o fantasma já pode ser encaixado aqui — o tamanho dele depende só
+    // da tela, não mais do frame do vídeo (que ainda nem chegou).
+    this.layoutGhost();
     maybeShowBgTip();
     await this.start();
   },
@@ -664,8 +671,8 @@ const Cam = {
         const pr = video.play();
         if (pr && pr.catch) pr.catch(() => {});
       };
-      // O tamanho do frame só é conhecido nos metadados — é quando o fantasma
-      // pode ser encaixado sobre ele (v8.6.1).
+      // Reencaixa o fantasma quando o vídeo entra (a área visível pode ter
+      // mudado de tamanho enquanto a câmera abria).
       video.onloadedmetadata = () => { tryPlay(); this.layoutGhost(); };
       tryPlay();
       // So mostra o botao manual se, apos 1s, o video realmente nao tocou.
@@ -781,26 +788,27 @@ const Cam = {
     this.layoutGhost();
   },
 
-  /* v8.6.1: encaixa o FANTASMA exatamente sobre o retângulo que o frame da
-     câmera ocupa na tela — o mesmo recorte "cover" do vídeo, mais o zoom
-     digital, inclusive a parte que sobra fora da tela. Dentro desse retângulo a
-     foto base entra INTEIRA (contain).
+  /* v8.6.2: o FANTASMA cabe INTEIRO na tela, com uma folga de GHOST_MARGIN em
+     volta — a foto base aparece completa, sem bordas cortadas.
 
-     Antes, o fantasma era recortado por object-fit:cover usando a proporção
-     DELE. Quando a proporção da foto base não batia com a do vídeo ao vivo (foto
-     importada da galeria, ou a câmera negociando outra resolução), os dois
-     ficavam com recortes diferentes — e o fantasma aparecia com zoom em relação
-     à imagem ao vivo. */
+     Na v8.6.1 o fantasma era encaixado sobre o retângulo do frame da câmera
+     (recorte "cover"), que no Android quase sempre é MAIOR que a tela: quando a
+     foto base tinha a mesma proporção do vídeo — o caso comum — o fantasma saía
+     do mesmo jeito que o vídeo e as bordas ficavam fora da tela.
+
+     Agora o fantasma é apenas ajustado (contain) dentro da área visível reduzida
+     por GHOST_MARGIN, sem seguir o zoom: ele vira a referência FIXA de silhueta,
+     e é o enquadramento ao vivo (distância/zoom) que o médico ajusta até a foto
+     ao vivo casar com ela. A escala fina continua sendo corrigida depois, na
+     tela Posicionamentos. */
   layoutGhost() {
     const v = $("#video"), g = $("#ghost");
     if (!v || !g || g.style.display === "none") return;
     const host = v.parentElement;
     const box = host && host.getBoundingClientRect();
-    const vw = v.videoWidth, vh = v.videoHeight;
-    if (!vw || !vh || !box || !box.width || !box.height) return;
-    const z = this._zoomNative ? 1 : (this.zoom || 1);
-    const k = Math.max(box.width / vw, box.height / vh) * z;
-    const fw = vw * k, fh = vh * k;
+    if (!box || !box.width || !box.height) return;
+    const k = 1 - Cam.GHOST_MARGIN;
+    const fw = box.width * k, fh = box.height * k;
     g.style.width = fw + "px";
     g.style.height = fh + "px";
     g.style.left = ((box.width - fw) / 2) + "px";

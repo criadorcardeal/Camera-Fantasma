@@ -13,7 +13,11 @@
    o diálogo; (4) a câmera de acompanhamento retoma o zoom da foto base e o
    fantasma é encaixado sobre o frame do vídeo (fim do zoom aparente);
    (5) novo filtro "Preto e branco" para a foto fantasma, ao lado do contorno. */
-const CACHE = "fotos-fantasma-v861";
+/* v8.6.2: a foto fantasma aparece INTEIRA na câmera. No Android ela vinha
+   ampliada pelo recorte "cover" do frame e as bordas ficavam fora da tela;
+   agora ela é ajustada dentro da área visível com 4% de folga (Cam.GHOST_MARGIN
+   em app.js), sem seguir o zoom. */
+const CACHE = "fotos-fantasma-v862";
 const ASSETS = [
   "./",
   "./index.html",
