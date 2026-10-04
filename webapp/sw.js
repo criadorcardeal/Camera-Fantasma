@@ -19,7 +19,11 @@
    em app.js), sem seguir o zoom. */
 /* v8.7 = MARCO ESTÁVEL: consolida v8.6.1 + v8.6.2 sem mudança funcional
    (só promoção de versão: badge + cache do service worker). */
-const CACHE = "fotos-fantasma-v87";
+/* v8.7.1: a foto salva é EXATAMENTE o que aparece na tela da câmera — a
+   captura recorta o frame pelo retângulo visível (cover + zoom digital), via
+   Cam.visibleCrop em app.js. No Galaxy A17 a foto saía bem mais ampla que a
+   prévia. */
+const CACHE = "fotos-fantasma-v871";
 const ASSETS = [
   "./",
   "./index.html",

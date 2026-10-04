@@ -818,6 +818,28 @@ const Cam = {
     g.style.objectFit = "contain";
   },
 
+  /* v8.7.1: retângulo do frame do vídeo (em px do frame) que está VISÍVEL na
+     tela. O elemento <video> cobre a caixa W×H com object-fit:cover (escala
+     s = max(W/vw, H/vh), centrado) e, no zoom digital, ainda recebe
+     scale(dz) por CSS em torno do centro. Logo a parte visível mede
+     W/(s·dz) × H/(s·dz), centrada no frame. Sem caixa conhecida (W ou H = 0)
+     cai no comportamento antigo: frame inteiro recortado só pelo zoom. */
+  visibleCrop(vw, vh, W, H, dz) {
+    dz = dz > 1.001 ? dz : 1;
+    let w, h;
+    if (W > 0 && H > 0) {
+      const s = Math.max(W / vw, H / vh);
+      w = W / (s * dz);
+      h = H / (s * dz);
+    } else {
+      w = vw / dz;
+      h = vh / dz;
+    }
+    w = Math.min(vw, Math.round(w));
+    h = Math.min(vh, Math.round(h));
+    return { x: Math.round((vw - w) / 2), y: Math.round((vh - h) / 2), w, h };
+  },
+
   // Devolve o fantasma ao posicionamento do CSS (usado ao fechar a câmera).
   resetGhostLayout() {
     const g = $("#ghost");
@@ -862,20 +884,20 @@ const Cam = {
       return;
     }
     const canvas = $("#canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
     const f = this.filters();
-    // Zoom digital: recorta o centro do frame pelo fator de zoom (o nativo já
-    // vem ampliado do hardware, então desenha o frame inteiro).
+    // v8.7.1: a foto salva é EXATAMENTE o que aparece na tela. O vídeo é
+    // exibido em "cover" (recorte centrado pela proporção da tela) e, no zoom
+    // digital, ampliado por CSS; antes a captura gravava o frame INTEIRO do
+    // sensor (só recortando pelo zoom), e no Android a foto saía bem mais
+    // ampla que a prévia. Agora recorta o frame pelo retângulo visível.
     const dz = this._zoomNative ? 1 : (this.zoom || 1);
-    if (dz > 1.001) {
-      const sw = video.videoWidth / dz, sh = video.videoHeight / dz;
-      const sx = (video.videoWidth - sw) / 2, sy = (video.videoHeight - sh) / 2;
-      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-    } else {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    }
+    const W = video.clientWidth || (video.parentElement && video.parentElement.clientWidth) || 0;
+    const H = video.clientHeight || (video.parentElement && video.parentElement.clientHeight) || 0;
+    const c = Cam.visibleCrop(video.videoWidth, video.videoHeight, W, H, dz);
+    canvas.width = c.w;
+    canvas.height = c.h;
+    ctx.drawImage(video, c.x, c.y, c.w, c.h, 0, 0, canvas.width, canvas.height);
     // "Imprime" brilho/contraste/saturacao nos pixels (confiavel em todo iPhone).
     bakeCameraFilter(ctx, canvas.width, canvas.height, f);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
