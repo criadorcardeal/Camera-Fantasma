@@ -17,7 +17,9 @@
    ampliada pelo recorte "cover" do frame e as bordas ficavam fora da tela;
    agora ela é ajustada dentro da área visível com 4% de folga (Cam.GHOST_MARGIN
    em app.js), sem seguir o zoom. */
-const CACHE = "fotos-fantasma-v862";
+/* v8.7 = MARCO ESTÁVEL: consolida v8.6.1 + v8.6.2 sem mudança funcional
+   (só promoção de versão: badge + cache do service worker). */
+const CACHE = "fotos-fantasma-v87";
 const ASSETS = [
   "./",
   "./index.html",
