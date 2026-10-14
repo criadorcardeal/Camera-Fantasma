@@ -1,0 +1,57 @@
+name: Supabase keep-alive
+
+# Impede que o Supabase (plano gratuito) pause o projeto do ComparaCam por
+# inatividade: o plano Free pausa projetos sem NENHUMA requisição por 7 dias.
+# Este workflow faz uma consulta leve ao banco (via PostgREST) duas vezes por
+# semana (segunda e quinta), o que conta como atividade.
+#
+# A chave usada é a "anon key" PÚBLICA, lida do próprio webapp/account.js
+# (ela já é visível a qualquer um que abra o app), então não há segredo aqui.
+#
+# Atenção: o GitHub desativa workflows agendados de repositórios públicos que
+# ficam 60 dias sem commits. Se isso acontecer, basta reativar em
+# Actions > "Supabase keep-alive" > Enable workflow.
+
+on:
+  schedule:
+    - cron: "0 9 * * 1,4"   # 09:00 UTC (06:00 Brasília), segunda e quinta
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: webapp/account.js
+          sparse-checkout-cone-mode: false
+
+      - name: Consultar o banco do Supabase
+        run: |
+          set -euo pipefail
+          URL=$(grep -oP 'CC_SB_URL\s*=\s*"\K[^"]+' webapp/account.js)
+          KEY=$(grep -oP 'CC_SB_KEY\s*=\s*"\K[^"]+' webapp/account.js)
+          echo "Projeto: $URL"
+
+          # Consulta real ao banco (passa pelo PostgREST + Postgres).
+          code=$(curl -s -o /tmp/rest.json -w '%{http_code}' --max-time 30 \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+            "$URL/rest/v1/wallets?select=balance&limit=1")
+          echo "REST /wallets -> HTTP $code"
+
+          # Também acorda o serviço de autenticação (usado no login por e-mail).
+          auth=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+            -H "apikey: $KEY" "$URL/auth/v1/health")
+          echo "Auth /health -> HTTP $auth"
+
+          # 2xx = ok. 4xx ainda prova que o projeto respondeu (ex.: RLS), mas
+          # não é o esperado; 000 (sem conexão) ou 5xx = projeto pausado/fora.
+          case "$code" in
+            2*) echo "Supabase ativo." ;;
+            4*) echo "::warning::Projeto respondeu, mas com HTTP $code: $(cat /tmp/rest.json)" ;;
+            *)  echo "::error::Supabase não respondeu (HTTP $code). O projeto pode estar pausado: https://supabase.com/dashboard/project/djrzihtdlzaqtdmjvdvx"; exit 1 ;;
+          esac
