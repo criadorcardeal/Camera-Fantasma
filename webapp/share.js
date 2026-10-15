@@ -354,10 +354,23 @@ const Share = {
         this.files.compare = await dataUrlToFile(cmp, "comparacao.jpg");
       }
     } catch (e) {
-      status.textContent = "Não foi possível preparar as imagens.";
-      return;
+      // v8.7.2: mostra o motivo (para diagnóstico) e tenta uma RESERVA sem
+      // rótulo/marca d'água, direto das fotos salvas, para não travar o
+      // compartilhamento. Se nem isso der, mantém a falha com o detalhe.
+      const msg = (e && (e.message || e.name)) ? (e.message || e.name) : String(e);
+      try {
+        this.files = {};
+        this.files.base = await dataUrlToFile(baseSrc(session), "foto-base.jpg");
+        if (hasFollow) this.files.follow = await dataUrlToFile(followSrc(session), "acompanhamento.jpg");
+        status.textContent = "Rótulos/marca não puderam ser aplicados (" + msg +
+          "). As fotos serão salvas sem eles; a imagem lado a lado não está disponível.";
+      } catch (e2) {
+        const msg2 = (e2 && (e2.message || e2.name)) ? (e2.message || e2.name) : String(e2);
+        status.textContent = "Não foi possível preparar as imagens. Detalhe: " + msg + " / " + msg2;
+        return;
+      }
     }
-    status.textContent = "";
+    if (!status.textContent.startsWith("Rótulos")) status.textContent = "";
 
     // Cada video leva ~2s reais para gravar. Gera em segundo plano (em paralelo)
     // e so libera cada botao quando o arquivo ja estiver pronto — mantem o clique

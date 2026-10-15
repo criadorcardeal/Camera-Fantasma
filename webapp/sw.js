@@ -23,7 +23,10 @@
    captura recorta o frame pelo retângulo visível (cover + zoom digital), via
    Cam.visibleCrop em app.js. No Galaxy A17 a foto saía bem mais ampla que a
    prévia. */
-const CACHE = "fotos-fantasma-v871";
+/* v8.7.2: diagnóstico — "Confirmar" do Posicionamentos e "Comparar" da Montagem
+   mostram o motivo quando falham (antes o erro era engolido); o Comparar ainda
+   tenta salvar as fotos sem rótulo/marca como reserva. */
+const CACHE = "fotos-fantasma-v872";
 const ASSETS = [
   "./",
   "./index.html",

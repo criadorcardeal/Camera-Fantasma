@@ -941,7 +941,20 @@ const Aligner = {
     this.apply();
   },
 
+  // v8.7.2: qualquer falha ao confirmar (imagem que não carrega, canvas,
+  // gravação no IndexedDB…) era engolida e o botão parecia "não reagir".
+  // Agora mostra o motivo para o usuário poder reportar.
   async confirm() {
+    try {
+      await this._confirmInner();
+    } catch (e) {
+      const msg = (e && (e.message || e.name)) ? (e.message || e.name) : String(e);
+      alert("Não foi possível confirmar o posicionamento.\n\nDetalhe: " + msg +
+            "\n\nToque na seta ‹ para voltar e tente de novo.");
+    }
+  },
+
+  async _confirmInner() {
     const stage = $("#al-stage");
     const rect = stage.getBoundingClientRect();
     const Wc = rect.width, Hc = rect.height;
