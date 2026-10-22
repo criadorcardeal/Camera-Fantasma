@@ -539,6 +539,56 @@ grant execute on function public.admin_create_batch(int,int,text,text,int,text) 
 
 ---
 
+## Parte 16 — Grants explícitos para a Data API (mudança do Supabase em 30/10/2026)
+
+Desde **30 de outubro de 2026** o Supabase **não concede mais automaticamente** acesso da
+Data API (supabase-js / PostgREST / GraphQL) a tabelas **novas** criadas no schema `public`.
+Tabelas que já existiam mantêm os grants. Sem grant, a API responde `permission denied`.
+
+Isso vale também quando o schema é **recriado do zero** (novo projeto, troca de região,
+ambiente de teste, `supabase db reset`): o SQL das Partes 4 e 7 acima, rodado num projeto
+novo, geraria tabelas invisíveis para a API. Por isso, **rode este bloco uma vez** no projeto
+atual (inofensivo, idempotente) e **sempre** ao recriar o schema, logo depois da Parte 7:
+
+```sql
+-- Tabelas que o app lê direto pela Data API (o RLS continua filtrando as linhas:
+-- cada usuário só enxerga o próprio perfil / saldo / extrato).
+grant select on public.profiles, public.wallets, public.credit_transactions to authenticated;
+
+-- Acesso administrativo (dashboard / Edge Functions com a chave service_role).
+grant select, insert, update, delete on all tables in schema public to service_role;
+grant usage, select on all sequences in schema public to service_role;
+```
+
+Observações:
+- **`anon` não recebe grant**: o app exige login (OTP) antes de qualquer leitura.
+- **`vouchers`, `partners`, `voucher_batches` e `admins` não recebem grant para `authenticated`**:
+  o usuário comum só chega a elas pelas funções RPC `security definer` (`redeem_voucher`,
+  `admin_*`), que rodam como dono do banco e não dependem de grant nas tabelas.
+- O bucket `videos` fica no schema `storage` e não é afetado.
+
+**Regra daqui em diante:** toda tabela nova em `public` nasce com o seu `grant` no **mesmo**
+bloco de SQL que a cria. Modelo:
+
+```sql
+create table public.nova_tabela (...);
+alter table public.nova_tabela enable row level security;
+-- (policies de RLS conforme o caso)
+grant select on public.nova_tabela to authenticated;                        -- se o app lê direto
+grant select, insert, update, delete on public.nova_tabela to service_role; -- admin / Edge Functions
+```
+
+Para conferir os grants atuais, no SQL Editor:
+
+```sql
+select grantee, table_name, privilege_type
+from information_schema.role_table_grants
+where table_schema = 'public' and grantee in ('anon','authenticated','service_role')
+order by table_name, grantee;
+```
+
+---
+
 ## Pendências fora do código (responsabilidade do dono do produto)
 - **CNPJ/MEI** e **conta Mercado Pago empresarial** (para receber e emitir nota).
 - **Termos de Uso + Política de Privacidade** e conformidade **LGPD**.
